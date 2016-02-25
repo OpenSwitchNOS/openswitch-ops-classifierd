@@ -20,7 +20,7 @@
 #include "vtysh/vtysh_user.h"
 #include "vswitch-idl.h"
 #include "ovsdb-idl.h"
-#include "qos_trust_port_vty.h"
+#include "qos_cos_port_vty.h"
 #include "qos_utils.h"
 #include "qos_utils_vty.h"
 #include "smap.h"
@@ -30,7 +30,7 @@
 #include "vtysh/vtysh_ovsdb_if.h"
 #include "vtysh/vtysh_ovsdb_config.h"
 
-VLOG_DEFINE_THIS_MODULE(vtysh_qos_trust_port_cli);
+VLOG_DEFINE_THIS_MODULE(vtysh_qos_cos_port_cli);
 extern struct ovsdb_idl *idl;
 
 static struct ovsrec_port *port_row_for_name(const char * port_name) {
@@ -59,15 +59,10 @@ static bool is_member_of_lag(const char *port_name) {
     return false;
 }
 
-static int qos_trust_port_command(const char *port_name,
-        const char *qos_trust_name) {
+static int qos_cos_port_command(const char *port_name,
+        const char *cos_map_index) {
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
-    }
-
-    if (qos_trust_name == NULL) {
-        vty_out(vty, "qos trust name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_SUCCESS;
     }
 
@@ -80,7 +75,7 @@ static int qos_trust_port_command(const char *port_name,
     }
 
     if (is_member_of_lag(port_name)) {
-        vty_out(vty, "QoS Trust cannot be configured on a member of a LAG.%s",
+        vty_out(vty, "QoS COS cannot be configured on a member of a LAG.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_SUCCESS;
@@ -93,9 +88,19 @@ static int qos_trust_port_command(const char *port_name,
         return CMD_SUCCESS;
     }
 
+    const char *qos_trust_name = smap_get(&port_row->qos_config,
+            QOS_TRUST_KEY);
+    if (qos_trust_name == NULL || strcmp(qos_trust_name,
+            QOS_TRUST_NONE_STRING) != 0) {
+        vty_out(vty, "QoS COS override is only allowed if the port trust mode is 'none'.%s",
+                VTY_NEWLINE);
+        cli_do_config_abort(txn);
+        return CMD_SUCCESS;
+    }
+
     struct smap smap;
     smap_clone(&smap, &port_row->qos_config);
-    smap_replace(&smap, QOS_TRUST_KEY, qos_trust_name);
+    smap_replace(&smap, QOS_COS_OVERRIDE_KEY, cos_map_index);
     ovsrec_port_set_qos_config(port_row, &smap);
     smap_destroy(&smap);
 
@@ -109,21 +114,19 @@ static int qos_trust_port_command(const char *port_name,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_trust_port,
-        qos_trust_port_cmd,
-        "qos trust (none|cos|dscp)",
+DEFUN (qos_cos_port,
+        qos_cos_port_cmd,
+        "qos cos <0-7>",
         "Configure QoS\n"
-        "Set the QoS Trust Mode configuration for the port\n"
-        "Do not trust any priority fields, and remark all of them to 0\n"
-        "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
-        "Trust DSCP and remark the 802.1p priority to match\n") {
+        "Set the COS override for the port\n"
+        "The index into the COS Map\n") {
     const char *port_name = (char*) vty->index;
-    const char *qos_trust_name = argv[0];
+    const char *cos_map_index = argv[0];
 
-    return qos_trust_port_command(port_name, qos_trust_name);
+    return qos_cos_port_command(port_name, cos_map_index);
 }
 
-static int qos_trust_port_no_command(const char *port_name) {
+static int qos_cos_port_no_command(const char *port_name) {
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_SUCCESS;
@@ -138,7 +141,7 @@ static int qos_trust_port_no_command(const char *port_name) {
     }
 
     if (is_member_of_lag(port_name)) {
-        vty_out(vty, "QoS Trust cannot be configured on a member of a LAG.%s",
+        vty_out(vty, "QoS COS cannot be configured on a member of a LAG.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_SUCCESS;
@@ -153,7 +156,7 @@ static int qos_trust_port_no_command(const char *port_name) {
 
     struct smap smap;
     smap_clone(&smap, &port_row->qos_config);
-    smap_remove(&smap, QOS_TRUST_KEY);
+    smap_remove(&smap, QOS_COS_OVERRIDE_KEY);
     ovsrec_port_set_qos_config(port_row, &smap);
     smap_destroy(&smap);
 
@@ -167,21 +170,19 @@ static int qos_trust_port_no_command(const char *port_name) {
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_trust_port_no,
-        qos_trust_port_no_cmd,
-        "no qos trust {none|cos|dscp}",
+DEFUN (qos_cos_port_no,
+        qos_cos_port_no_cmd,
+        "no qos cos {<0-7>}",
         NO_STR
         "Configure QoS\n"
-        "Remove the QoS Trust Mode configuration for the port\n"
-        "Do not trust any priority fields, and remark all of them to 0\n"
-        "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
-        "Trust DSCP and remark the 802.1p priority to match\n") {
+        "Remove the QoS COS override for the port\n"
+        "The index into the COS Map\n") {
     const char *port_name = (char*) vty->index;
 
-    return qos_trust_port_no_command(port_name);
+    return qos_cos_port_no_command(port_name);
 }
 
-void qos_trust_port_show(const struct ovsrec_port *port_row) {
+void qos_cos_port_show(const struct ovsrec_port *port_row) {
     if (port_row == NULL) {
         return;
     }
@@ -190,27 +191,24 @@ void qos_trust_port_show(const struct ovsrec_port *port_row) {
         return;
     }
 
-    const struct ovsrec_system *system_row = ovsrec_system_first(idl);
-    const char *qos_trust_name = smap_get(
-            &system_row->qos_config, QOS_TRUST_KEY);
-
-    const char *map_value = smap_get(&port_row->qos_config, QOS_TRUST_KEY);
-    if (map_value != NULL) {
-        qos_trust_name = map_value;
+    const char *cos_map_index = smap_get(&port_row->qos_config,
+            QOS_COS_OVERRIDE_KEY);
+    if (cos_map_index == NULL) {
+        return;
     }
 
-    vty_out(vty, " qos trust %s%s", qos_trust_name, VTY_NEWLINE);
+    vty_out(vty, " qos cos override %s%s", cos_map_index, VTY_NEWLINE);
 }
 
-void qos_trust_port_vty_init(void) {
-    install_element(INTERFACE_NODE, &qos_trust_port_cmd);
-    install_element(INTERFACE_NODE, &qos_trust_port_no_cmd);
+void qos_cos_port_vty_init(void) {
+    install_element(INTERFACE_NODE, &qos_cos_port_cmd);
+    install_element(INTERFACE_NODE, &qos_cos_port_no_cmd);
 
-    install_element(LINK_AGGREGATION_NODE, &qos_trust_port_cmd);
-    install_element(LINK_AGGREGATION_NODE, &qos_trust_port_no_cmd);
+    install_element(LINK_AGGREGATION_NODE, &qos_cos_port_cmd);
+    install_element(LINK_AGGREGATION_NODE, &qos_cos_port_no_cmd);
 }
 
-void qos_trust_port_ovsdb_init(void) {
+void qos_cos_port_ovsdb_init(void) {
     ovsdb_idl_add_table(idl, &ovsrec_table_port);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_qos_config);
 }

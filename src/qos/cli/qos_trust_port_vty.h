@@ -19,17 +19,6 @@
 #define _QOS_TRUST_PORT_VTY_H_
 
 /**
- * Shows the running config for port qos trust.
- */
-void qos_trust_port_show_running_config(const struct ovsrec_port *port_row,
-        bool *header_printed, const char *header);
-
-/**
- * Shows the port config for qos trust.
- */
-void qos_trust_port_show(const struct ovsrec_port *port_row);
-
-/**
  * Initializes vty functions for port qos trust.
  */
 void qos_trust_port_vty_init(void);

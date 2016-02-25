@@ -20,9 +20,19 @@
 #include "vtysh/vtysh_user.h"
 #include "vswitch-idl.h"
 #include "ovsdb-idl.h"
+#include "qos_apply_global_vty.h"
+#include "qos_apply_port_vty.h"
+#include "qos_cos_map_vty.h"
+#include "qos_cos_port_vty.h"
+#include "qos_dscp_map_vty.h"
+#include "qos_dscp_port_vty.h"
+#include "qos_queue_profile_vty.h"
+#include "qos_schedule_profile_vty.h"
 #include "qos_trust_global_vty.h"
 #include "qos_trust_port_vty.h"
 #include "qos_utils.h"
+#include "qos_utils_vty.h"
+#include "qos_vty.h"
 #include "smap.h"
 #include "memory.h"
 #include "openvswitch/vlog.h"
@@ -34,6 +44,14 @@
  * Initialize cli.
  */
 void cli_pre_init(void) {
+    qos_apply_global_ovsdb_init();
+    qos_apply_port_ovsdb_init();
+    qos_cos_map_ovsdb_init();
+    qos_cos_port_ovsdb_init();
+    qos_dscp_map_ovsdb_init();
+    qos_dscp_port_ovsdb_init();
+    qos_queue_profile_ovsdb_init();
+    qos_schedule_profile_ovsdb_init();
     qos_trust_global_ovsdb_init();
     qos_trust_port_ovsdb_init();
 }
@@ -42,8 +60,19 @@ void cli_pre_init(void) {
  * Initialize cli.
  */
 void cli_post_init(void) {
+    qos_apply_global_vty_init();
+    qos_apply_port_vty_init();
+    qos_cos_map_vty_init();
+    qos_cos_port_vty_init();
+    qos_dscp_map_vty_init();
+    qos_dscp_port_vty_init();
+    qos_queue_profile_vty_init();
+    qos_schedule_profile_vty_init();
     qos_trust_global_vty_init();
     qos_trust_port_vty_init();
 
+    qos_apply_global_show_running_config();
+    qos_cos_map_show_running_config();
+    qos_dscp_map_show_running_config();
     qos_trust_global_show_running_config();
 }

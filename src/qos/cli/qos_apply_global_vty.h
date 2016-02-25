@@ -15,25 +15,30 @@
  *
  ***************************************************************************/
 
-#include <pwd.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#include <setjmp.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-
-#include "openswitch-idl.h"
-#include "openvswitch/vlog.h"
-#include "ovsdb-idl.h"
-#include "qos_utils.h"
-#include "smap.h"
-#include "vswitch-idl.h"
+#ifndef _QOS_APPLY_GLOBAL_VTY_H_
+#define _QOS_APPLY_GLOBAL_VTY_H_
 
 /**
- * This is an empty placeholder. If this function is removed, and then this
- * file is removed, then there is a build error, since there are no .c files
- * to compile in this directory.
+ * Returns true if the queue profile and the schedule profile contain the
+ * same queues.
  */
-void qos_utils_placeholder(void) {
-    return;
-}
+bool qos_profiles_contain_same_queues(
+        struct ovsrec_q_profile * queue_profile_row,
+        struct ovsrec_qos *schedule_profile_row);
+
+/**
+ * Shows the running config for global qos apply.
+ */
+void qos_apply_global_show_running_config(void);
+
+/**
+ * Initializes vty functions for global qos apply.
+ */
+void qos_apply_global_vty_init(void);
+
+/**
+ * Initializes ovsdb functions for global qos apply.
+ */
+void qos_apply_global_ovsdb_init(void);
+
+#endif /* _QOS_APPLY_GLOBAL_VTY_H_ */

@@ -44,11 +44,20 @@ include_directories (${CMAKE_INCL_DIR}
 		    )
 
 # CLI libraries source files
-set (SOURCES_CLI ${PROJECT_SOURCE_DIR}/qos_trust_global_vty.c
+set (SOURCES_CLI
+                 ${PROJECT_SOURCE_DIR}/qos_apply_global_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_apply_port_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_cos_map_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_cos_port_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_dscp_map_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_dscp_port_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_queue_profile_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_schedule_profile_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_trust_global_vty.c
                  ${PROJECT_SOURCE_DIR}/qos_trust_port_vty.c
+                 ${PROJECT_SOURCE_DIR}/qos_utils_vty.c
                  ${PROJECT_SOURCE_DIR}/qos_vty.c
     )
-
 
 add_library (${LIBQOSCLI} SHARED ${SOURCES_CLI})
 

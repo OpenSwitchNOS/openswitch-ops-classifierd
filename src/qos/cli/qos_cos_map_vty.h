@@ -15,25 +15,22 @@
  *
  ***************************************************************************/
 
-#include <pwd.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#include <setjmp.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-
-#include "openswitch-idl.h"
-#include "openvswitch/vlog.h"
-#include "ovsdb-idl.h"
-#include "qos_utils.h"
-#include "smap.h"
-#include "vswitch-idl.h"
+#ifndef _QOS_COS_MAP_VTY_H_
+#define _QOS_COS_MAP_VTY_H_
 
 /**
- * This is an empty placeholder. If this function is removed, and then this
- * file is removed, then there is a build error, since there are no .c files
- * to compile in this directory.
+ * Shows the running config for qos cos map.
  */
-void qos_utils_placeholder(void) {
-    return;
-}
+void qos_cos_map_show_running_config(void);
+
+/**
+ * Initializes vty functions for qos cos map.
+ */
+void qos_cos_map_vty_init(void);
+
+/**
+ * Initializes ovsdb functions for qos cos map.
+ */
+void qos_cos_map_ovsdb_init(void);
+
+#endif /* _QOS_COS_MAP_VTY_H_ */

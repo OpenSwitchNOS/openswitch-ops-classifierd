@@ -22,6 +22,7 @@
 #include "ovsdb-idl.h"
 #include "qos_trust_global_vty.h"
 #include "qos_utils.h"
+#include "qos_utils_vty.h"
 #include "smap.h"
 #include "memory.h"
 #include "openvswitch/vlog.h"
@@ -30,7 +31,6 @@
 #include "vtysh/vtysh_ovsdb_config.h"
 
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_trust_global_cli);
-
 extern struct ovsdb_idl *idl;
 
 static int qos_trust_global_command(const char *qos_trust_name) {

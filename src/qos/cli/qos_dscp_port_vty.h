@@ -15,25 +15,17 @@
  *
  ***************************************************************************/
 
-#include <pwd.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#include <setjmp.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-
-#include "openswitch-idl.h"
-#include "openvswitch/vlog.h"
-#include "ovsdb-idl.h"
-#include "qos_utils.h"
-#include "smap.h"
-#include "vswitch-idl.h"
+#ifndef _QOS_DSCP_PORT_VTY_H_
+#define _QOS_DSCP_PORT_VTY_H_
 
 /**
- * This is an empty placeholder. If this function is removed, and then this
- * file is removed, then there is a build error, since there are no .c files
- * to compile in this directory.
+ * Initializes vty functions for port qos dscp.
  */
-void qos_utils_placeholder(void) {
-    return;
-}
+void qos_dscp_port_vty_init(void);
+
+/**
+ * Initializes ovsdb functions for port qos dscp.
+ */
+void qos_dscp_port_ovsdb_init(void);
+
+#endif /* _QOS_DSCP_PORT_VTY_H_ */

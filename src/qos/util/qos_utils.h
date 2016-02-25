@@ -43,25 +43,10 @@
 #define QOS_DSCP_MAP_ENTRY_COUNT 64
 
 /**
- * Creates an instance of the default cos map. The instance should be
- * destroyed when it is no longer in use.
+ * This is an empty placeholder. If this function is removed, and then the .c
+ * file is removed, then there is a build error, since there are no .c files
+ * to compile in this directory.
  */
-struct ovsrec_qos_cos_map_entry *qos_create_default_cos_map(void);
-
-/**
- * Destroys an instance of the default cos map.
- */
-void qos_destroy_default_cos_map(struct ovsrec_qos_cos_map_entry *cos_map);
-
-/**
- * Creates an instance of the default dscp map. The instance should be
- * destroyed when it is no longer in use.
- */
-struct ovsrec_qos_dscp_map_entry *qos_create_default_dscp_map(void);
-
-/**
- * Destroys an instance of the default dscp map.
- */
-void qos_destroy_default_dscp_map(struct ovsrec_qos_dscp_map_entry *dscp_map);
+void qos_utils_placeholder(void);
 
 #endif /* _QOS_UTILS_H_ */

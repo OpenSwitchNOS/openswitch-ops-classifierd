@@ -15,25 +15,16 @@
  *
  ***************************************************************************/
 
-#include <pwd.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#include <setjmp.h>
-#include <sys/un.h>
-#include <sys/wait.h>
+#ifndef _QOS_UTILS_VTY_H_
+#define _QOS_UTILS_VTY_H_
 
-#include "openswitch-idl.h"
-#include "openvswitch/vlog.h"
-#include "ovsdb-idl.h"
-#include "qos_utils.h"
-#include "smap.h"
-#include "vswitch-idl.h"
+#define QOS_INVALID_STRING_ERROR_MESSAGE \
+"This field can have a length up to 64 characters.\n\
+The allowed characters are alphanumeric, underscore ('_'), and hyphen ('-').%s"
 
 /**
- * This is an empty placeholder. If this function is removed, and then this
- * file is removed, then there is a build error, since there are no .c files
- * to compile in this directory.
+ * Returns true if the string is a valid string.
  */
-void qos_utils_placeholder(void) {
-    return;
-}
+bool qos_is_valid_string(const char *string);
+
+#endif /* _QOS_UTILS_VTY_H_ */

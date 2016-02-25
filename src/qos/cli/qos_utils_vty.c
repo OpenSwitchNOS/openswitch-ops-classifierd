@@ -15,25 +15,46 @@
  *
  ***************************************************************************/
 
-#include <pwd.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#include <setjmp.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-
-#include "openswitch-idl.h"
-#include "openvswitch/vlog.h"
-#include "ovsdb-idl.h"
-#include "qos_utils.h"
-#include "smap.h"
+#include "vtysh/command.h"
+#include "vtysh/vtysh.h"
+#include "vtysh/vtysh_user.h"
 #include "vswitch-idl.h"
+#include "ovsdb-idl.h"
+#include "qos_utils_vty.h"
+#include "qos_utils.h"
+#include "qos_utils_vty.h"
+#include "smap.h"
+#include "memory.h"
+#include "openvswitch/vlog.h"
+#include "openswitch-idl.h"
+#include "vtysh/vtysh_ovsdb_if.h"
+#include "vtysh/vtysh_ovsdb_config.h"
 
-/**
- * This is an empty placeholder. If this function is removed, and then this
- * file is removed, then there is a build error, since there are no .c files
- * to compile in this directory.
- */
-void qos_utils_placeholder(void) {
-    return;
+VLOG_DEFINE_THIS_MODULE(vtysh_qos_utils_cli);
+extern struct ovsdb_idl *idl;
+
+static bool is_valid_char(char c) {
+    return isalnum(c) || c == '_' || c == '-';
+}
+
+bool qos_is_valid_string(const char *string) {
+    if (string == NULL) {
+        return false;
+    }
+
+    int length = strlen(string);
+    if (length > QOS_CLI_MAX_STRING_LENGTH) {
+        return false;
+    }
+
+    int i;
+    for (i = 0; i < length; i++) {
+        char c = string[i];
+
+        if (!is_valid_char(c)) {
+            return false;
+        }
+    }
+
+    return true;
 }
