@@ -28,6 +28,7 @@ pkg_check_modules(OVSCOMMON REQUIRED libovscommon)
 include_directories(
    ${PROJECT_BINARY_DIR}
    ${PROJECT_SOURCE_DIR}
+   ${INCL_DIR}/switchd
    ${OVSCOMMON_INCLUDE_DIRS}
 )
 
