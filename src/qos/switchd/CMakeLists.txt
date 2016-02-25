@@ -19,6 +19,8 @@ project (${QOS})
 
 MESSAGE("got to switchd")
 MESSAGE("PROJECT_BINARY_DIR = ${PROJECT_BINARY_DIR}")
+MESSAGE("PROJECT_SOURCE_DIR = ${PROJECT_SOURCE_DIR}")
+MESSAGE("INCL_DIR = ${INCL_DIR}")
 MESSAGE("CMAKE_SOURCE_DIR = ${CMAKE_SOURCE_DIR}")
 
 # Define compile flags
@@ -31,7 +33,7 @@ pkg_check_modules(OVSCOMMON REQUIRED libovscommon)
 include_directories(
    ${PROJECT_BINARY_DIR}
    ${PROJECT_SOURCE_DIR}
-   ${CMAKE_SOURCE_DIR}/src/qos/util
+   ${INCL_DIR}/util
    ${OVSCOMMON_INCLUDE_DIRS}
 )
 

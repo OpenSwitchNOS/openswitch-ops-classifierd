@@ -16,7 +16,8 @@ cmake_minimum_required (VERSION 2.8)
 
 project ("qos_cli")
 
-set (INCL_DIR ${CMAKE_SOURCE_DIR}/include)
+set (CMAKE_INCL_DIR ${CMAKE_SOURCE_DIR}/include)
+set (UTIL_INCL_DIR ${INCL_DIR}/util)
 set (LIBQOSCLI qos_cli)
 
 # This option is passed by build system.
@@ -34,7 +35,8 @@ pkg_check_modules(OVSCOMMON REQUIRED libovscommon)
 pkg_check_modules(OVSDB REQUIRED libovsdb)
 pkg_check_modules(OPSCLI REQUIRED ops-cli)
 
-include_directories (${INCL_DIR}
+include_directories (${CMAKE_INCL_DIR}
+                     ${UTIL_INCL_DIR}
                      ${PROJECT_SOURCE_DIR}
                      ${OVSCOMMON_INCLUDE_DIRS}
                      ${OPSCLI_INCLUDE_DIRS}

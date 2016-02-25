@@ -18,6 +18,7 @@
 #ifndef _QOS_TRUST_H_
 #define _QOS_TRUST_H_
 
+#include "qos_ofproto.h"
 #include "vswitch-idl.h"
 #include "ofproto/ofproto-provider.h"
 
