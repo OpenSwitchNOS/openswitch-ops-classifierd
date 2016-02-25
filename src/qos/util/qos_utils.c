@@ -15,25 +15,22 @@
  *
  ***************************************************************************/
 
-#include <pwd.h>
-#include <readline/history.h>
-#include <readline/readline.h>
-#include <setjmp.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-
 #include "openswitch-idl.h"
 #include "openvswitch/vlog.h"
 #include "ovsdb-idl.h"
+#include "qos_map.h"
+#include "qos_profile.h"
 #include "qos_utils.h"
 #include "smap.h"
 #include "vswitch-idl.h"
 
-/**
- * This is an empty placeholder. If this function is removed, and then this
- * file is removed, then there is a build error, since there are no .c files
- * to compile in this directory.
- */
-void qos_utils_placeholder(void) {
-    return;
+
+/* Configure QOS maps & profiles for a particular bridge. */
+void qos_configure(struct ofproto *ofproto)
+{
+    qos_configure_cos_map(ofproto);
+
+    qos_configure_dscp_map(ofproto);
+
+    qos_configure_profiles(ofproto, NULL, NULL);
 }

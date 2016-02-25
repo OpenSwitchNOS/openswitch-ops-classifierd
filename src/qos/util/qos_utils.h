@@ -18,6 +18,9 @@
 #ifndef _QOS_UTILS_H_
 #define _QOS_UTILS_H_
 
+#include "ofproto/ofproto-provider.h"
+
+
 #define QOS_FACTORY_DEFAULT_NAME "factory-default"
 #define QOS_DEFAULT_NAME "default"
 
@@ -42,11 +45,11 @@
 
 #define QOS_DSCP_MAP_ENTRY_COUNT 64
 
+
 /**
- * This is an empty placeholder. If this function is removed, and then the .c
- * file is removed, then there is a build error, since there are no .c files
- * to compile in this directory.
+ * Configure QOS maps & profiles for a bridge
+ * @param ofproto
  */
-void qos_utils_placeholder(void);
+void qos_configure(struct ofproto *ofproto);
 
 #endif /* _QOS_UTILS_H_ */
