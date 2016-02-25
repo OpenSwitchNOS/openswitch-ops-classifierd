@@ -42,6 +42,9 @@ target_link_libraries (${CLASSIFIERD}
                        ${OVSCOMMON_LIBRARIES} ${OVSDB_LIBRARIES}
                        -lpthread -lrt)
 
+# Build cli shared libraries.
+add_subdirectory(src/qos/cli)
+
 # Rules to install ops-classifierd binary in rootfs
 install(TARGETS ${CLASSIFIERD}
         RUNTIME DESTINATION bin)
