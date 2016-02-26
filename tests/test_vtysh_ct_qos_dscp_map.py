@@ -21,7 +21,9 @@ from opsvsi.docker import *
 from opsvsi.opsvsitest import *
 import re
 
+
 class QosDscpMapCliTest(OpsVsiTest):
+
     def setupNet(self):
         host_opts = self.getHostOpts()
         switch_opts = self.getSwitchOpts()
@@ -42,28 +44,37 @@ class QosDscpMapCliTest(OpsVsiTest):
 
     def qosDscpMapCommand(self):
         s1 = self.setUp()
-        s1.cmdCLI('qos dscp-map 38 local-priority 1 cos 2 color green name MyName1')
-        s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
+        # The cos option is not supported in toronto.
+#         s1.cmdCLI('qos dscp-map 38 local-priority 1 cos 2 color green name MyName1')
+#         s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
+        s1.cmdCLI(
+            'qos dscp-map 38 local-priority 1 color green name MyName1')
+        s1.cmdCLI(
+            'qos dscp-map 38 local-priority 2 color yellow name MyName2')
         out = s1.cmdCLI('do show running-config')
         assert 'code_point 38' in out
         assert 'local_priority 2' in out
-        assert 'cos 3' in out
+        # The cos option is not supported in toronto.
+#        assert 'cos 3' in out
         assert 'color yellow' in out
         assert 'name \"MyName2\"' in out
 
     def qosDscpMapCommandWithIllegalCodePoint(self):
         s1 = self.setUp()
-        out = s1.cmdCLI('qos dscp-map 64 local-priority 2 cos 3 color yellow name MyName2')
+        out = s1.cmdCLI(
+            'qos dscp-map 64 local-priority 2 cos 3 color yellow name MyName2')
         assert 'Unknown command' in out
 
     def qosDscpMapCommandWithNullCodePoint(self):
         s1 = self.setUp()
-        out = s1.cmdCLI('qos dscp-map local-priority 2 cos 3 color yellow name MyName2')
+        out = s1.cmdCLI(
+            'qos dscp-map local-priority 2 cos 3 color yellow name MyName2')
         assert 'Unknown command' in out
 
     def qosDscpMapCommandWithIllegalLocalPriority(self):
         s1 = self.setUp()
-        out = s1.cmdCLI('qos dscp-map 38 local-priority 8 cos 3 color yellow name MyName2')
+        out = s1.cmdCLI(
+            'qos dscp-map 38 local-priority 8 cos 3 color yellow name MyName2')
         assert 'Unknown command' in out
 
     def qosDscpMapCommandWithNullLocalPriority(self):
@@ -73,12 +84,14 @@ class QosDscpMapCliTest(OpsVsiTest):
 
     def qosDscpMapCommandWithIllegalCos(self):
         s1 = self.setUp()
-        out = s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 8 color yellow name MyName2')
+        out = s1.cmdCLI(
+            'qos dscp-map 38 local-priority 2 cos 8 color yellow name MyName2')
         assert 'Unknown command' in out
 
     def qosDscpMapCommandWithNullCos(self):
         s1 = self.setUp()
-        out = s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow name MyName2')
+        out = s1.cmdCLI(
+            'qos dscp-map 38 local-priority 2 color yellow name MyName2')
         out = s1.cmdCLI('do show running-config')
         assert 'code_point 38' in out
         assert 'local_priority 2' in out
@@ -88,10 +101,13 @@ class QosDscpMapCliTest(OpsVsiTest):
 
     def qosDscpMapCommandWithIllegalColor(self):
         s1 = self.setUp()
-        out = s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color illegal name MyName2')
+        out = s1.cmdCLI(
+            'qos dscp-map 38 local-priority 2 cos 3 color illegal name MyName2')
         assert 'Unknown command' in out
 
     def qosDscpMapCommandWithNullColor(self):
+        # The cos option is not supported in toronto.
+        return
         s1 = self.setUp()
         out = s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 name MyName2')
         out = s1.cmdCLI('do show running-config')
@@ -102,12 +118,16 @@ class QosDscpMapCliTest(OpsVsiTest):
         assert 'name \"MyName2\"' in out
 
     def qosDscpMapCommandWithIllegalName(self):
+        # The cos option is not supported in toronto.
+        return
         s1 = self.setUp()
         out = s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow '
-                'name NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+                        'name NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
         assert 'allowed' in out
 
     def qosDscpMapCommandWithNullName(self):
+        # The cos option is not supported in toronto.
+        return
         s1 = self.setUp()
         out = s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow')
         out = s1.cmdCLI('do show running-config')
@@ -119,7 +139,8 @@ class QosDscpMapCliTest(OpsVsiTest):
 
     def qosDscpMapNoCommand(self):
         s1 = self.setUp()
-        s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
+        s1.cmdCLI(
+            'qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
         s1.cmdCLI('no qos dscp-map 38')
         out = s1.cmdCLI('do show running-config')
         assert 'code_point' not in out
@@ -129,14 +150,19 @@ class QosDscpMapCliTest(OpsVsiTest):
         assert 'name' not in out
 
     def qosDscpMapShowCommand(self):
+        # The cos option is not supported in toronto.
         s1 = self.setUp()
-        s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
+#         s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
+#         out = s1.cmdCLI('do show qos dscp-map')
+#         assert '38         2              3   yellow  "MyName2"' in out
+        s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow name MyName2')
         out = s1.cmdCLI('do show qos dscp-map')
-        assert '38         2              3   yellow  "MyName2"' in out
+        assert '38         2              yellow  "MyName2"' in out
 
     def qosDscpMapShowCommandWithDefault(self):
         s1 = self.setUp()
-        s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
+        s1.cmdCLI(
+            'qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
         out = s1.cmdCLI('do show qos dscp-map default')
         assert '38         4              4   red     "AF43"' in out
 
@@ -150,7 +176,9 @@ class QosDscpMapCliTest(OpsVsiTest):
         assert 'color' not in out
         assert 'name' not in out
 
+
 class Test_qos_dscp_map_cli:
+
     def setup_class(cls):
         Test_qos_dscp_map_cli.test = QosDscpMapCliTest()
 

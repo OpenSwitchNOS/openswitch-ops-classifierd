@@ -30,6 +30,8 @@
 #include "vtysh/vtysh_ovsdb_if.h"
 #include "vtysh/vtysh_ovsdb_config.h"
 
+#define QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_dscp_map_cli);
 extern struct ovsdb_idl *idl;
 
@@ -199,6 +201,29 @@ static int qos_dscp_map_command(int64_t code_point, int64_t local_priority,
     return CMD_SUCCESS;
 }
 
+DEFUN (qos_dscp_map_cos_remark_disabled,
+        qos_dscp_map_cos_remark_disabled_cmd,
+        "qos dscp-map <0-63> local-priority <0-7> {color (green|yellow|red) | name STRING}",
+        "Configure QoS\n"
+        "Configure QoS DSCP Map\n"
+        "The QoS DSCP Map code point\n"
+        "Configure QoS DSCP Map local-priority\n"
+        "The QoS DSCP Map local-priority\n"
+        "Configure QoS DSCP Map color\n"
+        "Set color to green\n"
+        "Set color to yellow\n"
+        "Set color to red\n"
+        "Configure QoS DSCP Map name\n"
+        "The QoS DSCP Map name\n") {
+    int64_t code_point = atoi(argv[0]);
+    int64_t local_priority = atoi(argv[1]);
+    const char *color = argv[2];
+    const char *description = argv[3];
+
+    return qos_dscp_map_command(code_point,
+            local_priority, NULL, color, description);
+}
+
 DEFUN (qos_dscp_map,
         qos_dscp_map_cmd,
         "qos dscp-map <0-63> local-priority <0-7> {cos <0-7> | color (green|yellow|red) | name STRING}",
@@ -285,11 +310,15 @@ static void print_dscp_map_row(struct ovsrec_qos_dscp_map_entry *dscp_map_row) {
 
     vty_out (vty, "%-14d ", (int) dscp_map_row->local_priority);
 
+#ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+    /* Disabled for toronto. */
+#else
     buffer[0] = '\0';
     if (dscp_map_row->priority_code_point != NULL) {
         sprintf(buffer, "%d", (int) *dscp_map_row->priority_code_point);
     }
     vty_out (vty, "%-3s ", buffer);
+#endif
 
     vty_out (vty, "%-7s ", dscp_map_row->color);
 
@@ -303,8 +332,14 @@ static void print_dscp_map_row(struct ovsrec_qos_dscp_map_entry *dscp_map_row) {
 }
 
 static int qos_dscp_map_show_command(const char *default_parameter) {
+#ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+    /* cos is disabled for toronto. */
+    vty_out (vty, "code_point local_priority color   name%s", VTY_NEWLINE);
+    vty_out (vty, "---------- -------------- ------- ----%s", VTY_NEWLINE);
+#else
     vty_out (vty, "code_point local_priority cos color   name%s", VTY_NEWLINE);
     vty_out (vty, "---------- -------------- --- ------- ----%s", VTY_NEWLINE);
+#endif
 
     if (default_parameter != NULL) {
         /* Show default map. */
@@ -390,6 +425,9 @@ static vtysh_ret_val qos_dscp_map_show_running_config_callback(
                             (int) dscp_map_row->local_priority, VTY_NEWLINE);
                 }
 
+#ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+                /* cos is disabled for toronto. */
+#else
                 /* Show priority_code_point. */
                 char current_priority_code_point[QOS_CLI_STRING_BUFFER_SIZE];
                 if (dscp_map_row->priority_code_point == NULL) {
@@ -414,6 +452,7 @@ static vtysh_ret_val qos_dscp_map_show_running_config_callback(
                     vty_out(vty, "        cos %s%s",
                             current_priority_code_point, VTY_NEWLINE);
                 }
+#endif
 
                 /* Show color. */
                 if (strcmp(dscp_map_row->color, default_dscp_map_entry.color)
@@ -464,7 +503,12 @@ void qos_dscp_map_show_running_config(void) {
 }
 
 void qos_dscp_map_vty_init(void) {
+#ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+    /* For toronto, there is no cos parameter for the dscp map command. */
+    install_element(CONFIG_NODE, &qos_dscp_map_cos_remark_disabled_cmd);
+#else
     install_element(CONFIG_NODE, &qos_dscp_map_cmd);
+#endif
     install_element(CONFIG_NODE, &qos_dscp_map_no_cmd);
     install_element (ENABLE_NODE, &qos_dscp_map_show_cmd);
 }
