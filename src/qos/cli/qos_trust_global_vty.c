@@ -155,16 +155,16 @@ static vtysh_ret_val qos_trust_global_show_running_config_callback(
 }
 
 void qos_trust_global_show_running_config(void) {
-    vtysh_ret_val retval =
-            install_show_run_config_subcontext(e_vtysh_config_context,
-                                      e_vtysh_config_context_qos_trust,
-                                      &qos_trust_global_show_running_config_callback,
-                                      NULL, NULL);
+    vtysh_context_client client;
+    memset(&client, 0, sizeof(vtysh_context_client));
+    client.p_client_name = "qos_trust_global_show_running_config_callback";
+    client.client_id = e_vtysh_config_context_qos_trust;
+    client.p_callback = &qos_trust_global_show_running_config_callback;
 
-    if(e_vtysh_ok != retval) {
-        vtysh_ovsdb_config_logmsg(VTYSH_OVSDB_CONFIG_ERR,
-                            "config context unable to add client callback");
-        assert(0);
+    vtysh_ret_val retval = vtysh_context_addclient(
+            e_vtysh_config_context, e_vtysh_config_context_qos_trust, &client);
+    if(retval != e_vtysh_ok) {
+        vty_out(vty, "Unable to add client callback.%s", VTY_NEWLINE);
     }
 }
 
