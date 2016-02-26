@@ -30,6 +30,8 @@
 #include "vtysh/vtysh_ovsdb_if.h"
 #include "vtysh/vtysh_ovsdb_config.h"
 
+#define QOS_CAPABILITY_COS_OVERRIDE_DISABLED
+
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_cos_port_cli);
 extern struct ovsdb_idl *idl;
 
@@ -201,11 +203,15 @@ void qos_cos_port_show(const struct ovsrec_port *port_row) {
 }
 
 void qos_cos_port_vty_init(void) {
+#ifdef QOS_CAPABILITY_COS_OVERRIDE_DISABLED
+    /* For toronto, there is no cos override command. */
+#else
     install_element(INTERFACE_NODE, &qos_cos_port_cmd);
     install_element(INTERFACE_NODE, &qos_cos_port_no_cmd);
 
     install_element(LINK_AGGREGATION_NODE, &qos_cos_port_cmd);
     install_element(LINK_AGGREGATION_NODE, &qos_cos_port_no_cmd);
+#endif
 }
 
 void qos_cos_port_ovsdb_init(void) {

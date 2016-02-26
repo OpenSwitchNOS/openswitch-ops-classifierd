@@ -30,6 +30,8 @@
 #include "vtysh/vtysh_ovsdb_if.h"
 #include "vtysh/vtysh_ovsdb_config.h"
 
+#define QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_dscp_map_cli);
 extern struct ovsdb_idl *idl;
 
@@ -197,6 +199,29 @@ static int qos_dscp_map_command(int64_t code_point, int64_t local_priority,
     }
 
     return CMD_SUCCESS;
+}
+
+DEFUN (qos_dscp_map_cos_remark_disabled,
+        qos_dscp_map_cos_remark_disabled_cmd,
+        "qos dscp-map <0-63> local-priority <0-7> {color (green|yellow|red) | name STRING}",
+        "Configure QoS\n"
+        "Configure QoS DSCP Map\n"
+        "The QoS DSCP Map code point\n"
+        "Configure QoS DSCP Map local-priority\n"
+        "The QoS DSCP Map local-priority\n"
+        "Configure QoS DSCP Map color\n"
+        "Set color to green\n"
+        "Set color to yellow\n"
+        "Set color to red\n"
+        "Configure QoS DSCP Map name\n"
+        "The QoS DSCP Map name\n") {
+    int64_t code_point = atoi(argv[0]);
+    int64_t local_priority = atoi(argv[1]);
+    const char *color = argv[2];
+    const char *description = argv[3];
+
+    return qos_dscp_map_command(code_point,
+            local_priority, NULL, color, description);
 }
 
 DEFUN (qos_dscp_map,
@@ -464,7 +489,12 @@ void qos_dscp_map_show_running_config(void) {
 }
 
 void qos_dscp_map_vty_init(void) {
+#ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+    /* For toronto, there is no cos parameter for the dscp map command. */
+    install_element(CONFIG_NODE, &qos_dscp_map_cos_remark_disabled_cmd);
+#else
     install_element(CONFIG_NODE, &qos_dscp_map_cmd);
+#endif
     install_element(CONFIG_NODE, &qos_dscp_map_no_cmd);
     install_element (ENABLE_NODE, &qos_dscp_map_show_cmd);
 }
