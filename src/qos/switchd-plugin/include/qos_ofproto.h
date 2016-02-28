@@ -17,13 +17,8 @@
 #ifndef QOS_OFPROTO_H
 #define QOS_OFPROTO_H 1
 
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include "ofproto/ofproto.h"
 #include "smap.h"
+#include "ofproto/ofproto.h"
 
 #ifdef  __cplusplus
 extern "C" {

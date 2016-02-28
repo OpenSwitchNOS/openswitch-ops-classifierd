@@ -16,9 +16,13 @@ cmake_minimum_required (VERSION 2.8)
 
 project ("qos_cli")
 
+MESSAGE("got to qos/cli")
+MESSAGE("PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
+MESSAGE("QOS_INCL_DIR=${QOS_INCL_DIR}")
+MESSAGE("INCL_DIR=${INCL_DIR}")
 set (CMAKE_INCL_DIR ${CMAKE_SOURCE_DIR}/include)
-set (UTIL_INCL_DIR ${INCL_DIR}/util)
 set (LIBQOSCLI qos_cli)
+MESSAGE("CMAKE_INCL_DIR=${CMAKE_INCL_DIR}")
 
 # This option is passed by build system.
 OPTION( CPU_LITTLE_ENDIAN "Specifies CPU architecture is Little-Endian" OFF )
@@ -36,7 +40,7 @@ pkg_check_modules(OVSDB REQUIRED libovsdb)
 pkg_check_modules(OPSCLI REQUIRED ops-cli)
 
 include_directories (${CMAKE_INCL_DIR}
-                     ${UTIL_INCL_DIR}
+                     ${QOS_INCL_DIR}
                      ${PROJECT_SOURCE_DIR}
                      ${OVSCOMMON_INCLUDE_DIRS}
                      ${OPSCLI_INCLUDE_DIRS}

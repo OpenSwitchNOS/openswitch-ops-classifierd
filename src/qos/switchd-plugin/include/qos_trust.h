@@ -1,5 +1,5 @@
 /****************************************************************************
- * (c) Copyright 2015-2016 Hewlett Packard Enterprise Development LP
+ * (c) Copyright 2016 Hewlett Packard Enterprise Development LP
  *
  *    Licensed under the Apache License, Version 2.0 (the "License"); you may
  *    not use this file except in compliance with the License. You may obtain
@@ -15,22 +15,20 @@
  *
  ***************************************************************************/
 
-#include "openswitch-idl.h"
-#include "openvswitch/vlog.h"
-#include "ovsdb-idl.h"
-#include "qos_map.h"
-#include "qos_profile.h"
-#include "qos_utils.h"
-#include "smap.h"
+#ifndef _QOS_TRUST_H_
+#define _QOS_TRUST_H_
+
+#include "qos_ofproto.h"
 #include "vswitch-idl.h"
+#include "ofproto/ofproto-provider.h"
 
 
-/* Configure QOS maps & profiles for a particular bridge. */
-void qos_configure(struct ofproto *ofproto)
-{
-    qos_configure_cos_map(ofproto);
+void qos_ofproto_trust_init(void);
 
-    qos_configure_dscp_map(ofproto);
+void qos_configure_trust(struct ovsdb_idl *idl, unsigned int idl_seqno);
+void qos_trust_send_change(struct ofproto *ofproto,
+                           void *aux, /* struct port * */
+                           const struct ovsrec_port *port_cfg,
+                           unsigned int idl_seqno);
 
-    qos_configure_profiles(ofproto, NULL, NULL);
-}
+#endif /* _QOS_TRUST_H_ */

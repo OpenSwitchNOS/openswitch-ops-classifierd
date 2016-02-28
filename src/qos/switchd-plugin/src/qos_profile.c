@@ -15,15 +15,19 @@
  *
  ***************************************************************************/
 
-#include <stdlib.h>
-#include <string.h>
-#include <openvswitch/vlog.h>
+#include <config.h>
 #include "qos_profile.h"
 #include "qos_utils.h"
+#include <stdlib.h>
+#include <string.h>
 #include "smap.h"
+#include "openvswitch/vlog.h"
 
 
 VLOG_DEFINE_THIS_MODULE(qos_profile);
+
+static bool global_queue_profile_changed = false;
+static bool global_schedule_profile_changed = false;
 
 /* Queue and Schedule profiles. */
 
@@ -266,126 +270,286 @@ qos_apply_profile(struct ofproto *ofproto,
     return status;
 }
 
-/* Apply queue and schedule profiles globally or to a port. */
+/* Apply queue and schedule profiles globally. */
 void
-qos_configure_profiles(struct ofproto *ofproto,
-                       const struct ovsrec_port *port_cfg,
-                       const void *aux /* struct port *port */)
+qos_configure_global_profiles(struct ofproto *ofproto,
+                              struct ovsdb_idl *idl, unsigned int idl_seqno)
 {
     const struct ovsrec_system *ovs_row = NULL;
     const struct ovsrec_q_profile *ovsrec_q_profile;
     const struct ovsrec_qos *ovsrec_qos;
     const char *queue_profile_applied;
     const char *schedule_profile_applied;
-    bool row_modified;
     bool apply_profile_needed;
-    const struct smap *status_smap;
+    bool apply_queue_profile_needed = false;
+    bool apply_schedule_profile_needed = false;
 
 
-    /* Fetch system row, may be needed for either global or per-port update. */
+    /* Clear global changed flags. */
+    global_queue_profile_changed = global_schedule_profile_changed = false;
+
     ovs_row = ovsrec_system_first(idl);
 
-    if (aux != NULL) {
-        row_modified = (OVSREC_IDL_IS_ROW_MODIFIED(port_cfg, idl_seqno) ||
-                        OVSREC_IDL_IS_ROW_INSERTED(port_cfg, idl_seqno));
-    }
-    else {
-        row_modified = (OVSREC_IDL_IS_ROW_MODIFIED(ovs_row, idl_seqno) ||
-                        OVSREC_IDL_IS_ROW_INSERTED(ovs_row, idl_seqno));
-    }
+    /* Has System row changed? */
+    if (OVSREC_IDL_IS_ROW_MODIFIED(ovs_row, idl_seqno) ||
+        OVSREC_IDL_IS_ROW_INSERTED(ovs_row, idl_seqno)) {
 
-    if (row_modified) {
-        if (aux != NULL) {
-            status_smap = &port_cfg->qos_status;
-            if ((ovsrec_q_profile = port_cfg->q_profile) == NULL) {
-                ovsrec_q_profile = ovs_row->q_profile;
+        /* compare configured name with applied name.  If they
+         * don't match, try to apply them.
+         *
+         * NOTE: if no profile is configured, use "default" profile
+         *      if no default, give up -- don't change anything.
+         */
+        queue_profile_applied = smap_get(&ovs_row->qos_status, "queue_profile");
+        schedule_profile_applied = smap_get(&ovs_row->qos_status, "schedule_profile");
+
+        apply_profile_needed = false;
+        if (!queue_profile_applied) {
+            /* No queue profile is applied, we need to apply one. */
+            apply_profile_needed = true;
+            apply_queue_profile_needed = apply_profile_needed;
+            queue_profile_applied = "";
+        }
+
+        /* if no queue profile is configured, try to find "default" */
+        ovsrec_q_profile = ovs_row->q_profile;
+        if (ovsrec_q_profile == NULL) {
+            OVSREC_Q_PROFILE_FOR_EACH(ovsrec_q_profile, idl) {
+                if (!strcmp(QOS_DEFAULT_NAME, ovsrec_q_profile->name))
+                    break;
             }
-            if ((ovsrec_qos = port_cfg->qos) == NULL) {
-                ovsrec_qos = ovs_row->qos;
+        }
+
+        if (ovsrec_q_profile != NULL) {
+            /* If name changed, we must apply new profile. */
+            if (ovsrec_q_profile->name) {
+                /* strcmp returns true if names don't match. */
+                apply_profile_needed = strcmp(ovsrec_q_profile->name,
+                                              queue_profile_applied);
+                apply_queue_profile_needed = apply_profile_needed;
             }
         }
         else {
-            status_smap = &ovs_row->qos_status;
-
-            ovsrec_q_profile = ovs_row->q_profile;
-            ovsrec_qos = ovs_row->qos;
+            /* no queue profile defined -- do no harm -- get out. */
+            return;
         }
 
-        /* compare configured name with applied name.  If they
-         * don't match, try to apply them. */
-        queue_profile_applied = smap_get(status_smap, "queue_profile");
-        schedule_profile_applied = smap_get(status_smap, "schedule_profile");
+        if (!schedule_profile_applied) {
 
-        apply_profile_needed = false;
-        if (!queue_profile_applied || !schedule_profile_applied) {
-            if (!queue_profile_applied) {
+            /* No schedule profile is applied, we need to apply one. */
+            apply_profile_needed = true;
+            apply_schedule_profile_needed = apply_profile_needed;
+            schedule_profile_applied = "";
+        }
 
-                /* No queue profile is applied, we need to apply one. */
-                apply_profile_needed = true;
-
-                if (ovsrec_q_profile == NULL) {
-                    /* no queue profile defined, try to find "default" */
-                    OVSREC_Q_PROFILE_FOR_EACH(ovsrec_q_profile, idl) {
-                        if (!strcmp(QOS_DEFAULT_NAME, ovsrec_q_profile->name))
-                            break;
-                    }
-                }
+        /* if no queue profile is configured, try to find "default" */
+        ovsrec_qos = ovs_row->qos;
+        if (ovsrec_qos == NULL) {
+            OVSREC_QOS_FOR_EACH(ovsrec_qos, idl) {
+                if (!strcmp(QOS_DEFAULT_NAME, ovsrec_qos->name))
+                    break;
             }
-            else {
-                /* queue profile is applied -- q_profile must be specified.
-                   If name changed, we must apply new profile. */
-                if (ovsrec_q_profile->name && /* sanity check - must have name*/
-                    strcmp(ovsrec_q_profile->name, queue_profile_applied)) {
-                    apply_profile_needed = true;
-                }
-            }
-            if (!schedule_profile_applied) {
+        }
 
-                /* No schedule profile is applied, we need to apply one. */
-                apply_profile_needed = true;
-
-                if (ovsrec_qos == NULL) {
-                    /* no schedule profile defined, try to find "default" */
-                    OVSREC_QOS_FOR_EACH(ovsrec_qos, idl) {
-                        if (!strcmp(QOS_DEFAULT_NAME, ovsrec_qos->name))
-                            break;
-                    }
-                }
+        if (ovsrec_qos != NULL) {
+            /* If name changed, we must apply new profile. */
+            if (ovsrec_qos->name) {
+                /* strcmp returns true if names don't match. */
+                apply_profile_needed = strcmp(ovsrec_qos->name,
+                                              schedule_profile_applied);
+                apply_schedule_profile_needed = apply_profile_needed;
             }
-            else {
-                /* schedule profile is applied -- qos must be specified.
-                If name changed, we must apply new profile. */
-                if (ovsrec_qos->name && /* sanity check - must have name*/
-                    strcmp(ovsrec_qos->name, schedule_profile_applied)) {
-                    apply_profile_needed = true;
-                }
-            }
+        }
+        else {
+            /* no schedule profile defined -- do no harm -- get out. */
+            return;
         }
 
         if (apply_profile_needed) {
 
-            if (qos_apply_profile(ofproto, aux,
+            if (qos_apply_profile(ofproto,
+                                  NULL, /* global profile */
                                   ovsrec_qos,
                                   ovsrec_q_profile) == 0) {
                 /* profiles were applied, save profile names so we stop
                    trying to update them. */
                 struct smap smap;
 
-                smap_clone(&smap, status_smap);
+                smap_clone(&smap, &ovs_row->qos_status);
                 if (ovsrec_q_profile) {
-                    smap_replace(&smap, "queue_profile", ovsrec_q_profile->name);
+                    smap_replace(&smap, "queue_profile",
+                                 ovsrec_q_profile->name);
                 }
                 if (ovsrec_qos) {
-                    smap_replace(&smap, "schedule_profile", ovsrec_qos->name);
+                    smap_replace(&smap, "schedule_profile",
+                                 ovsrec_qos->name);
                 }
-                if (aux != NULL) {
-                    ovsrec_port_set_qos_status(port_cfg, &smap);
-                }
-                else {
-                    ovsrec_system_set_qos_status(ovs_row, &smap);
-                }
+                ovsrec_system_set_qos_status(ovs_row, &smap);
                 smap_destroy(&smap);
+
+                global_queue_profile_changed = apply_queue_profile_needed;
+                global_schedule_profile_changed = apply_schedule_profile_needed;
             }
         }
     }
+    return;
+}
+
+/* Apply queue and schedule profiles to a port. */
+void
+qos_configure_port_profiles(struct ofproto *ofproto,
+                            const struct ovsrec_port *port_cfg,
+                            const void *aux, /* struct port *port */
+                            struct ovsdb_idl *idl, unsigned int idl_seqno)
+{
+    const struct ovsrec_system *ovs_row = NULL;
+    const struct ovsrec_q_profile *ovsrec_q_profile;
+    const struct ovsrec_qos *ovsrec_qos;
+    const char *queue_profile_applied;
+    const char *schedule_profile_applied;
+    bool apply_profile_needed;
+
+
+    ovs_row = ovsrec_system_first(idl);
+
+    /* if no queue profile is configured, try to find something to use:
+     * 1. global queue profile from System row
+     * 2. "default" queue profile
+     * 3. "factory-default" queue profile (iow, profile has hw_default = TRUE)
+     */
+    ovsrec_q_profile = port_cfg->q_profile;
+    if (ovsrec_q_profile == NULL) {
+        ovsrec_q_profile = ovs_row->q_profile;
+        if (ovsrec_q_profile == NULL) {
+            OVSREC_Q_PROFILE_FOR_EACH(ovsrec_q_profile, idl) {
+                if (!strcmp(QOS_DEFAULT_NAME, ovsrec_q_profile->name))
+                    break;
+            }
+            if (ovsrec_q_profile == NULL) {
+                /* search for "factory-default" profile */
+                OVSREC_Q_PROFILE_FOR_EACH(ovsrec_q_profile, idl) {
+                    if (ovsrec_q_profile->hw_default &&
+                                    *ovsrec_q_profile->hw_default) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    if (ovsrec_q_profile == NULL) {
+        /* no queue profile defined -- do no harm -- get out. */
+        VLOG_INFO("%s: port %s no queue profile defined. NO CHANGE.",
+                  __FUNCTION__, port_cfg->name);
+        return;
+    }
+
+    /* if no schedule profile is configured, try to find something to use:
+     * 1. global schedule profile (already done at the start of this function)
+     * 2. "default" schedule profile
+     * 3. "factory-default" schedule profile (iow, profile has hw_default = TRUE)
+     */
+    ovsrec_qos = port_cfg->qos;
+    if (ovsrec_qos == NULL) {
+        ovsrec_qos = ovs_row->qos;
+    }
+    if (ovsrec_qos == NULL) {
+        /* search for "default" profile */
+        OVSREC_QOS_FOR_EACH(ovsrec_qos, idl) {
+            if (!strcmp(QOS_DEFAULT_NAME, ovsrec_qos->name))
+                break;
+        }
+        if (ovsrec_qos == NULL) {
+            /* search for "factory-default" profile */
+            OVSREC_QOS_FOR_EACH(ovsrec_qos, idl) {
+                if (ovsrec_qos->hw_default && *ovsrec_qos->hw_default) {
+                    break;
+                }
+            }
+        }
+    }
+    if (ovsrec_qos == NULL) {
+        /* no schedule profile defined -- do no harm -- get out. */
+        VLOG_INFO("%s: port %s no schedule profile defined. NO CHANGE.",
+                  __FUNCTION__, port_cfg->name);
+        return;
+    }
+
+    /* compare configured name with applied name.  If they
+     * don't match, try to apply them.
+     */
+    queue_profile_applied = smap_get(&port_cfg->qos_status,
+                                     "queue_profile");
+    schedule_profile_applied = smap_get(&port_cfg->qos_status,
+                                        "schedule_profile");
+
+    apply_profile_needed = false;
+
+    /* Investigate if applied queue profile has changed. */
+    if (!queue_profile_applied) {
+        /* No queue profile is applied, we need to apply one. */
+        apply_profile_needed = true;
+        queue_profile_applied = "";
+    }
+
+    /* If name changed, we must apply new profile. */
+    if (ovsrec_q_profile->name) {
+        /* strcmp returns true if names don't match. */
+        apply_profile_needed = strcmp(ovsrec_q_profile->name,
+                                      queue_profile_applied);
+    }
+
+    if (!schedule_profile_applied) {
+        /* No schedule profile is applied, we need to apply one. */
+        apply_profile_needed = true;
+        schedule_profile_applied = "";
+    }
+
+    /* If name changed, we must apply new profile. */
+    if (ovsrec_qos->name) {
+        /* strcmp returns true if names don't match. */
+        if (strcmp(ovsrec_qos->name, schedule_profile_applied)) {
+            apply_profile_needed = true;
+        }
+    }
+
+    /* a sanity check: queue & schedule profiles must have same # of queues. */
+    if (ovsrec_qos->n_queues != ovsrec_q_profile->n_q_profile_entries) {
+        VLOG_INFO("%s: port %s #-queues mismatched Q=%d S=%d", __FUNCTION__,
+                  port_cfg->name,
+                  (int)ovsrec_qos->n_queues,
+                  (int)ovsrec_q_profile->n_q_profile_entries);
+        return;
+    }
+
+    /* Finally ready to apply the profiles. */
+    if (apply_profile_needed) {
+
+        if (qos_apply_profile(ofproto, aux,
+                              ovsrec_qos,
+                              ovsrec_q_profile) == 0) {
+            /* profiles were applied, save profile names so we stop
+               trying to update them. */
+            struct smap smap;
+
+            smap_clone(&smap, &port_cfg->qos_status);
+            if (ovsrec_q_profile) {
+                smap_replace(&smap, "queue_profile", ovsrec_q_profile->name);
+            }
+            if (ovsrec_qos) {
+                smap_replace(&smap, "schedule_profile", ovsrec_qos->name);
+            }
+            if (port_cfg != NULL) {
+                ovsrec_port_set_qos_status(port_cfg, &smap);
+            }
+            else {
+                ovsrec_system_set_qos_status(ovs_row, &smap);
+            }
+            smap_destroy(&smap);
+        }
+    }
+}
+
+void
+qos_ofproto_profile_init(void)
+{
 }

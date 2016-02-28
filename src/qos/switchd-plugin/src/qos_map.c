@@ -15,10 +15,11 @@
  *
  ***************************************************************************/
 
+#include <config.h>
+#include "qos_map.h"
 #include <stdlib.h>
 #include <string.h>
-#include <openvswitch/vlog.h>
-#include "qos_map.h"
+#include "openvswitch/vlog.h"
 
 
 VLOG_DEFINE_THIS_MODULE(qos_map);
@@ -47,7 +48,7 @@ qos_get_color(const char *color_text)
 
 /* Configure QOS COS maps for a particular bridge. */
 void
-qos_configure_cos_map(struct ofproto *ofproto)
+qos_configure_cos_map(struct ofproto *ofproto, struct ovsdb_idl *idl, unsigned int idl_seqno)
 {
     int n_modified;
     const struct ovsrec_qos_cos_map_entry *ovsrec_cos_map_entry;
@@ -94,7 +95,7 @@ qos_configure_cos_map(struct ofproto *ofproto)
 
 /* Configure QOS DSCP maps for a particular bridge. */
 void
-qos_configure_dscp_map(struct ofproto *ofproto)
+qos_configure_dscp_map(struct ofproto *ofproto, struct ovsdb_idl *idl, unsigned int idl_seqno)
 {
     int n_modified;
     const struct ovsrec_qos_dscp_map_entry *ovsrec_dscp_map_entry;
@@ -138,4 +139,9 @@ qos_configure_dscp_map(struct ofproto *ofproto)
         ofproto_set_dscp_map(ofproto, NULL, &dscp_map_settings);
         free(dscp_map_settings.entries);
     }
+}
+
+void
+qos_ofproto_map_init(void)
+{
 }

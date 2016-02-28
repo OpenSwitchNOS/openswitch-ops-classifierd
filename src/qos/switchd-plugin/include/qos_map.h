@@ -15,24 +15,15 @@
  *
  ***************************************************************************/
 
-#ifndef _QOS_TRUST_H_
-#define _QOS_TRUST_H_
+#ifndef _QOS_MAP_H_
+#define _QOS_MAP_H_
 
 #include "qos_ofproto.h"
 #include "vswitch-idl.h"
 #include "ofproto/ofproto-provider.h"
 
+void qos_ofproto_map_init(void);
+void qos_configure_cos_map(struct ofproto *, struct ovsdb_idl *, unsigned int);
+void qos_configure_dscp_map(struct ofproto *, struct ovsdb_idl *, unsigned int);
 
-/* OVSDB IDL used to obtain configuration. */
-extern struct ovsdb_idl *idl;
-
-/* Most recently processed IDL sequence number. */
-extern unsigned int idl_seqno;
-
-
-bool qos_configure_trust(void);
-void qos_set_port_qos_cfg(struct ofproto *ofproto,
-                          void *aux, /* struct port * */
-                          struct ovsrec_port *port_cfg);
-
-#endif /* _QOS_TRUST_H_ */
+#endif /* _QOS_MAP_H_ */
