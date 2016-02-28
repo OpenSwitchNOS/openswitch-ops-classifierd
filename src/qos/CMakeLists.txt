@@ -17,10 +17,9 @@ cmake_minimum_required (VERSION 2.8)
 PROJECT(qos)
 
 MESSAGE("got to qos")
-set(INCL_DIR "${PROJECT_SOURCE_DIR}")
+set(QOS_INCL_DIR "${PROJECT_SOURCE_DIR}/include")
 MESSAGE("PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
-MESSAGE("INCL_DIR=${INCL_DIR}")
+MESSAGE("QOS_INCL_DIR=${QOS_INCL_DIR}")
 
 add_subdirectory(cli)
-add_subdirectory(switchd)
-add_subdirectory(util)
+add_subdirectory(switchd-plugin)
