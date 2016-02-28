@@ -15,30 +15,34 @@
  *
  ***************************************************************************/
 
-#include <openvswitch/vlog.h>
+#include <config.h>
 #include "qos_trust.h"
 #include "qos_utils.h"
+#include "openvswitch/vlog.h"
 
 
 VLOG_DEFINE_THIS_MODULE(qos_trust);
 
 /* Global QOS trust state. */
 static enum qos_trust global_qos_trust = QOS_TRUST_NONE;
+static bool global_trust_changed = false;
 
 
 /* Configure global QOS trust setting. */
-bool
-qos_configure_trust(void)
+void
+qos_configure_trust(struct ovsdb_idl *idl, unsigned int idl_seqno)
 {
     enum qos_trust qos_trust;
     const struct ovsrec_system *ovs_row = NULL;
-    bool changed = false;
 
+
+    /* Clear global trust changed indicator. */
+    global_trust_changed = false;
 
     // nothing to do if System row is unchanged.
     ovs_row = ovsrec_system_first(idl);
-    if (OVSREC_IDL_IS_ROW_MODIFIED(ovs_row, idl_seqno) ||
-        OVSREC_IDL_IS_ROW_INSERTED(ovs_row, idl_seqno))
+    if (OVSREC_IDL_IS_ROW_MODIFIED(ovs_row, idl_seqno) &&
+        OVSREC_IDL_IS_COLUMN_MODIFIED(ovsrec_system_col_qos_config, idl_seqno))
     {
         qos_trust = get_qos_trust_value(&ovs_row->qos_config);
 
@@ -46,23 +50,42 @@ qos_configure_trust(void)
         if (qos_trust != QOS_TRUST_MAX) {
             if (qos_trust != global_qos_trust)
             {
-                changed = true;
+                /* Indicate trust change to rest of the world. */
+                global_trust_changed = true;
                 global_qos_trust = qos_trust;
             }
         }
     }
 
-    return changed;
+    return;
 }
 
 void
-qos_set_port_qos_cfg(struct ofproto *ofproto,
-                     void *aux, /* struct port * */
-                     struct ovsrec_port *port_cfg) {
+qos_trust_send_change(struct ofproto *ofproto,
+                      void *aux,
+                      const struct ovsrec_port *port_cfg,
+                      unsigned int idl_seqno)
+{
+    bool send_trust_change = false;
 
-    ofproto_set_port_qos_cfg(ofproto,
-                             aux,
-                             global_qos_trust,
-                             &port_cfg->qos_config,
-                             &port_cfg->other_config);
+    if (global_trust_changed) {
+        if (smap_get(&port_cfg->qos_config, "qos_trust") == NULL) {
+            send_trust_change = true;
+        }
+    }
+    if (send_trust_change ||
+        OVSREC_IDL_IS_ROW_MODIFIED(port_cfg, idl_seqno)) {
+
+        VLOG_DBG("%s: port %s TRUST change", __FUNCTION__, port_cfg->name);
+        ofproto_set_port_qos_cfg(ofproto,
+                                 aux,
+                                 global_qos_trust,
+                                 &port_cfg->qos_config,
+                                 &port_cfg->other_config);
+    }
+}
+
+void
+qos_ofproto_trust_init(void)
+{
 }

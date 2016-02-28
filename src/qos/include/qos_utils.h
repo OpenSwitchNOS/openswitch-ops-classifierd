@@ -18,8 +18,6 @@
 #ifndef _QOS_UTILS_H_
 #define _QOS_UTILS_H_
 
-#include "ofproto/ofproto-provider.h"
-
 
 #define QOS_FACTORY_DEFAULT_NAME "factory-default"
 #define QOS_DEFAULT_NAME "default"
@@ -39,7 +37,6 @@
 #define QOS_LOCAL_PRIORITY_COUNT (QOS_MAX_LOCAL_PRIORITY + 1)
 
 #define QOS_CLI_EMPTY_DISPLAY_STRING "<empty>"
-
 #define QOS_CLI_MAX_STRING_LENGTH 64
 #define QOS_CLI_STRING_BUFFER_SIZE (QOS_CLI_MAX_STRING_LENGTH + 3)
 
@@ -54,11 +51,5 @@
 #define QOS_DEFAULT_PRIORITY_CODE_POINT_KEY "default_priority_code_point"
 #define QOS_DEFAULT_COLOR_KEY "default_color"
 #define QOS_DEFAULT_DESCRIPTION_KEY "default_description"
-
-/**
- * Configure QOS maps & profiles for a bridge
- * @param ofproto
- */
-void qos_configure(struct ofproto *ofproto);
 
 #endif /* _QOS_UTILS_H_ */

@@ -23,19 +23,17 @@
 #include "ofproto/ofproto-provider.h"
 
 
-/* OVSDB IDL used to obtain configuration. */
-extern struct ovsdb_idl *idl;
-
-/* Most recently processed IDL sequence number. */
-extern unsigned int idl_seqno;
-
+void qos_ofproto_profile_init(void);
 
 int qos_apply_profile(struct ofproto *ofproto,
                       const void *aux, /* struct port *port */
                       const struct ovsrec_qos *ovsrec_qos,
                       const struct ovsrec_q_profile *ovsrec_q_profile);
-void qos_configure_profiles(struct ofproto *ofproto,
-                            const struct ovsrec_port *port_cfg,
-                            const void *aux /* struct port *port */);
+void qos_configure_global_profiles(struct ofproto *ofproto,
+                                   struct ovsdb_idl *idl, unsigned int idl_seqno);
+void qos_configure_port_profiles(struct ofproto *ofproto,
+                                 const struct ovsrec_port *port_cfg,
+                                 const void *aux, /* struct port *port */
+                                 struct ovsdb_idl *idl, unsigned int idl_seqno);
 
 #endif /* _QOS_PROFILE_H_ */
