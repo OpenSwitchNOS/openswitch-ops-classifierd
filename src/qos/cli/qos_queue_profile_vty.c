@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"
@@ -189,24 +191,24 @@ static bool qos_queue_profile_command(struct ovsdb_idl_txn *txn,
 static int qos_queue_profile_command_commit(const char *profile_name) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(profile_name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
         vty_out(vty, "profile_name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -242,9 +244,26 @@ DEFUN (qos_queue_profile,
        "Configure QoS\n"
        "Set the QoS Queue Profile configuration\n"
        "The name of the Queue Profile\n") {
-    const char *profile_name = argv[0];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: qos queue-profile");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_queue_profile_command_commit(profile_name);
+    const char *profile_name = argv[0];
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_queue_profile_command_commit(profile_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static bool qos_queue_profile_no_command(struct ovsdb_idl_txn *txn,
@@ -272,24 +291,24 @@ static bool qos_queue_profile_no_command(struct ovsdb_idl_txn *txn,
 static int qos_queue_profile_no_command_commit(const char *profile_name) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(profile_name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
         vty_out(vty, "profile_name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -323,9 +342,26 @@ DEFUN (qos_queue_profile_no,
         "Configure QoS\n"
         "Deletes a Queue Profile, if it is not currently applied\n"
         "The name of the Queue Profile to delete\n") {
-    const char *profile_name = argv[0];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no qos queue-profile");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_queue_profile_no_command_commit(profile_name);
+    const char *profile_name = argv[0];
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_queue_profile_no_command_commit(profile_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static bool qos_queue_profile_name_command(struct ovsdb_idl_txn *txn,
@@ -359,23 +395,23 @@ static int qos_queue_profile_name_command_commit(const char *profile_name,
         int64_t queue_num, const char *queue_name) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (queue_name == NULL) {
         vty_out(vty, "queue_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(queue_name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -410,12 +446,46 @@ DEFUN (qos_queue_profile_name,
        "Sets the name of a queue\n"
        "The number of the queue\n"
        "The name of the queue\n") {
-    const char *profile_name = (char*) vty->index;
-    int64_t queue_num = atoi(argv[0]);
-    const char *queue_name = argv[1];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: name queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_queue_profile_name_command_commit(profile_name, queue_num,
+    const char *profile_name = (char*) vty->index;
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *queue_num = argv[0];
+    if (queue_num != NULL) {
+        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t queue_num_int = atoi(queue_num);
+
+    const char *queue_name = argv[1];
+    if (queue_name != NULL) {
+        char *cfg = audit_encode_nv_string("queue_name", queue_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_queue_profile_name_command_commit(profile_name, queue_num_int,
             queue_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static bool has_content(struct ovsrec_q_profile_entry *queue_row) {
@@ -487,13 +557,13 @@ static int qos_queue_profile_name_no_command_commit(const char *profile_name,
         int64_t queue_num) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -529,10 +599,36 @@ DEFUN (qos_queue_profile_name_no,
         "Deletes the name of a queue\n"
         "The number of the queue\n"
         "The name of the queue\n") {
-     const char *profile_name = (char*) vty->index;
-     int64_t queue_num = atoi(argv[0]);
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no name queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-     return qos_queue_profile_name_no_command_commit(profile_name, queue_num);
+    const char *profile_name = (char*) vty->index;
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *queue_num = argv[0];
+    if (queue_num != NULL) {
+        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t queue_num_int = atoi(queue_num);
+
+    int result = qos_queue_profile_name_no_command_commit(profile_name, queue_num_int);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static void add_local_priority(struct ovsrec_q_profile_entry *queue_row,
@@ -586,13 +682,13 @@ static int qos_queue_profile_map_command_commit(const char *profile_name,
         int64_t queue_num, int64_t local_priority) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -628,12 +724,47 @@ DEFUN (qos_queue_profile_map,
        "The number of the queue\n"
        "The local-priority to configure\n"
        "The local-priority to configure\n") {
-    const char *profile_name = (char*) vty->index;
-    int64_t queue_num = atoi(argv[0]);
-    int64_t local_priority = atoi(argv[1]);
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: map queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_queue_profile_map_command_commit(profile_name, queue_num,
-            local_priority);
+    const char *profile_name = (char*) vty->index;
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *queue_num = argv[0];
+    if (queue_num != NULL) {
+        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t queue_num_int = atoi(queue_num);
+
+    const char *local_priority = argv[1];
+    if (local_priority != NULL) {
+        char *cfg = audit_encode_nv_string("local_priority", local_priority, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t local_priority_int = atoi(local_priority);
+
+    int result = qos_queue_profile_map_command_commit(profile_name, queue_num_int,
+            local_priority_int);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static void remove_local_priority(
@@ -703,13 +834,13 @@ static int qos_queue_profile_map_no_command_commit(const char *profile_name,
         int64_t queue_num, int64_t *local_priority) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -746,8 +877,30 @@ DEFUN (qos_queue_profile_map_no,
        "The number of the queue\n"
        "The local-priority to delete\n"
        "The local-priority to delete\n") {
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no map queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
+
     const char *profile_name = (char*) vty->index;
-    int64_t queue_num = atoi(argv[0]);
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *queue_num = argv[0];
+    if (queue_num != NULL) {
+        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t queue_num_int = atoi(queue_num);
 
     const char *local_priority_string = argv[1];
     int64_t *local_priority = NULL;
@@ -756,9 +909,20 @@ DEFUN (qos_queue_profile_map_no,
         local_priority = &local_priority_value;
         local_priority_value = atoi(local_priority_string);
     }
+    if (local_priority_string != NULL) {
+        char *cfg = audit_encode_nv_string("local_priority_string", local_priority_string, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
 
-    return qos_queue_profile_map_no_command_commit(profile_name, queue_num,
+    int result = qos_queue_profile_map_no_command_commit(profile_name, queue_num_int,
             local_priority);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static void sprintf_local_priorities(char *buffer,
@@ -798,12 +962,12 @@ static void print_queue_profile_entry_row(int64_t queue_num,
 static int qos_queue_profile_show_command(const char *name) {
     if (name == NULL) {
         vty_out(vty, "name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = NULL;
@@ -825,7 +989,7 @@ static int qos_queue_profile_show_command(const char *name) {
     if (profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 name, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     vty_out (vty, "queue_num local_priorities name%s", VTY_NEWLINE);

@@ -40,7 +40,7 @@ add_executable (${CLASSIFIERD} ${SOURCES})
 
 target_link_libraries (${CLASSIFIERD}
                        ${OVSCOMMON_LIBRARIES} ${OVSDB_LIBRARIES}
-                       -lpthread -lrt)
+                       -lpthread -lrt audit)
 
 # Rules to install ops-classifierd binary in rootfs
 install(TARGETS ${CLASSIFIERD}

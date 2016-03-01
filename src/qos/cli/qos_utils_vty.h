@@ -27,4 +27,14 @@ The allowed characters are alphanumeric, underscore ('_'), and hyphen ('-').%s"
  */
 bool qos_is_valid_string(const char *string);
 
+/**
+ * Returns the port row for the given port name.
+ */
+struct ovsrec_port *port_row_for_name(const char *port_name);
+
+/**
+ * Returns true if the given port_name is a member of a lag.
+ */
+bool is_member_of_lag(const char *port_name);
+
 #endif /* _QOS_UTILS_VTY_H_ */

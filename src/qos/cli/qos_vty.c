@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"

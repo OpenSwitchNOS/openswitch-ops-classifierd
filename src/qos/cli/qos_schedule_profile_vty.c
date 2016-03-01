@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"
@@ -203,24 +205,24 @@ static bool qos_schedule_profile_command(struct ovsdb_idl_txn *txn,
 static int qos_schedule_profile_command_commit(const char *profile_name) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(profile_name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
         vty_out(vty, "profile_name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -256,9 +258,26 @@ DEFUN (qos_schedule_profile,
        "Configure QoS\n"
        "Set the QoS Schedule Profile configuration\n"
        "The name of the Schedule Profile\n") {
-    const char *profile_name = argv[0];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: qos schedule-profile");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_schedule_profile_command_commit(profile_name);
+    const char *profile_name = argv[0];
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_schedule_profile_command_commit(profile_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static bool qos_schedule_profile_no_command(struct ovsdb_idl_txn *txn,
@@ -285,24 +304,24 @@ static bool qos_schedule_profile_no_command(struct ovsdb_idl_txn *txn,
 static int qos_schedule_profile_no_command_commit(const char *profile_name) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(profile_name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
         vty_out(vty, "profile_name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -336,9 +355,26 @@ DEFUN (qos_schedule_profile_no,
         "Configure QoS\n"
         "Deletes a Schedule Profile, if it is not currently applied\n"
         "The name of the Schedule Profile to delete\n") {
-    const char *profile_name = argv[0];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no qos schedule-profile");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_schedule_profile_no_command_commit(profile_name);
+    const char *profile_name = argv[0];
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_schedule_profile_no_command_commit(profile_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static bool qos_schedule_profile_strict_command(struct ovsdb_idl_txn *txn,
@@ -373,13 +409,13 @@ static int qos_schedule_profile_strict_command_commit(const char *profile_name,
         int64_t queue_num) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -413,10 +449,36 @@ DEFUN (qos_schedule_profile_strict,
        "Configure a queue in a Schedule Profile to use strict scheduling\n"
        "The number of the queue\n"
        "The number of the queue\n") {
-    const char *profile_name = (char*) vty->index;
-    int64_t queue_num = atoi(argv[0]);
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: strict queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_schedule_profile_strict_command_commit(profile_name, queue_num);
+    const char *profile_name = (char*) vty->index;
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *queue_num = argv[0];
+    if (queue_num != NULL) {
+        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t queue_num_int = atoi(queue_num);
+
+    int result = qos_schedule_profile_strict_command_commit(profile_name, queue_num_int);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static bool has_content(struct ovsrec_queue *queue_row) {
@@ -492,13 +554,13 @@ static int qos_schedule_profile_strict_no_command_commit(const char *profile_nam
         int64_t queue_num) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -533,10 +595,36 @@ DEFUN (qos_schedule_profile_strict_no,
         "Clears the algorithm for a queue, if the algorithm is 'strict'\n"
         "The number of the queue\n"
         "The number of the queue\n") {
-     const char *profile_name = (char*) vty->index;
-     int64_t queue_num = atoi(argv[0]);
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no strict queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-     return qos_schedule_profile_strict_no_command_commit(profile_name, queue_num);
+     const char *profile_name = (char*) vty->index;
+     if (profile_name != NULL) {
+         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+         if (cfg != NULL) {
+             strncat(aubuf, cfg, 130);
+             free(cfg);
+         }
+     }
+
+     const char *queue_num = argv[0];
+     if (queue_num != NULL) {
+         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+         if (cfg != NULL) {
+             strncat(aubuf, cfg, 130);
+             free(cfg);
+         }
+     }
+     int64_t queue_num_int = atoi(queue_num);
+
+     int result = qos_schedule_profile_strict_no_command_commit(profile_name, queue_num_int);
+
+     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+     return result;
 }
 
 static bool qos_schedule_profile_wrr_command(struct ovsdb_idl_txn *txn,
@@ -571,13 +659,13 @@ static int qos_schedule_profile_wrr_command_commit(const char *profile_name,
         int64_t queue_num, int64_t weight) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -607,18 +695,53 @@ static int qos_schedule_profile_wrr_command_commit(const char *profile_name,
 
 DEFUN (qos_schedule_profile_wrr,
         qos_schedule_profile_wrr_cmd,
-       "wrr queue <0-7> weight <0-1023>",
+       "wrr queue <0-7> weight <1-127>",
        "Configure a queue in a Schedule Profile to use wrr scheduling\n"
        "The number of the queue\n"
        "The number of the queue\n"
        "The weight to configure\n"
        "The weight to configure\n") {
-    const char *profile_name = (char*) vty->index;
-    int64_t queue_num = atoi(argv[0]);
-    int64_t weight = atoi(argv[1]);
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: wrr queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_schedule_profile_wrr_command_commit(profile_name, queue_num,
-            weight);
+    const char *profile_name = (char*) vty->index;
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *queue_num = argv[0];
+    if (queue_num != NULL) {
+        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t queue_num_int = atoi(queue_num);
+
+    const char *weight = argv[1];
+    if (weight != NULL) {
+        char *cfg = audit_encode_nv_string("weight", weight, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t weight_int = atoi(weight);
+
+    int result = qos_schedule_profile_wrr_command_commit(profile_name, queue_num_int,
+            weight_int);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static bool qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
@@ -661,13 +784,13 @@ static int qos_schedule_profile_wrr_no_command_commit(const char *profile_name,
         int64_t queue_num) {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -697,18 +820,44 @@ static int qos_schedule_profile_wrr_no_command_commit(const char *profile_name,
 
 DEFUN (qos_schedule_profile_wrr_no,
         qos_schedule_profile_wrr_no_cmd,
-       "no wrr queue <0-7> {weight <0-1023>}",
+       "no wrr queue <0-7> {weight <1-127>}",
        NO_STR
        "Clears the algorithm for a queue, if the algorithm is 'wrr'\n"
        "The number of the queue\n"
        "The number of the queue\n"
        "The weight to configure\n"
        "The weight to configure\n") {
-    const char *profile_name = (char*) vty->index;
-    int64_t queue_num = atoi(argv[0]);
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no wrr queue");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_schedule_profile_wrr_no_command_commit(profile_name,
-            queue_num);
+    const char *profile_name = (char*) vty->index;
+    if (profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *queue_num = argv[0];
+    if (queue_num != NULL) {
+        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t queue_num_int = atoi(queue_num);
+
+    int result = qos_schedule_profile_wrr_no_command_commit(profile_name,
+            queue_num_int);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static void print_schedule_profile_entry_row(int64_t queue_num,
@@ -731,18 +880,18 @@ static void print_schedule_profile_entry_row(int64_t queue_num,
 static int qos_schedule_profile_show_command(const char *name) {
     if (name == NULL) {
         vty_out(vty, "name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (strcmp(name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
         vty_out(vty, "profile_name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = NULL;
@@ -764,7 +913,7 @@ static int qos_schedule_profile_show_command(const char *name) {
     if (profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 name, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     vty_out (vty, "queue_num algorithm weight%s", VTY_NEWLINE);

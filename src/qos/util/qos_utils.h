@@ -45,6 +45,11 @@
 
 #define QOS_DSCP_MAP_ENTRY_COUNT 64
 
+#define QOS_DEFAULT_CODE_POINT_KEY "default_code_point"
+#define QOS_DEFAULT_LOCAL_PRIORITY_KEY "default_local_priority"
+#define QOS_DEFAULT_PRIORITY_CODE_POINT_KEY "default_priority_code_point"
+#define QOS_DEFAULT_COLOR_KEY "default_color"
+#define QOS_DEFAULT_DESCRIPTION_KEY "default_description"
 
 /**
  * Configure QOS maps & profiles for a bridge

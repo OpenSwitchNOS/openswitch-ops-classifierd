@@ -61,6 +61,8 @@ set (SOURCES_CLI
 
 add_library (${LIBQOSCLI} SHARED ${SOURCES_CLI})
 
+target_link_libraries(${LIBQOSCLI} audit)
+
 # Installation
 install(TARGETS ${LIBQOSCLI}
         LIBRARY DESTINATION lib/cli/plugins

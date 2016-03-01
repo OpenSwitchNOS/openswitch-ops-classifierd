@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"
@@ -35,37 +37,11 @@
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_cos_port_cli);
 extern struct ovsdb_idl *idl;
 
-static struct ovsrec_port *port_row_for_name(const char * port_name) {
-    const struct ovsrec_port *port_row;
-    OVSREC_PORT_FOR_EACH(port_row, idl) {
-        if (strcmp(port_row->name, port_name) == 0) {
-            return (struct ovsrec_port *) port_row;
-        }
-    }
-
-    return NULL;
-}
-
-static bool is_member_of_lag(const char *port_name) {
-    const struct ovsrec_port *port_row;
-    OVSREC_PORT_FOR_EACH(port_row, idl) {
-        int i;
-        for (i = 0; i < port_row->n_interfaces; i++) {
-            if ((strcmp(port_row->interfaces[i]->name, port_name) == 0)
-                    && (strcmp(port_row->name, port_name) != 0)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 static int qos_cos_port_command(const char *port_name,
         const char *cos_map_index) {
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -80,14 +56,14 @@ static int qos_cos_port_command(const char *port_name,
         vty_out(vty, "QoS COS cannot be configured on a member of a LAG.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsrec_port *port_row = port_row_for_name(port_name);
     if (port_row == NULL) {
         vty_out(vty, "Port row cannot be NULL.%s", VTY_NEWLINE);
         cli_do_config_abort(txn);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     const char *qos_trust_name = smap_get(&port_row->qos_config,
@@ -97,7 +73,7 @@ static int qos_cos_port_command(const char *port_name,
         vty_out(vty, "QoS COS override is only allowed if the port trust mode is 'none'.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct smap smap;
@@ -122,16 +98,41 @@ DEFUN (qos_cos_port,
         "Configure QoS\n"
         "Set the COS override for the port\n"
         "The index into the COS Map\n") {
-    const char *port_name = (char*) vty->index;
-    const char *cos_map_index = argv[0];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: qos cos");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_cos_port_command(port_name, cos_map_index);
+    const char *port_name = (char*) vty->index;
+    if (port_name != NULL) {
+        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *cos_map_index = argv[0];
+    if (cos_map_index != NULL) {
+        char *cfg = audit_encode_nv_string("cos_map_index", cos_map_index, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_cos_port_command(port_name, cos_map_index);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static int qos_cos_port_no_command(const char *port_name) {
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -146,14 +147,14 @@ static int qos_cos_port_no_command(const char *port_name) {
         vty_out(vty, "QoS COS cannot be configured on a member of a LAG.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsrec_port *port_row = port_row_for_name(port_name);
     if (port_row == NULL) {
         vty_out(vty, "Port row cannot be NULL.%s", VTY_NEWLINE);
         cli_do_config_abort(txn);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct smap smap;
@@ -179,9 +180,26 @@ DEFUN (qos_cos_port_no,
         "Configure QoS\n"
         "Remove the QoS COS override for the port\n"
         "The index into the COS Map\n") {
-    const char *port_name = (char*) vty->index;
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no qos cos");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_cos_port_no_command(port_name);
+    const char *port_name = (char*) vty->index;
+    if (port_name != NULL) {
+        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_cos_port_no_command(port_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 void qos_cos_port_show(const struct ovsrec_port *port_row) {

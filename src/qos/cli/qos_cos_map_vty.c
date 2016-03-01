@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"
@@ -82,7 +84,7 @@ static int qos_cos_map_command(int64_t code_point, int64_t local_priority,
     if (description != NULL) {
         if (!qos_is_valid_string(description)) {
             vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_OVSDB_FAILURE;
         }
     }
 
@@ -134,12 +136,55 @@ DEFUN (qos_cos_map,
         "Set color to red\n"
         "Configure QoS COS Map name\n"
         "The QoS COS Map name\n") {
-    int64_t code_point = atoi(argv[0]);
-    int64_t local_priority = atoi(argv[1]);
-    const char *color = argv[2];
-    const char *description = argv[3];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: qos cos-map");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_cos_map_command(code_point, local_priority, color, description);
+    const char *code_point = argv[0];
+    if (code_point != NULL) {
+        char *cfg = audit_encode_nv_string("code_point", code_point, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t code_point_int = atoi(code_point);
+
+    const char *local_priority = argv[1];
+    if (local_priority != NULL) {
+        char *cfg = audit_encode_nv_string("local_priority", local_priority, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t local_priority_int = atoi(local_priority);
+
+    const char *color = argv[2];
+    if (color != NULL) {
+        char *cfg = audit_encode_nv_string("color", color, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *description = argv[3];
+    if (description != NULL) {
+        char *cfg = audit_encode_nv_string("description", description, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_cos_map_command(code_point_int, local_priority_int, color, description);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static int qos_cos_map_no_command(int64_t code_point) {
@@ -177,9 +222,27 @@ DEFUN (qos_cos_map_no,
         "Set color to red\n"
         "Configure QoS COS Map name\n"
         "The QoS COS Map name\n") {
-    int64_t code_point = atoi(argv[0]);
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no qos cos-map");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_cos_map_no_command(code_point);
+    const char *code_point = argv[0];
+    if (code_point != NULL) {
+        char *cfg = audit_encode_nv_string("code_point", code_point, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+    int64_t code_point_int = atoi(code_point);
+
+    int result = qos_cos_map_no_command(code_point_int);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static void print_cos_map_row(struct ovsrec_qos_cos_map_entry *cos_map_row) {

@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"
@@ -36,7 +38,7 @@ extern struct ovsdb_idl *idl;
 static int qos_trust_global_command(const char *qos_trust_name) {
     if (qos_trust_name == NULL) {
         vty_out(vty, "qos trust name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -78,9 +80,26 @@ DEFUN (qos_trust_global,
         "Do not trust any priority fields, and remark all of them to 0\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
         "Trust DSCP and remark the 802.1p priority to match\n") {
-    const char *qos_trust_name = argv[0];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: qos trust");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_trust_global_command(qos_trust_name);
+    const char *qos_trust_name = argv[0];
+    if (qos_trust_name != NULL) {
+        char *cfg = audit_encode_nv_string("qos_trust_name", qos_trust_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_trust_global_command(qos_trust_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static int qos_trust_global_no_command(void) {
@@ -98,7 +117,17 @@ DEFUN (qos_trust_global_no,
         "Do not trust any priority fields, and remark all of them to 0\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
         "Trust DSCP and remark the 802.1p priority to match\n") {
-    return qos_trust_global_no_command();
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: no qos trust");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
+
+    int result = qos_trust_global_no_command();
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static int qos_trust_global_show_command(const char *default_parameter) {
@@ -111,7 +140,7 @@ static int qos_trust_global_show_command(const char *default_parameter) {
         const struct ovsrec_system *system_row = ovsrec_system_first(idl);
         if (system_row == NULL) {
             vty_out(vty, "system row cannot be NULL.%s", VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_OVSDB_FAILURE;
         }
 
         qos_trust_name = smap_get(&system_row->qos_config, QOS_TRUST_KEY);

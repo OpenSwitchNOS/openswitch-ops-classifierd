@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"
@@ -57,4 +59,30 @@ bool qos_is_valid_string(const char *string) {
     }
 
     return true;
+}
+
+struct ovsrec_port *port_row_for_name(const char *port_name) {
+    const struct ovsrec_port *port_row;
+    OVSREC_PORT_FOR_EACH(port_row, idl) {
+        if (strcmp(port_row->name, port_name) == 0) {
+            return (struct ovsrec_port *) port_row;
+        }
+    }
+
+    return NULL;
+}
+
+bool is_member_of_lag(const char *port_name) {
+    const struct ovsrec_port *port_row;
+    OVSREC_PORT_FOR_EACH(port_row, idl) {
+        int i;
+        for (i = 0; i < port_row->n_interfaces; i++) {
+            if ((strcmp(port_row->interfaces[i]->name, port_name) == 0)
+                    && (strcmp(port_row->name, port_name) != 0)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

@@ -15,6 +15,8 @@
  *
  ***************************************************************************/
 
+#include <libaudit.h>
+
 #include "vtysh/command.h"
 #include "vtysh/vtysh.h"
 #include "vtysh/vtysh_user.h"
@@ -62,22 +64,22 @@ static int qos_apply_global_command(const char *queue_profile_name,
         const char *schedule_profile_name) {
     if (queue_profile_name == NULL) {
         vty_out(vty, "queue_profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(queue_profile_name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (schedule_profile_name == NULL) {
         vty_out(vty, "schedule_profile_name cannot be NULL.%s", VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     if (!qos_is_valid_string(schedule_profile_name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_OVSDB_FAILURE;
     }
 
     struct ovsdb_idl_txn *txn = cli_do_config_start();
@@ -168,10 +170,35 @@ DEFUN (qos_apply_global,
         "The queue-profile to apply\n"
         "The schedule-profile to apply\n"
         "The schedule-profile to apply\n") {
-    const char *queue_profile_name = argv[0];
-    const char *schedule_profile_name = argv[1];
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: apply qos");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_apply_global_command(queue_profile_name, schedule_profile_name);
+    const char *queue_profile_name = argv[0];
+    if (queue_profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("queue_profile_name", queue_profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *schedule_profile_name = argv[1];
+    if (schedule_profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_apply_global_command(queue_profile_name, schedule_profile_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 DEFUN (qos_apply_global_strict,
@@ -183,10 +210,35 @@ DEFUN (qos_apply_global_strict,
         "The queue-profile to apply\n"
         "The schedule-profile to apply\n"
         "Use the strict schedule profile which has all queues configured to use the strict algorithm\n") {
-    const char *queue_profile_name = argv[0];
-    const char *schedule_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
+    char aubuf[160];
+    strcpy(aubuf, "op=CLI: appy qos");
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+    int audit_fd = audit_open();
 
-    return qos_apply_global_command(queue_profile_name, schedule_profile_name);
+    const char *queue_profile_name = argv[0];
+    if (queue_profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("queue_profile_name", queue_profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    const char *schedule_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
+    if (schedule_profile_name != NULL) {
+        char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, 130);
+            free(cfg);
+        }
+    }
+
+    int result = qos_apply_global_command(queue_profile_name, schedule_profile_name);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+
+    return result;
 }
 
 static vtysh_ret_val qos_apply_global_show_running_config_callback(
