@@ -37,9 +37,6 @@ class QosDscpMapEntryValidator(BaseValidator):
         qos_dscp_map_entry_row = validation_args.resource_row
         self.validate_dscp_map_description_contains_valid_chars(
             qos_dscp_map_entry_row)
-        # The cos field of dscp map is not supported for toronto.
-        self.validate_dscp_map_does_not_have_cos(
-            qos_dscp_map_entry_row)
 
     #
     # Validates that the given deletion of a given row is allowed.
@@ -52,14 +49,8 @@ class QosDscpMapEntryValidator(BaseValidator):
     # Validates that the dscp map desctiption contains valid characters.
     #
     def validate_dscp_map_description_contains_valid_chars(self, qos_dscp_map_entry_row):
+        if qos_dscp_map_entry_row.description is None:
+            return
+
         description = qos_dscp_map_entry_row.description[0]
         qos_utils.validate_string_contains_valid_chars(description)
-
-    #
-    # Validates that the dscp map does not have a cos value.
-    #
-    def validate_dscp_map_does_not_have_cos(self, qos_dscp_map_entry_row):
-        priority_code_point = qos_dscp_map_entry_row.priority_code_point[0]
-        if priority_code_point is not None:
-            details = "DSCP Map priority code point is not currently supported."
-            raise ValidationError(error.VERIFICATION_FAILED, details)

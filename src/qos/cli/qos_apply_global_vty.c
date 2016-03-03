@@ -60,6 +60,25 @@ bool qos_profiles_contain_same_queues(
     return true;
 }
 
+static bool qos_port_profiles_contain_same_queues(
+        struct ovsrec_q_profile * queue_profile_row) {
+    const struct ovsrec_port *port_row;
+    OVSREC_PORT_FOR_EACH(port_row, idl) {
+        struct ovsrec_qos *port_schedule_profile = port_row->qos;
+        if (port_schedule_profile == NULL) {
+            continue;
+        }
+
+        if (!qos_profiles_contain_same_queues(queue_profile_row, port_schedule_profile)) {
+            vty_out(vty, "The queue profile and the schedule profile applied on port %s cannot contain different queues.%s",
+                    port_row->name, VTY_NEWLINE);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static int qos_apply_global_command(const char *queue_profile_name,
         const char *schedule_profile_name) {
     if (queue_profile_name == NULL) {
@@ -100,14 +119,14 @@ static int qos_apply_global_command(const char *queue_profile_name,
     }
 
     /* Check that the profile is complete. */
-    if (!qos_queue_profile_is_complete(queue_profile_row)) {
-        vty_out(vty, "queue_profile_row cannot be incomplete.%s", VTY_NEWLINE);
+    if (!qos_queue_profile_is_complete(queue_profile_row, true)) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
     /* If the profile is strict, make sure the 'strict' profile exists. */
-    if (strcmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
+    if (strncmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_MAX_STRING_LENGTH) == 0) {
         qos_schedule_profile_create_strict_profile(txn);
     }
 
@@ -122,10 +141,10 @@ static int qos_apply_global_command(const char *queue_profile_name,
 
     /* Perform some checks, but only if the profile is not strict. The strict */
     /* profile does not contain any queues. */
-    if (strcmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) != 0) {
+    if (strncmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_MAX_STRING_LENGTH) != 0) {
         /* Check that the profile is complete. */
-        if (!qos_schedule_profile_is_complete(schedule_profile_row)) {
-            vty_out(vty, "schedule_profile_row cannot be incomplete.%s", VTY_NEWLINE);
+        if (!qos_schedule_profile_is_complete(schedule_profile_row, true)) {
             cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
@@ -133,10 +152,18 @@ static int qos_apply_global_command(const char *queue_profile_name,
         /* Check that profiles contain all the same queues. */
         if (!qos_profiles_contain_same_queues(queue_profile_row,
                 schedule_profile_row)) {
-            vty_out(vty, "queue_profile_row and schedule_profile_row cannot contain different queues.%s", VTY_NEWLINE);
+            vty_out(vty, "The queue profile and the schedule profile cannot contain different queues.%s",
+                    VTY_NEWLINE);
             cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
+    }
+
+    /* Validate that the queue profile is consistent with any other
+     * port-applied schedule profiles. */
+    if (!qos_port_profiles_contain_same_queues(queue_profile_row)) {
+        cli_do_config_abort(txn);
+        return CMD_OVSDB_FAILURE;
     }
 
     /* Retrieve the system row. */
@@ -170,8 +197,8 @@ DEFUN (qos_apply_global,
         "The queue-profile to apply\n"
         "The schedule-profile to apply\n"
         "The schedule-profile to apply\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: apply qos");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: apply qos", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -180,7 +207,7 @@ DEFUN (qos_apply_global,
     if (queue_profile_name != NULL) {
         char *cfg = audit_encode_nv_string("queue_profile_name", queue_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -189,7 +216,7 @@ DEFUN (qos_apply_global,
     if (schedule_profile_name != NULL) {
         char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -210,8 +237,8 @@ DEFUN (qos_apply_global_strict,
         "The queue-profile to apply\n"
         "The schedule-profile to apply\n"
         "Use the strict schedule profile which has all queues configured to use the strict algorithm\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: appy qos");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: appy qos", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -220,7 +247,7 @@ DEFUN (qos_apply_global_strict,
     if (queue_profile_name != NULL) {
         char *cfg = audit_encode_nv_string("queue_profile_name", queue_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -229,7 +256,7 @@ DEFUN (qos_apply_global_strict,
     if (schedule_profile_name != NULL) {
         char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }

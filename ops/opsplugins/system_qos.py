@@ -36,11 +36,13 @@ class SystemQosValidator(BaseValidator):
         self.validate_trust_global_is_not_empty(system_row)
         self.validate_apply_global_queue_profile_has_all_local_priorities(
             system_row)
+        self.validate_apply_global_queue_profile_has_no_duplicate_local_priorities(
+            system_row)
         self.validate_apply_global_schedule_profile_has_same_algorithm_on_all_queues(
             system_row)
-        self.validate_apply_global_queue_profile_contains_all_schedule_profile_queues(
+        self.validate_apply_global_profiles_contain_same_queues(
             system_row)
-        self.validate_apply_global_schedule_profile_contains_all_queue_profile_queues(
+        self.validate_apply_port_profiles_contain_same_queues(
             system_row)
 
     #
@@ -65,12 +67,34 @@ class SystemQosValidator(BaseValidator):
     #
     def validate_apply_global_queue_profile_has_all_local_priorities(self, system_row):
         q_profile = utils.get_column_data_from_row(system_row, "q_profile")
+        if q_profile is None:
+            return
 
-        if q_profile is not None:
-            for local_priority in range(0, qos_utils.QOS_MAX_LOCAL_PRIORITY):
-                if not self.profile_has_local_priority(q_profile[0], local_priority):
-                    details = "The queue profile must have each local priority assigned to a queue."
+        for local_priority in range(0, qos_utils.QOS_MAX_LOCAL_PRIORITY + 1):
+            if not self.profile_has_local_priority(q_profile[0], local_priority):
+                details = "The queue profile is missing local priority " + str(local_priority) + "."
+                raise ValidationError(error.VERIFICATION_FAILED, details)
+
+    #
+    # Validates that the global apply has a queue profile that does not
+    # contain any duplicate local priorities.
+    #
+    def validate_apply_global_queue_profile_has_no_duplicate_local_priorities(self, system_row):
+        found_local_priorities = []
+
+        q_profile = utils.get_column_data_from_row(system_row, "q_profile")
+        if q_profile is None:
+            return
+
+        q_profile_entries = utils.get_column_data_from_row(
+            q_profile[0], "q_profile_entries")
+        for q_profile_entry in q_profile_entries.values():
+            local_priorities = q_profile_entry.local_priorities
+            for local_priority in local_priorities:
+                if local_priority in found_local_priorities:
+                    details = "The queue profile has local priority " + str(local_priority) + " assigned more than once."
                     raise ValidationError(error.VERIFICATION_FAILED, details)
+                found_local_priorities.append(local_priority)
 
     #
     # Returns True if the q_profile contains the given local_priority.
@@ -102,25 +126,36 @@ class SystemQosValidator(BaseValidator):
     #
     def validate_apply_global_schedule_profile_has_same_algorithm_on_all_queues(self, system_row):
         schedule_profile = utils.get_column_data_from_row(system_row, "qos")
+        if schedule_profile is None:
+            return
+
         qos_utils.validate_schedule_profile_has_same_algorithm_on_all_queues(
             schedule_profile[0])
 
     #
-    # Validates that the global apply queue profile contains all of the
-    # schedule profile queues.
+    # Validates that the global apply profiles contain the same queues.
     #
-    def validate_apply_global_queue_profile_contains_all_schedule_profile_queues(self, system_row):
+    def validate_apply_global_profiles_contain_same_queues(self, system_row):
         q_profile = utils.get_column_data_from_row(system_row, "q_profile")
+        if q_profile is None:
+            return
+
         schedule_profile = utils.get_column_data_from_row(system_row, "qos")
-        qos_utils.validate_queue_profile_contains_all_schedule_profile_queues(
+        if schedule_profile is None:
+            return
+
+        qos_utils.validate_profiles_contain_same_queues(
             q_profile[0], schedule_profile[0])
 
     #
-    # Validates that the global apply schedule profile contains all of the
-    # queue profile queues.
+    # Validates that the port profiles contain the same queues.
     #
-    def validate_apply_global_schedule_profile_contains_all_queue_profile_queues(self, system_row):
+    def validate_apply_port_profiles_contain_same_queues(self, system_row):
         q_profile = utils.get_column_data_from_row(system_row, "q_profile")
-        schedule_profile = utils.get_column_data_from_row(system_row, "qos")
-        qos_utils.validate_schedule_profile_contains_all_queue_profile_queues(
-            q_profile[0], schedule_profile[0])
+        if q_profile is None:
+            return
+
+        for port_row in idl.tables["Port"].rows.itervalues():
+            if len(port_row.qos) != 0:
+                qos_utils.validate_profiles_contain_same_queues(
+                    q_profile[0], port_row.qos[0])

@@ -113,13 +113,13 @@ class QosCosMapCliTest(OpsVsiTest):
         s1 = self.setUp()
         s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow name MyName2')
         out = s1.cmdCLI('do show qos cos-map')
-        assert '7          2              yellow  "MyName2"' in out
+        assert '7          2              yellow  MyName2' in out
 
     def qosCosMapShowCommandWithDefault(self):
         s1 = self.setUp()
         s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow name MyName2')
         out = s1.cmdCLI('do show qos cos-map default')
-        assert '7          7              green   "Network_Control"' in out
+        assert '7          7              green   Network_Control' in out
 
     def qosCosMapShowRunningConfigWithDefault(self):
         s1 = self.setUp()

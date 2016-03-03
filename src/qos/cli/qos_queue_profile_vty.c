@@ -37,10 +37,6 @@ extern struct ovsdb_idl *idl;
 
 static char g_profile_name[QOS_CLI_STRING_BUFFER_SIZE];
 
-static void qos_queue_profile_create_factory_default(
-        struct ovsdb_idl_txn *txn,
-        const char *default_name);
-
 static bool queue_has_local_priority(
         struct ovsrec_q_profile_entry *queue_row,
         int64_t local_priority) {
@@ -58,7 +54,7 @@ struct ovsrec_q_profile *qos_get_queue_profile_row(
         const char *profile_name) {
     const struct ovsrec_q_profile *profile_row;
     OVSREC_Q_PROFILE_FOR_EACH(profile_row, idl) {
-        if (strcmp(profile_row->name, profile_name) == 0) {
+        if (strncmp(profile_row->name, profile_name, QOS_CLI_MAX_STRING_LENGTH) == 0) {
             return (struct ovsrec_q_profile *) profile_row;
         }
     }
@@ -91,25 +87,39 @@ bool qos_queue_profile_has_queue_num(struct ovsrec_q_profile *profile_row,
     return false;
 }
 
-static bool profile_has_local_priority(struct ovsrec_q_profile *profile_row,
-        int64_t local_priority) {
+bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row,
+        bool print_error) {
+    bool found_local_priorities[QOS_LOCAL_PRIORITY_COUNT];
+    int i;
+    for (i = 0; i < QOS_LOCAL_PRIORITY_COUNT; i++) {
+        found_local_priorities[i] = false;
+    }
+
+    /* Validate that each local priority does not appear more than once. */
     int j;
     for (j = 0; j < profile_row->n_q_profile_entries; j++) {
-        struct ovsrec_q_profile_entry *profile_entry_row =
+        struct ovsrec_q_profile_entry *queue_row =
                 profile_row->value_q_profile_entries[j];
-        if (queue_has_local_priority(profile_entry_row, local_priority)) {
-            return true;
+        for (i = 0; i < queue_row->n_local_priorities; i++) {
+            int64_t local_priority = queue_row->local_priorities[i];
+            if (found_local_priorities[local_priority] == true) {
+                if (print_error) {
+                    vty_out(vty, "The queue profile has local priority %d assigned more than once.%s",
+                            (int) local_priority, VTY_NEWLINE);
+                }
+                return false;
+            }
+            found_local_priorities[local_priority] = true;
         }
     }
 
-    return false;
-}
-
-bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row) {
-    int local_priority;
-    for (local_priority = 0; local_priority <= QOS_MAX_LOCAL_PRIORITY;
-            local_priority++) {
-        if (!profile_has_local_priority(profile_row, local_priority)) {
+    /* Validate that all local priorities have been assigned. */
+    for (i = 0; i < QOS_LOCAL_PRIORITY_COUNT; i++) {
+        if (found_local_priorities[i] == false) {
+            if (print_error) {
+                vty_out(vty, "The queue profile is missing local priority %d.%s",
+                        i, VTY_NEWLINE);
+            }
             return false;
         }
     }
@@ -142,6 +152,25 @@ static bool is_applied(const char *profile_name) {
             profile_name);
 
     return is_row_applied(profile_row);
+}
+
+static bool is_row_hw_default(const struct ovsrec_q_profile *profile_row) {
+    if (profile_row == NULL) {
+        return false;
+    }
+
+    if (profile_row->hw_default == NULL) {
+        return false;
+    }
+
+    return *profile_row->hw_default;
+}
+
+static bool is_hw_default(const char *profile_name) {
+    struct ovsrec_q_profile *profile_row = qos_get_queue_profile_row(
+            profile_name);
+
+    return is_row_hw_default(profile_row);
 }
 
 static struct ovsrec_q_profile_entry *insert_queue_row(
@@ -199,14 +228,20 @@ static int qos_queue_profile_command_commit(const char *profile_name) {
         return CMD_OVSDB_FAILURE;
     }
 
-    if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
-        vty_out(vty, "profile_name cannot be '%s'.%s",
+    if (strncmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT, QOS_CLI_MAX_STRING_LENGTH) == 0) {
+        vty_out(vty, "The profile name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty, "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -244,8 +279,8 @@ DEFUN (qos_queue_profile,
        "Configure QoS\n"
        "Set the QoS Queue Profile configuration\n"
        "The name of the Queue Profile\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: qos queue-profile");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: qos queue-profile", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -254,7 +289,7 @@ DEFUN (qos_queue_profile,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -268,20 +303,61 @@ DEFUN (qos_queue_profile,
 
 static bool qos_queue_profile_no_command(struct ovsdb_idl_txn *txn,
         const char *profile_name) {
-    if (strcmp(profile_name, QOS_DEFAULT_NAME) == 0) {
+    /* Retrieve the row. */
+    struct ovsrec_q_profile *profile_row =
+            qos_get_queue_profile_row(profile_name);
+    if (profile_row == NULL) {
+        vty_out(vty, "Profile %s does not exist.%s",
+                profile_name, VTY_NEWLINE);
+        return true;
+    }
+
+    if (strncmp(profile_name, QOS_DEFAULT_NAME, QOS_CLI_MAX_STRING_LENGTH) == 0) {
         /* For the profile named 'default', restore the factory defaults. */
-        qos_queue_profile_create_factory_default(txn, profile_name);
-    } else {
-        /* Retrieve the row. */
-        struct ovsrec_q_profile *profile_row =
-                qos_get_queue_profile_row(profile_name);
-        if (profile_row == NULL) {
+
+        /* Delete all default profile queue rows. */
+        ovsrec_q_profile_set_q_profile_entries(profile_row, NULL, NULL, 0);
+
+        /* Retrieve the factory default row. */
+        struct ovsrec_q_profile *factory_default_profile_row =
+                qos_get_queue_profile_row(QOS_FACTORY_DEFAULT_NAME);
+        if (factory_default_profile_row == NULL) {
             vty_out(vty, "Profile %s does not exist.%s",
-                    profile_name, VTY_NEWLINE);
+                    QOS_FACTORY_DEFAULT_NAME, VTY_NEWLINE);
             return true;
         }
 
-        /* Delete the row. */
+        /* Copy all factory defaults into new entry rows. */
+        int64_t queue_row_count =
+                factory_default_profile_row->n_q_profile_entries;
+        int64_t *key_list =
+                xmalloc(sizeof(int64_t) *
+                        queue_row_count);
+        struct ovsrec_q_profile_entry **value_list =
+                xmalloc(sizeof *profile_row->value_q_profile_entries *
+                        queue_row_count);
+        int j;
+        for (j = 0; j < queue_row_count; j++) {
+            struct ovsrec_q_profile_entry *queue_row =
+                    ovsrec_q_profile_entry_insert(txn);
+            struct ovsrec_q_profile_entry *default_row =
+                    factory_default_profile_row->value_q_profile_entries[j];
+            ovsrec_q_profile_entry_set_description(queue_row,
+                    default_row->description);
+            ovsrec_q_profile_entry_set_local_priorities(
+                    queue_row, default_row->local_priorities,
+                    default_row->n_local_priorities);
+            key_list[j] = factory_default_profile_row->key_q_profile_entries[j];
+            value_list[j] = queue_row;
+        }
+
+        /* Add the new entry rows to the profile row. */
+        ovsrec_q_profile_set_q_profile_entries(profile_row, key_list,
+                value_list, queue_row_count);
+        free(key_list);
+        free(value_list);
+    } else {
+        /* If not the profile named 'default', delete the row. */
         ovsrec_q_profile_delete(profile_row);
     }
 
@@ -299,14 +375,20 @@ static int qos_queue_profile_no_command_commit(const char *profile_name) {
         return CMD_OVSDB_FAILURE;
     }
 
-    if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
-        vty_out(vty, "profile_name cannot be '%s'.%s",
+    if (strncmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT, QOS_CLI_MAX_STRING_LENGTH) == 0) {
+        vty_out(vty, "The profile name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty, "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -342,8 +424,8 @@ DEFUN (qos_queue_profile_no,
         "Configure QoS\n"
         "Deletes a Queue Profile, if it is not currently applied\n"
         "The name of the Queue Profile to delete\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no qos queue-profile");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no qos queue-profile", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -352,7 +434,7 @@ DEFUN (qos_queue_profile_no,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -414,6 +496,12 @@ static int qos_queue_profile_name_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
+    if (is_hw_default(profile_name)) {
+        vty_out(vty, "A hardware default profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
     struct ovsdb_idl_txn *txn = cli_do_config_start();
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
@@ -446,8 +534,8 @@ DEFUN (qos_queue_profile_name,
        "Sets the name of a queue\n"
        "The number of the queue\n"
        "The name of the queue\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: name queue");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: name queue", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -456,7 +544,7 @@ DEFUN (qos_queue_profile_name,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -465,7 +553,7 @@ DEFUN (qos_queue_profile_name,
     if (queue_num != NULL) {
         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -475,7 +563,7 @@ DEFUN (qos_queue_profile_name,
     if (queue_name != NULL) {
         char *cfg = audit_encode_nv_string("queue_name", queue_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -566,6 +654,12 @@ static int qos_queue_profile_name_no_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
+    if (is_hw_default(profile_name)) {
+        vty_out(vty, "A hardware default profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
     struct ovsdb_idl_txn *txn = cli_do_config_start();
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
@@ -599,8 +693,8 @@ DEFUN (qos_queue_profile_name_no,
         "Deletes the name of a queue\n"
         "The number of the queue\n"
         "The name of the queue\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no name queue");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no name queue", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -609,7 +703,7 @@ DEFUN (qos_queue_profile_name_no,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -618,7 +712,7 @@ DEFUN (qos_queue_profile_name_no,
     if (queue_num != NULL) {
         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -691,6 +785,12 @@ static int qos_queue_profile_map_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
+    if (is_hw_default(profile_name)) {
+        vty_out(vty, "A hardware default profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
     struct ovsdb_idl_txn *txn = cli_do_config_start();
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
@@ -724,8 +824,8 @@ DEFUN (qos_queue_profile_map,
        "The number of the queue\n"
        "The local-priority to configure\n"
        "The local-priority to configure\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: map queue");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: map queue", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -734,7 +834,7 @@ DEFUN (qos_queue_profile_map,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -743,7 +843,7 @@ DEFUN (qos_queue_profile_map,
     if (queue_num != NULL) {
         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -753,7 +853,7 @@ DEFUN (qos_queue_profile_map,
     if (local_priority != NULL) {
         char *cfg = audit_encode_nv_string("local_priority", local_priority, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -843,6 +943,12 @@ static int qos_queue_profile_map_no_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
+    if (is_hw_default(profile_name)) {
+        vty_out(vty, "A hardware default profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
     struct ovsdb_idl_txn *txn = cli_do_config_start();
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
@@ -877,8 +983,8 @@ DEFUN (qos_queue_profile_map_no,
        "The number of the queue\n"
        "The local-priority to delete\n"
        "The local-priority to delete\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no map queue");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no map queue", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -887,7 +993,7 @@ DEFUN (qos_queue_profile_map_no,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -896,7 +1002,7 @@ DEFUN (qos_queue_profile_map_no,
     if (queue_num != NULL) {
         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -912,7 +1018,7 @@ DEFUN (qos_queue_profile_map_no,
     if (local_priority_string != NULL) {
         char *cfg = audit_encode_nv_string("local_priority_string", local_priority_string, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -925,16 +1031,16 @@ DEFUN (qos_queue_profile_map_no,
     return result;
 }
 
-static void sprintf_local_priorities(char *buffer,
+static void snprintf_local_priorities(char *buffer, int64_t n,
         struct ovsrec_q_profile_entry *profile_entry_row) {
     int i;
     for (i = 0; i < profile_entry_row->n_local_priorities; i++) {
-        buffer += sprintf(buffer,
+        buffer += snprintf(buffer, n,
                 "%d", (int) profile_entry_row->local_priorities[i]);
 
         /* If not the last one, then print a comma. */
         if (i < profile_entry_row->n_local_priorities - 1) {
-            buffer += sprintf(buffer, ",");
+            buffer += snprintf(buffer, n, ",");
         }
     }
 }
@@ -946,13 +1052,13 @@ static void print_queue_profile_entry_row(int64_t queue_num,
     vty_out (vty, "%-9d ", (int) queue_num);
 
     buffer[0] = '\0';
-    sprintf_local_priorities(buffer, profile_entry_row);
+    snprintf_local_priorities(buffer, QOS_CLI_STRING_BUFFER_SIZE, profile_entry_row);
     vty_out (vty, "%-16s ", buffer);
 
     buffer[0] = '\0';
     if (profile_entry_row->description != NULL &&
-            strcmp(profile_entry_row->description, "") != 0) {
-        sprintf(buffer, "\"%s\"", profile_entry_row->description);
+            strncmp(profile_entry_row->description, "", QOS_CLI_MAX_STRING_LENGTH) != 0) {
+        snprintf(buffer, QOS_CLI_STRING_BUFFER_SIZE, "%s", profile_entry_row->description);
     }
     vty_out (vty, "%s ", buffer);
 
@@ -968,21 +1074,6 @@ static int qos_queue_profile_show_command(const char *name) {
     if (!qos_is_valid_string(name)) {
         vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
-    }
-
-    struct ovsdb_idl_txn *txn = NULL;
-    if (strcmp(name, QOS_FACTORY_DEFAULT_NAME) == 0) {
-        /* Start a transaction so that a temporary factory-default profile can be created. */
-        txn = cli_do_config_start();
-        if (txn == NULL) {
-            vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-            VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-            cli_do_config_abort(txn);
-            return CMD_OVSDB_FAILURE;
-        }
-
-        qos_queue_profile_create_factory_default(
-                txn, QOS_FACTORY_DEFAULT_NAME);
     }
 
     struct ovsrec_q_profile *profile_row = qos_get_queue_profile_row(name);
@@ -1001,11 +1092,6 @@ static int qos_queue_profile_show_command(const char *name) {
                 profile_row->value_q_profile_entries[i]);
     }
 
-    if (strcmp(name, QOS_FACTORY_DEFAULT_NAME) == 0) {
-        /* Abort the transaction to get rid of the temporary factory-default profile. */
-        cli_do_config_abort(txn);
-    }
-
     return CMD_SUCCESS;
 }
 
@@ -1021,16 +1107,6 @@ DEFUN (qos_queue_profile_show,
     return qos_queue_profile_show_command(name);
 }
 
-DEFUN (qos_queue_profile_show_factory_default,
-    qos_queue_profile_show_factory_default_cmd,
-    "show qos queue-profile factory-default",
-    SHOW_STR
-    "Show QoS Configuration\n"
-    "Show QoS Queue Profile Configuration\n"
-    "Show the factory default profile\n") {
-    return qos_queue_profile_show_command(QOS_FACTORY_DEFAULT_NAME);
-}
-
 static int qos_queue_profile_show_all_command(void) {
     vty_out (vty, "profile_status profile_name%s", VTY_NEWLINE);
     vty_out (vty, "-------------- ------------%s", VTY_NEWLINE);
@@ -1042,7 +1118,7 @@ static int qos_queue_profile_show_all_command(void) {
         if (is_row_applied(profile_row)) {
             vty_out (vty, "applied        ");
         } else if (qos_queue_profile_is_complete(
-                (struct ovsrec_q_profile *) profile_row)) {
+                (struct ovsrec_q_profile *) profile_row, false)) {
             vty_out (vty, "complete       ");
         } else {
             vty_out (vty, "incomplete     ");
@@ -1050,8 +1126,8 @@ static int qos_queue_profile_show_all_command(void) {
 
         buffer[0] = '\0';
         if (profile_row->name != NULL &&
-                strcmp(profile_row->name, "") != 0) {
-            sprintf(buffer, "\"%s\"", profile_row->name);
+                strncmp(profile_row->name, "", QOS_CLI_MAX_STRING_LENGTH) != 0) {
+            snprintf(buffer, QOS_CLI_STRING_BUFFER_SIZE, "%s", profile_row->name);
         }
         vty_out (vty, "%s ", buffer);
 
@@ -1089,18 +1165,6 @@ static void display_header(bool *header_displayed) {
 }
 
 void qos_queue_profile_show_running_config(void) {
-    /* Start a transaction so that a temporary factory-default profile can be created. */
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return;
-    }
-
-    qos_queue_profile_create_factory_default(
-            txn, QOS_FACTORY_DEFAULT_NAME);
-
     struct ovsrec_q_profile *default_profile_row = qos_get_queue_profile_row(
             QOS_FACTORY_DEFAULT_NAME);
     if (default_profile_row == NULL) {
@@ -1114,8 +1178,8 @@ void qos_queue_profile_show_running_config(void) {
 
     bool header_displayed = false;
     /* Show profile name. */
-    if (strcmp(applied_profile_row->name, default_profile_row->name) != 0 &&
-            strcmp(applied_profile_row->name, QOS_DEFAULT_NAME) != 0) {
+    if (strncmp(applied_profile_row->name, default_profile_row->name, QOS_CLI_MAX_STRING_LENGTH) != 0 &&
+            strncmp(applied_profile_row->name, QOS_DEFAULT_NAME, QOS_CLI_MAX_STRING_LENGTH) != 0) {
         display_header(&header_displayed);
         vty_out(vty, "    name %s%s",
                 applied_profile_row->name, VTY_NEWLINE);
@@ -1144,9 +1208,9 @@ void qos_queue_profile_show_running_config(void) {
         default_buffer[0] = '\0';
         char applied_buffer[QOS_CLI_STRING_BUFFER_SIZE];
         applied_buffer[0] = '\0';
-        sprintf_local_priorities(default_buffer, default_profile_entry);
-        sprintf_local_priorities(applied_buffer, applied_profile_entry);
-        if (strcmp(applied_buffer, default_buffer) != 0) {
+        snprintf_local_priorities(default_buffer, QOS_CLI_STRING_BUFFER_SIZE, default_profile_entry);
+        snprintf_local_priorities(applied_buffer, QOS_CLI_STRING_BUFFER_SIZE, applied_profile_entry);
+        if (strncmp(applied_buffer, default_buffer, QOS_CLI_MAX_STRING_LENGTH) != 0) {
             display_headers(&header_displayed,
                     &queue_num_header_displayed, default_queue_num);
             vty_out(vty, "        local_priorities %s%s",
@@ -1156,58 +1220,31 @@ void qos_queue_profile_show_running_config(void) {
         /* Show description. */
         char applied_description[QOS_CLI_STRING_BUFFER_SIZE];
         if (applied_profile_entry->description == NULL) {
-            strcpy(applied_description, QOS_CLI_EMPTY_DISPLAY_STRING);
+            strncpy(applied_description, QOS_CLI_EMPTY_DISPLAY_STRING, QOS_CLI_EMPTY_DISPLAY_STRING_BUFFER_SIZE);
         } else {
-            sprintf(applied_description, "%d",
+            snprintf(applied_description, QOS_CLI_STRING_BUFFER_SIZE, "%d",
                     *applied_profile_entry->description);
         }
         char default_description[QOS_CLI_STRING_BUFFER_SIZE];
         if (default_profile_entry->description == NULL) {
-            strcpy(default_description, QOS_CLI_EMPTY_DISPLAY_STRING);
+            strncpy(default_description, QOS_CLI_EMPTY_DISPLAY_STRING, QOS_CLI_EMPTY_DISPLAY_STRING_BUFFER_SIZE);
         } else {
-            sprintf(default_description, "%d",
+            snprintf(default_description, QOS_CLI_STRING_BUFFER_SIZE, "%d",
                     *default_profile_entry->description);
         }
-        if (strcmp(applied_description,
-                default_description) != 0) {
+        if (strncmp(applied_description, default_description, QOS_CLI_MAX_STRING_LENGTH) != 0) {
             display_headers(&header_displayed,
                     &queue_num_header_displayed, default_queue_num);
             vty_out(vty, "        name %s%s",
                     applied_description, VTY_NEWLINE);
         }
     }
-
-    /* Abort the transaction to get rid of the temporary factory-default profile. */
-    cli_do_config_abort(txn);
-}
-
-static void qos_queue_profile_create_factory_default(
-        struct ovsdb_idl_txn *txn,
-        const char *default_name) {
-    qos_queue_profile_command(txn, default_name);
-
-    /* Delete all queue rows. */
-    struct ovsrec_q_profile *profile_row =
-            qos_get_queue_profile_row(default_name);
-    ovsrec_q_profile_set_q_profile_entries(profile_row, NULL,
-            NULL, 0);
-
-    /* Create all queue rows. */
-    qos_queue_profile_map_command(txn, default_name, 7, 7);
-    qos_queue_profile_map_command(txn, default_name, 6, 6);
-    qos_queue_profile_map_command(txn, default_name, 5, 5);
-    qos_queue_profile_map_command(txn, default_name, 4, 4);
-    qos_queue_profile_map_command(txn, default_name, 3, 3);
-    qos_queue_profile_map_command(txn, default_name, 2, 2);
-    qos_queue_profile_map_command(txn, default_name, 1, 1);
-    qos_queue_profile_map_command(txn, default_name, 0, 0);
 }
 
 void qos_queue_profile_vty_init(void) {
     install_element(CONFIG_NODE, &qos_queue_profile_cmd);
     install_element(CONFIG_NODE, &qos_queue_profile_no_cmd);
     install_element(ENABLE_NODE, &qos_queue_profile_show_cmd);
-    install_element(ENABLE_NODE, &qos_queue_profile_show_factory_default_cmd);
     install_element(ENABLE_NODE, &qos_queue_profile_show_all_cmd);
 
     install_element(QOS_QUEUE_PROFILE_NODE, &qos_queue_profile_name_cmd);
@@ -1224,9 +1261,15 @@ void qos_queue_profile_ovsdb_init(void) {
     ovsdb_idl_add_table(idl, &ovsrec_table_q_profile);
     ovsdb_idl_add_column(idl, &ovsrec_q_profile_col_name);
     ovsdb_idl_add_column(idl, &ovsrec_q_profile_col_q_profile_entries);
+    ovsdb_idl_add_column(idl, &ovsrec_q_profile_col_hw_default);
+    ovsdb_idl_add_column(idl, &ovsrec_q_profile_col_other_config);
+    ovsdb_idl_add_column(idl, &ovsrec_q_profile_col_external_ids);
 
     ovsdb_idl_add_table(idl, &ovsrec_table_q_profile_entry);
     ovsdb_idl_add_column(idl,
             &ovsrec_q_profile_entry_col_local_priorities);
     ovsdb_idl_add_column(idl, &ovsrec_q_profile_entry_col_description);
+    ovsdb_idl_add_column(idl, &ovsrec_q_profile_entry_col_hw_default);
+    ovsdb_idl_add_column(idl, &ovsrec_q_profile_entry_col_other_config);
+    ovsdb_idl_add_column(idl, &ovsrec_q_profile_entry_col_external_ids);
 }

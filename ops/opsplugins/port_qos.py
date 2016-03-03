@@ -45,11 +45,11 @@ class PortQosValidator(BaseValidator):
             port_row, qos_utils.QOS_COS_OVERRIDE_KEY, "COS")
         self.validate_port_override_has_port_trust_mode_none(
             port_row, qos_utils.QOS_DSCP_OVERRIDE_KEY, "DSCP")
+        self.validate_apply_port_queue_profile_is_null(
+            port_row)
         self.validate_apply_port_schedule_profile_has_same_algorithm_on_all_queues(
             port_row)
-        self.validate_apply_port_queue_profile_contains_all_schedule_profile_queues(
-            port_row, system_row)
-        self.validate_apply_port_schedule_profile_contains_all_queue_profile_queues(
+        self.validate_apply_port_profiles_contain_same_queues(
             port_row, system_row)
 
     #
@@ -69,7 +69,7 @@ class PortQosValidator(BaseValidator):
         if qos_override is None:
             return
 
-        # Cos override is not supported for toronto.
+        # Cos override is not supported for dill.
         if qos_config_key == qos_utils.QOS_COS_OVERRIDE_KEY:
             details = "QoS " + display_string + \
                 " override is not currently supported."
@@ -79,6 +79,15 @@ class PortQosValidator(BaseValidator):
         if qos_trust_value is None or qos_trust_value != qos_utils.QOS_TRUST_NONE_STRING:
             details = "QoS " + display_string + \
                 " override is only allowed if the port trust mode is 'none'."
+            raise ValidationError(error.VERIFICATION_FAILED, details)
+
+    #
+    # Validates that the port queue profile is null.
+    #
+    def validate_apply_port_queue_profile_is_null(self, port_row):
+        q_profile = utils.get_column_data_from_row(port_row, "q_profile")
+        if q_profile != []:
+            details = "Port-level queue profile is not supported."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #
@@ -97,24 +106,14 @@ class PortQosValidator(BaseValidator):
     # Validates that the port queue profile contains all of the schedule
     # profile queues.
     #
-    def validate_apply_port_queue_profile_contains_all_schedule_profile_queues(self, port_row, system_row):
+    def validate_apply_port_profiles_contain_same_queues(self, port_row, system_row):
         schedule_profile = utils.get_column_data_from_row(port_row, "qos")
         if schedule_profile == []:
             return
 
         queue_profile = utils.get_column_data_from_row(system_row, "q_profile")
-        qos_utils.validate_queue_profile_contains_all_schedule_profile_queues(
-            queue_profile[0], schedule_profile[0])
-
-    #
-    # Validates that the port schedule profile contains all of the queue
-    # profile queues.
-    #
-    def validate_apply_port_schedule_profile_contains_all_queue_profile_queues(self, port_row, system_row):
-        schedule_profile = utils.get_column_data_from_row(port_row, "qos")
-        if schedule_profile == []:
+        if queue_profile == []:
             return
 
-        queue_profile = utils.get_column_data_from_row(system_row, "q_profile")
-        qos_utils.validate_schedule_profile_contains_all_queue_profile_queues(
+        qos_utils.validate_profiles_contain_same_queues(
             queue_profile[0], schedule_profile[0])

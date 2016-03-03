@@ -38,7 +38,8 @@ bool qos_schedule_profile_has_queue_num(struct ovsrec_qos *profile_row,
 /**
  * Returns true if the schedule profile is complete.
  */
-bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row);
+bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row,
+        bool print_error);
 
 /**
  * Retrieves the schedule profile row.

@@ -32,7 +32,8 @@ bool qos_queue_profile_has_queue_num(struct ovsrec_q_profile *profile_row,
 /**
  * Returns true if the queue profile is complete.
  */
-bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row);
+bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row,
+        bool print_error);
 
 /**
  * Retrieves the queue profile row.

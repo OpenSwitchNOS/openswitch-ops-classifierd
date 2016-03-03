@@ -64,7 +64,7 @@ bool qos_is_valid_string(const char *string) {
 struct ovsrec_port *port_row_for_name(const char *port_name) {
     const struct ovsrec_port *port_row;
     OVSREC_PORT_FOR_EACH(port_row, idl) {
-        if (strcmp(port_row->name, port_name) == 0) {
+        if (strncmp(port_row->name, port_name, QOS_CLI_MAX_STRING_LENGTH) == 0) {
             return (struct ovsrec_port *) port_row;
         }
     }
@@ -77,8 +77,8 @@ bool is_member_of_lag(const char *port_name) {
     OVSREC_PORT_FOR_EACH(port_row, idl) {
         int i;
         for (i = 0; i < port_row->n_interfaces; i++) {
-            if ((strcmp(port_row->interfaces[i]->name, port_name) == 0)
-                    && (strcmp(port_row->name, port_name) != 0)) {
+            if ((strncmp(port_row->interfaces[i]->name, port_name, QOS_CLI_MAX_STRING_LENGTH) == 0)
+                    && (strncmp(port_row->name, port_name, QOS_CLI_MAX_STRING_LENGTH) != 0)) {
                 return true;
             }
         }

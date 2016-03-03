@@ -66,8 +66,7 @@ static int qos_dscp_port_command(const char *port_name,
 
     const char *qos_trust_name = smap_get(&port_row->qos_config,
             QOS_TRUST_KEY);
-    if (qos_trust_name == NULL || strcmp(qos_trust_name,
-            QOS_TRUST_NONE_STRING) != 0) {
+    if (qos_trust_name == NULL || strncmp(qos_trust_name, QOS_TRUST_NONE_STRING, QOS_CLI_MAX_STRING_LENGTH) != 0) {
         vty_out(vty, "QoS DSCP override is only allowed if the port trust mode is 'none'.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
@@ -96,8 +95,8 @@ DEFUN (qos_dscp_port,
         "Configure QoS\n"
         "Set the DSCP override for the port\n"
         "The index into the DSCP Map\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: qos dscp");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: qos dscp", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -106,7 +105,7 @@ DEFUN (qos_dscp_port,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -115,7 +114,7 @@ DEFUN (qos_dscp_port,
     if (dscp_map_index != NULL) {
         char *cfg = audit_encode_nv_string("dscp_map_index", dscp_map_index, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -178,8 +177,8 @@ DEFUN (qos_dscp_port_no,
         "Configure QoS\n"
         "Remove the QoS DSCP override for the port\n"
         "The index into the DSCP Map\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no qos dscp");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no qos dscp", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -188,7 +187,7 @@ DEFUN (qos_dscp_port_no,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }

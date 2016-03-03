@@ -81,7 +81,8 @@ static int qos_apply_port_command(const char *port_name,
     struct ovsrec_q_profile *queue_profile_row = system_row->q_profile;
 
     /* If the profile is strict, make sure the 'strict' profile exists. */
-    if (strcmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
+    if (strncmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_MAX_STRING_LENGTH) == 0) {
         qos_schedule_profile_create_strict_profile(txn);
     }
 
@@ -96,10 +97,10 @@ static int qos_apply_port_command(const char *port_name,
 
     /* Perform some checks, but only if the profile is not strict. The strict */
     /* profile does not contain any queues. */
-    if (strcmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) != 0) {
+    if (strncmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_MAX_STRING_LENGTH) != 0) {
         /* Check that the profile is complete. */
-        if (!qos_schedule_profile_is_complete(schedule_profile_row)) {
-            vty_out(vty, "schedule_profile_row cannot be incomplete.%s", VTY_NEWLINE);
+        if (!qos_schedule_profile_is_complete(schedule_profile_row, true)) {
             cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
@@ -107,7 +108,7 @@ static int qos_apply_port_command(const char *port_name,
         /* Check that profiles contain all the same queues. */
         if (!qos_profiles_contain_same_queues(queue_profile_row,
                 schedule_profile_row)) {
-            vty_out(vty, "queue_profile_row and schedule_profile_row cannot contain different queues.%s", VTY_NEWLINE);
+            vty_out(vty, "The queue profile and schedule profile cannot contain different queues.%s", VTY_NEWLINE);
             cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
@@ -141,8 +142,8 @@ DEFUN (qos_apply_port,
         "Configure QoS\n"
         "The schedule-profile to apply\n"
         "The schedule-profile to apply\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: apply qos");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: apply qos", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -151,7 +152,7 @@ DEFUN (qos_apply_port,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -160,7 +161,7 @@ DEFUN (qos_apply_port,
     if (schedule_profile_name != NULL) {
         char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -179,8 +180,8 @@ DEFUN (qos_apply_port_strict,
         "Configure QoS\n"
         "The schedule-profile to apply\n"
         "Use the strict schedule profile which has all queues configured to use the strict algorithm\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: apply qos");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: apply qos", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -189,7 +190,7 @@ DEFUN (qos_apply_port_strict,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -198,7 +199,7 @@ DEFUN (qos_apply_port_strict,
     if (schedule_profile_name != NULL) {
         char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
@@ -260,8 +261,8 @@ DEFUN (qos_apply_port_no,
         "Configure QoS\n"
         "Clears the schedule profile\n"
         "The name of the schedule profile\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no apply qos");
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no apply qos", QOS_CLI_AUDIT_BUFFER_SIZE);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -270,7 +271,7 @@ DEFUN (qos_apply_port_no,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, QOS_CLI_STRING_BUFFER_SIZE);
             free(cfg);
         }
     }
