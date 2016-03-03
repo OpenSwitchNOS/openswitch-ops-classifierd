@@ -52,14 +52,14 @@ class QosApplyGlobalCliTest(OpsVsiTest):
 
         s1.cmdCLI('no qos schedule-profile p1')
         s1.cmdCLI('qos schedule-profile p1')
-        s1.cmdCLI('wrr queue 4 weight 400')
-        s1.cmdCLI('wrr queue 5 weight 500')
-        s1.cmdCLI('wrr queue 6 weight 600')
-        s1.cmdCLI('wrr queue 7 weight 700')
+        s1.cmdCLI('wrr queue 4 weight 40')
+        s1.cmdCLI('wrr queue 5 weight 50')
+        s1.cmdCLI('wrr queue 6 weight 60')
+        s1.cmdCLI('wrr queue 7 weight 70')
         s1.cmdCLI('wrr queue 0 weight 1')
-        s1.cmdCLI('wrr queue 1 weight 100')
-        s1.cmdCLI('wrr queue 2 weight 200')
-        s1.cmdCLI('wrr queue 3 weight 300')
+        s1.cmdCLI('wrr queue 1 weight 10')
+        s1.cmdCLI('wrr queue 2 weight 20')
+        s1.cmdCLI('wrr queue 3 weight 30')
         s1.cmdCLI('exit')
 
         return s1
@@ -69,6 +69,15 @@ class QosApplyGlobalCliTest(OpsVsiTest):
         s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = s1.cmdCLI('do show running-config')
         assert 'p1' in out
+
+    def qosApplyGlobalCommandWithDuplicateQueueProfileQueue(self):
+        s1 = self.setUp()
+        s1.cmdCLI('qos queue-profile p1')
+        s1.cmdCLI('map queue 0 local-priority 7')
+        s1.cmdCLI('map queue 1 local-priority 7')
+        s1.cmdCLI('exit')
+        out = s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
+        assert 'assigned more than once' in out
 
     def qosApplyGlobalCommandWithMissingQueueProfileQueue(self):
         s1 = self.setUp()
@@ -136,7 +145,7 @@ class QosApplyGlobalCliTest(OpsVsiTest):
         s1.cmdCLI('exit')
         s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = s1.cmdCLI('do show qos schedule-profile')
-        assert 'applied        "p1"' in out
+        assert 'applied        p1' in out
 
     def qosApplyGlobalCommandWithAllWrr(self):
         s1 = self.setUp()
@@ -152,7 +161,7 @@ class QosApplyGlobalCliTest(OpsVsiTest):
         s1.cmdCLI('exit')
         s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = s1.cmdCLI('do show qos schedule-profile')
-        assert 'applied        "p1"' in out
+        assert 'applied        p1' in out
 
     def qosApplyGlobalCommandWithAllWrrWithMaxStrict(self):
         s1 = self.setUp()
@@ -168,7 +177,7 @@ class QosApplyGlobalCliTest(OpsVsiTest):
         s1.cmdCLI('exit')
         s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = s1.cmdCLI('do show qos schedule-profile')
-        assert 'applied        "p1"' in out
+        assert 'applied        p1' in out
 
     def qosApplyGlobalCommandWithHigherStrictLowerWrr(self):
         s1 = self.setUp()
@@ -183,7 +192,7 @@ class QosApplyGlobalCliTest(OpsVsiTest):
         s1.cmdCLI('wrr queue 3 weight 300')
         s1.cmdCLI('exit')
         out = s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
-        assert 'incomplete' in out
+        assert 'must have the same algorithm assigned to each queue' in out
 
     def qosApplyGlobalCommandWithLowerStrictHigherWrr(self):
         s1 = self.setUp()
@@ -198,7 +207,7 @@ class QosApplyGlobalCliTest(OpsVsiTest):
         s1.cmdCLI('strict queue 3')
         s1.cmdCLI('exit')
         out = s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
-        assert 'incomplete' in out
+        assert 'must have the same algorithm assigned to each queue' in out
 
     def qosApplyGlobalCommandAndThenRestoreDefaultQueueProfile(self):
         s1 = self.setUp()
@@ -243,8 +252,11 @@ class Test_qos_apply_global_cli:
     def test_qosApplyGlobalCommand(self):
         self.test.qosApplyGlobalCommand()
 
-    def test_qosApplyGlobalCommandWithMissingQueueProfileQueue(self):
-        self.test.qosApplyGlobalCommandWithMissingQueueProfileQueue()
+    def test_qosApplyGlobalCommandWithDuplicateQueueProfileQueue(self):
+        self.test.qosApplyGlobalCommandWithDuplicateQueueProfileQueue()
+
+    def test_qosApplyGlobalCommandWithDuplicateQueueProfileQueue(self):
+        self.test.qosApplyGlobalCommandWithDuplicateQueueProfileQueue()
 
     def test_qosApplyGlobalCommandWithMissingScheduleProfileQueue(self):
         self.test.qosApplyGlobalCommandWithMissingScheduleProfileQueue()

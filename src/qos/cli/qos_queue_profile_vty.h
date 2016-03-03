@@ -21,38 +21,46 @@
 /**
  * Shows the global queue profile running config.
  */
-void qos_queue_profile_show_running_config(void);
+void
+qos_queue_profile_show_running_config(void);
 
 /**
  * Returns true if the queue profile has the queue_num.
  */
-bool qos_queue_profile_has_queue_num(struct ovsrec_q_profile *profile_row,
+bool
+qos_queue_profile_has_queue_num(struct ovsrec_q_profile *profile_row,
         int64_t queue_num);
 
 /**
  * Returns true if the queue profile is complete.
  */
-bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row);
+bool
+qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row,
+        bool print_error);
 
 /**
  * Retrieves the queue profile row.
  */
-struct ovsrec_q_profile *qos_get_queue_profile_row(
+struct ovsrec_q_profile *
+qos_get_queue_profile_row(
         const char *profile_name);
 
 /**
  * Shows the running config for qos queue profile.
  */
-void qos_queue_profile_show_running_config(void);
+void
+qos_queue_profile_show_running_config(void);
 
 /**
  * Initializes vty functions for qos queue profile.
  */
-void qos_queue_profile_vty_init(void);
+void
+qos_queue_profile_vty_init(void);
 
 /**
  * Initializes ovsdb functions for qos queue profile.
  */
-void qos_queue_profile_ovsdb_init(void);
+void
+qos_queue_profile_ovsdb_init(void);
 
 #endif /* _QOS_QUEUE_PROFILE_VTY_H_ */

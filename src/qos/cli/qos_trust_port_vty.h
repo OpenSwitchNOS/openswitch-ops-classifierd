@@ -21,11 +21,13 @@
 /**
  * Initializes vty functions for port qos trust.
  */
-void qos_trust_port_vty_init(void);
+void
+qos_trust_port_vty_init(void);
 
 /**
  * Initializes ovsdb functions for port qos trust.
  */
-void qos_trust_port_ovsdb_init(void);
+void
+qos_trust_port_ovsdb_init(void);
 
 #endif /* _QOS_TRUST_PORT_VTY_H_ */

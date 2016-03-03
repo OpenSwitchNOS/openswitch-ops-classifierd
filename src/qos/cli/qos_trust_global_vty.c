@@ -35,7 +35,12 @@
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_trust_global_cli);
 extern struct ovsdb_idl *idl;
 
-static int qos_trust_global_command(const char *qos_trust_name) {
+/**
+ * Executes the qos_trust_global_command for the given qos_trust_name.
+ */
+static int
+qos_trust_global_command(const char *qos_trust_name)
+{
     if (qos_trust_name == NULL) {
         vty_out(vty, "qos trust name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -72,43 +77,57 @@ static int qos_trust_global_command(const char *qos_trust_name) {
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_trust_global,
+/**
+ * Executes the qos_trust_global_command.
+ */
+DEFUN(qos_trust_global,
         qos_trust_global_cmd,
         "qos trust (none|cos|dscp)",
         "Configure QoS\n"
         "Set the top-level QoS Trust Mode configuration\n"
         "Do not trust any priority fields, and remark all of them to 0\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
-        "Trust DSCP and remark the 802.1p priority to match\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: qos trust");
+        "Trust DSCP and remark the 802.1p priority to match\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: qos trust", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *qos_trust_name = argv[0];
     if (qos_trust_name != NULL) {
-        char *cfg = audit_encode_nv_string("qos_trust_name", qos_trust_name, 0);
+        char *cfg = audit_encode_nv_string(
+                "qos_trust_name", qos_trust_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     int result = qos_trust_global_command(qos_trust_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static int qos_trust_global_no_command(void) {
+/**
+ * Executes the qos_trust_global_no_command.
+ */
+static int
+qos_trust_global_no_command(void)
+{
     qos_trust_global_command(QOS_TRUST_DEFAULT);
 
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_trust_global_no,
+/**
+ * Executes the qos_trust_global_no_command.
+ */
+DEFUN(qos_trust_global_no,
         qos_trust_global_no_cmd,
         "no qos trust {none|cos|dscp}",
         NO_STR
@@ -116,21 +135,28 @@ DEFUN (qos_trust_global_no,
         "Restore the top-level QoS Trust Mode to its factory default\n"
         "Do not trust any priority fields, and remark all of them to 0\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
-        "Trust DSCP and remark the 802.1p priority to match\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no qos trust");
+        "Trust DSCP and remark the 802.1p priority to match\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no qos trust", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     int result = qos_trust_global_no_command();
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static int qos_trust_global_show_command(const char *default_parameter) {
+/**
+ * Executes the qos_trust_global_show_command for the given default_parameter.
+ */
+static int
+qos_trust_global_show_command(const char *default_parameter)
+{
     const char *qos_trust_name;
     if (default_parameter != NULL) {
         /* Show the factory default. */
@@ -151,20 +177,29 @@ static int qos_trust_global_show_command(const char *default_parameter) {
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_trust_global_show,
+/**
+ * Executes the qos_trust_global_show_command.
+ */
+DEFUN(qos_trust_global_show,
         qos_trust_global_show_cmd,
         "show qos trust {default}",
         SHOW_STR
         "Show QoS Configuration\n"
         "Show QoS Trust Configuration\n"
-        "Display the factory default value\n") {
+        "Display the factory default value\n")
+{
     const char *default_parameter = argv[0];
 
     return qos_trust_global_show_command(default_parameter);
 }
 
-static vtysh_ret_val qos_trust_global_show_running_config_callback(
-        void *p_private) {
+/**
+ * The callback function for qos_trust_global_show_running_config.
+ */
+static vtysh_ret_val
+qos_trust_global_show_running_config_callback(
+        void *p_private)
+{
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
     if (system_row == NULL) {
         return e_vtysh_ok;
@@ -176,14 +211,20 @@ static vtysh_ret_val qos_trust_global_show_running_config_callback(
         return e_vtysh_ok;
     }
 
-    if (strcmp(qos_trust_name, QOS_TRUST_DEFAULT) != 0) {
+    if (strncmp(qos_trust_name, QOS_TRUST_DEFAULT,
+            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
         vty_out(vty, "qos trust %s%s", qos_trust_name, VTY_NEWLINE);
     }
 
     return e_vtysh_ok;
 }
 
-void qos_trust_global_show_running_config(void) {
+/**
+ * Installs the callback function for qos_trust_global_show_running_config.
+ */
+void
+qos_trust_global_show_running_config(void)
+{
     vtysh_context_client client;
     memset(&client, 0, sizeof(vtysh_context_client));
     client.p_client_name = "qos_trust_global_show_running_config_callback";
@@ -197,13 +238,23 @@ void qos_trust_global_show_running_config(void) {
     }
 }
 
-void qos_trust_global_vty_init(void) {
+/**
+ * Initializes qos_trust_global_vty.
+ */
+void
+qos_trust_global_vty_init(void)
+{
     install_element(CONFIG_NODE, &qos_trust_global_cmd);
     install_element(CONFIG_NODE, &qos_trust_global_no_cmd);
     install_element (ENABLE_NODE, &qos_trust_global_show_cmd);
 }
 
-void qos_trust_global_ovsdb_init(void) {
+/**
+ * Initializes qos_trust_global_ovsdb.
+ */
+void
+qos_trust_global_ovsdb_init(void)
+{
     ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_qos_config);
 }

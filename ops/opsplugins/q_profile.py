@@ -35,6 +35,8 @@ class QProfileValidator(BaseValidator):
         profile_row = validation_args.resource_row
         self.validate_profile_applied_cannot_be_amended_or_deleted(
             validation_args, profile_row)
+        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
         self.validate_profile_name_contains_valid_chars(profile_row)
         self.validate_profile_name_cannot_be_strict(profile_row)
 
@@ -45,6 +47,10 @@ class QProfileValidator(BaseValidator):
         profile_row = validation_args.resource_row
         self.validate_profile_applied_cannot_be_amended_or_deleted(
             validation_args, profile_row)
+        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
+        self.validate_profile_default_cannot_be_deleted(
+            validation_args, profile_row)
 
     #
     # Validates that an applied profile cannot be amended or deleted.
@@ -52,6 +58,23 @@ class QProfileValidator(BaseValidator):
     def validate_profile_applied_cannot_be_amended_or_deleted(self, validation_args, profile_row):
         if qos_utils.queue_profile_is_applied(validation_args, profile_row):
             details = "An applied profile cannot be amended or deleted."
+            raise ValidationError(error.VERIFICATION_FAILED, details)
+
+    #
+    # Validates that a hardware default profile cannot be amended or deleted.
+    #
+    def validate_profile_hw_default_cannot_be_amended_or_deleted(self, validation_args, profile_row):
+        if qos_utils.queue_profile_is_hw_default(validation_args, profile_row):
+            details = "A hardware default profile cannot be amended or deleted."
+            raise ValidationError(error.VERIFICATION_FAILED, details)
+
+    #
+    # Validates that the default profile cannot be deleted.
+    #
+    def validate_profile_default_cannot_be_deleted(self, validation_args, profile_row):
+        profile_name = profile_row.name
+        if profile_name == qos_utils.QOS_DEFAULT_NAME:
+            details = "The default profile cannot be deleted."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #

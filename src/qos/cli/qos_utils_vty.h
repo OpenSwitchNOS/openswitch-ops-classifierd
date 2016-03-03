@@ -20,21 +20,25 @@
 
 #define QOS_INVALID_STRING_ERROR_MESSAGE \
 "This field can have a length up to 64 characters.\n\
-The allowed characters are alphanumeric, underscore ('_'), and hyphen ('-').%s"
+The allowed characters are alphanumeric, underscore ('_'),\n\
+hyphen ('-'), and dot ('.').%s"
 
 /**
  * Returns true if the string is a valid string.
  */
-bool qos_is_valid_string(const char *string);
+bool
+qos_is_valid_string(const char *string);
 
 /**
  * Returns the port row for the given port name.
  */
-struct ovsrec_port *port_row_for_name(const char *port_name);
+struct ovsrec_port *
+port_row_for_name(const char *port_name);
 
 /**
  * Returns true if the given port_name is a member of a lag.
  */
-bool is_member_of_lag(const char *port_name);
+bool
+is_member_of_lag(const char *port_name);
 
 #endif /* _QOS_UTILS_VTY_H_ */

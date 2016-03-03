@@ -35,8 +35,13 @@
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_cos_map_cli);
 extern struct ovsdb_idl *idl;
 
-static struct ovsrec_qos_cos_map_entry *qos_cos_map_row_for_code_point(
-        int64_t code_point) {
+/**
+ * Returns the cos_map_row for the given code_point.
+ */
+static struct ovsrec_qos_cos_map_entry *
+qos_cos_map_row_for_code_point(
+        int64_t code_point)
+{
     const struct ovsrec_qos_cos_map_entry *cos_map_row;
     OVSREC_QOS_COS_MAP_ENTRY_FOR_EACH(cos_map_row, idl) {
         if (cos_map_row->code_point == code_point) {
@@ -47,40 +52,14 @@ static struct ovsrec_qos_cos_map_entry *qos_cos_map_row_for_code_point(
     return NULL;
 }
 
-static void set_cos_map_entry(struct ovsrec_qos_cos_map_entry *cos_map_entry,
-        int64_t code_point, int64_t local_priority, char *color,
-        char *description) {
-    cos_map_entry->code_point = code_point;
-    cos_map_entry->local_priority = local_priority;
-    cos_map_entry->color = color;
-    cos_map_entry->description = description;
-}
-
-static struct ovsrec_qos_cos_map_entry *qos_create_default_cos_map(void) {
-    struct ovsrec_qos_cos_map_entry *cos_map = xmalloc(
-            sizeof(struct ovsrec_qos_cos_map_entry) * QOS_COS_MAP_ENTRY_COUNT);
-    set_cos_map_entry(&cos_map[0], 0, 1, "green", "Best_Effort");
-    set_cos_map_entry(&cos_map[1], 1, 0, "green", "Background");
-    set_cos_map_entry(&cos_map[2], 2, 2, "green", "Excellent_Effort");
-    set_cos_map_entry(&cos_map[3], 3, 3, "green", "Critical_Applications");
-    set_cos_map_entry(&cos_map[4], 4, 4, "green", "Video");
-    set_cos_map_entry(&cos_map[5], 5, 5, "green", "Voice");
-    set_cos_map_entry(&cos_map[6], 6, 6, "green", "Internetwork_Control");
-    set_cos_map_entry(&cos_map[7], 7, 7, "green", "Network_Control");
-
-    return cos_map;
-}
-
-static void qos_destroy_default_cos_map(struct ovsrec_qos_cos_map_entry *cos_map) {
-    if (cos_map == NULL) {
-        return;
-    }
-
-    free(cos_map);
-}
-
-static int qos_cos_map_command(int64_t code_point, int64_t local_priority,
-        const char *color, const char *description) {
+/**
+ * Executes the qos_cos_map_command for the given
+ * code_point, local_priority, color, and description.
+ */
+static int
+qos_cos_map_command(int64_t code_point, int64_t local_priority,
+        const char *color, const char *description)
+{
     if (description != NULL) {
         if (!qos_is_valid_string(description)) {
             vty_out(vty, QOS_INVALID_STRING_ERROR_MESSAGE, VTY_NEWLINE);
@@ -122,9 +101,14 @@ static int qos_cos_map_command(int64_t code_point, int64_t local_priority,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_cos_map,
+/**
+ * Executes the qos_cos_map_command for the given
+ * code_point, local_priority, color, and description.
+ */
+DEFUN(qos_cos_map,
         qos_cos_map_cmd,
-        "qos cos-map <0-7> local-priority <0-7> {color (green|yellow|red) | name STRING}",
+        "qos cos-map <0-7> local-priority <0-7>\
+ {color (green|yellow|red) | name STRING}",
         "Configure QoS\n"
         "Configure QoS COS Map\n"
         "The QoS COS Map code point\n"
@@ -135,9 +119,10 @@ DEFUN (qos_cos_map,
         "Set color to yellow\n"
         "Set color to red\n"
         "Configure QoS COS Map name\n"
-        "The QoS COS Map name\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: qos cos-map");
+        "The QoS COS Map name\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: qos cos-map", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -146,7 +131,7 @@ DEFUN (qos_cos_map,
     if (code_point != NULL) {
         char *cfg = audit_encode_nv_string("code_point", code_point, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -154,9 +139,10 @@ DEFUN (qos_cos_map,
 
     const char *local_priority = argv[1];
     if (local_priority != NULL) {
-        char *cfg = audit_encode_nv_string("local_priority", local_priority, 0);
+        char *cfg = audit_encode_nv_string(
+                "local_priority", local_priority, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -166,7 +152,7 @@ DEFUN (qos_cos_map,
     if (color != NULL) {
         char *cfg = audit_encode_nv_string("color", color, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -175,44 +161,58 @@ DEFUN (qos_cos_map,
     if (description != NULL) {
         char *cfg = audit_encode_nv_string("description", description, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
-    int result = qos_cos_map_command(code_point_int, local_priority_int, color, description);
+    int result = qos_cos_map_command(
+            code_point_int, local_priority_int, color, description);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static int qos_cos_map_no_command(int64_t code_point) {
-    struct ovsrec_qos_cos_map_entry *default_cos_map = qos_create_default_cos_map();
-
-    int i;
-    for (i = 0; i < QOS_COS_MAP_ENTRY_COUNT; i++) {
-        struct ovsrec_qos_cos_map_entry default_cos_map_entry = default_cos_map[i];
-        if (code_point == default_cos_map_entry.code_point) {
-            qos_cos_map_command(
-                    default_cos_map_entry.code_point,
-                    default_cos_map_entry.local_priority,
-                    default_cos_map_entry.color,
-                    default_cos_map_entry.description);
-        }
+/**
+ * Executes the qos_cos_map_no_command for the given code_point.
+ */
+static int
+qos_cos_map_no_command(int64_t code_point)
+{
+    /* Retrieve the row. */
+    struct ovsrec_qos_cos_map_entry *cos_map_row =
+            qos_cos_map_row_for_code_point(code_point);
+    if (cos_map_row == NULL) {
+        vty_out(vty, "cos map row cannot be NULL.%s", VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
     }
 
-    qos_destroy_default_cos_map(default_cos_map);
+    int64_t local_priority = atoi(smap_get(
+            &cos_map_row->hw_defaults, QOS_DEFAULT_LOCAL_PRIORITY_KEY));
+    const char *color = smap_get(
+            &cos_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY);
+    const char *description = smap_get(
+            &cos_map_row->hw_defaults, QOS_DEFAULT_DESCRIPTION_KEY);
 
-    return CMD_SUCCESS;
+    int result = qos_cos_map_command(code_point, local_priority,
+            color, description);
+
+    return result;
 }
 
-DEFUN (qos_cos_map_no,
+/**
+ * Executes the qos_cos_map_no_command for the given code_point.
+ */
+DEFUN(qos_cos_map_no,
         qos_cos_map_no_cmd,
-        "no qos cos-map <0-7> {local-priority <0-7> | color (green|yellow|red) | name STRING}",
+        "no qos cos-map <0-7> {local-priority <0-7>\
+ | color (green|yellow|red) | name STRING}",
         NO_STR
         "Configure QoS\n"
-        "Restore the QoS COS Map values for a given code point to their factory default\n"
+        "Restore the QoS COS Map values for a given\
+ code point to their factory default\n"
         "The QoS COS Map code point\n"
         "Configure QoS COS Map local-priority\n"
         "The QoS COS Map local-priority\n"
@@ -221,9 +221,10 @@ DEFUN (qos_cos_map_no,
         "Set color to yellow\n"
         "Set color to red\n"
         "Configure QoS COS Map name\n"
-        "The QoS COS Map name\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no qos cos-map");
+        "The QoS COS Map name\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no qos cos-map", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -232,7 +233,7 @@ DEFUN (qos_cos_map_no,
     if (code_point != NULL) {
         char *cfg = audit_encode_nv_string("code_point", code_point, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -240,80 +241,97 @@ DEFUN (qos_cos_map_no,
 
     int result = qos_cos_map_no_command(code_point_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static void print_cos_map_row(struct ovsrec_qos_cos_map_entry *cos_map_row) {
-    char buffer[QOS_CLI_STRING_BUFFER_SIZE];
+/**
+ * Prints the given cos_map_row. If is_default is true, then the
+ * hw_defaults will be shown.
+ */
+static void
+print_cos_map_row(struct ovsrec_qos_cos_map_entry *cos_map_row,
+        bool is_default)
+{
+    int code_point = is_default ?
+            atoi(smap_get(&cos_map_row->hw_defaults,
+                    QOS_DEFAULT_CODE_POINT_KEY)) :
+                    (int) cos_map_row->code_point;
+    vty_out (vty, "%-10d ", code_point);
 
-    vty_out (vty, "%-10d ", (int) cos_map_row->code_point);
+    int local_priority = is_default ?
+            atoi(smap_get(&cos_map_row->hw_defaults,
+                    QOS_DEFAULT_LOCAL_PRIORITY_KEY)) :
+                    (int) cos_map_row->local_priority;
+    vty_out (vty, "%-14d ", local_priority);
 
-    vty_out (vty, "%-14d ", (int) cos_map_row->local_priority);
+    const char *color = is_default ?
+            smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY) :
+            cos_map_row->color;
+    vty_out (vty, "%-7s ", color);
 
-    vty_out (vty, "%-7s ", cos_map_row->color);
-
-    buffer[0] = '\0';
-    if (cos_map_row->description != NULL &&
-            strcmp(cos_map_row->description, "") != 0) {
-        sprintf(buffer, "\"%s\"", cos_map_row->description);
-    }
-    vty_out (vty, "%s ", buffer);
+    const char *description = is_default ?
+            smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_DESCRIPTION_KEY) :
+            cos_map_row->description;
+    vty_out (vty, "%s ", description);
 
     vty_out (vty, "%s", VTY_NEWLINE);
 }
 
-static int qos_cos_map_show_command(const char *default_parameter) {
+/**
+ * Executes the qos_cos_map_show_command. If the default_parameter is
+ * not NULL, then the defaults will be shown.
+ */
+static int
+qos_cos_map_show_command(const char *default_parameter)
+{
     vty_out (vty, "code_point local_priority color   name%s", VTY_NEWLINE);
     vty_out (vty, "---------- -------------- ------- ----%s", VTY_NEWLINE);
 
-    if (default_parameter != NULL) {
-        /* Show default map. */
-        struct ovsrec_qos_cos_map_entry *default_cos_map =
-                qos_create_default_cos_map();
+    /* Create an ordered array of rows. */
+    struct ovsrec_qos_cos_map_entry *cos_map_rows[QOS_COS_MAP_ENTRY_COUNT];
+    const struct ovsrec_qos_cos_map_entry *cos_map_row;
+    OVSREC_QOS_COS_MAP_ENTRY_FOR_EACH(cos_map_row, idl) {
+        cos_map_rows[cos_map_row->code_point] =
+                (struct ovsrec_qos_cos_map_entry *) cos_map_row;
+    }
 
-        int i;
-        for (i = 0; i < QOS_COS_MAP_ENTRY_COUNT; i++) {
-            print_cos_map_row(&default_cos_map[i]);
-        }
-
-        qos_destroy_default_cos_map(default_cos_map);
-    } else {
-        /* Show the active map. */
-
-        /* Create an ordered array of rows. */
-        struct ovsrec_qos_cos_map_entry *cos_map_rows[QOS_COS_MAP_ENTRY_COUNT];
-        const struct ovsrec_qos_cos_map_entry *cos_map_row;
-        OVSREC_QOS_COS_MAP_ENTRY_FOR_EACH(cos_map_row, idl) {
-            cos_map_rows[cos_map_row->code_point] =
-                    (struct ovsrec_qos_cos_map_entry *) cos_map_row;
-        }
-
-        /* Print the ordered rows. */
-        int i;
-        for (i = 0; i < QOS_COS_MAP_ENTRY_COUNT; i++) {
-            print_cos_map_row(cos_map_rows[i]);
-        }
+    /* Print the ordered rows. */
+    bool is_default = (default_parameter != NULL);
+    int i;
+    for (i = 0; i < QOS_COS_MAP_ENTRY_COUNT; i++) {
+        print_cos_map_row(cos_map_rows[i], is_default);
     }
 
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_cos_map_show,
+/**
+ * Executes the qos_cos_map_show_command. If the default_parameter is
+ * not NULL, then the defaults will be shown.
+ */
+DEFUN(qos_cos_map_show,
         qos_cos_map_show_cmd,
         "show qos cos-map {default}",
         SHOW_STR
         "Show QoS Configuration\n"
         "Show QoS COS-Map Configuration\n"
-        "Display the factory default values\n") {
+        "Display the factory default values\n")
+{
     const char *default_parameter = argv[0];
 
     return qos_cos_map_show_command(default_parameter);
 }
 
-static void display_headers(bool *cos_map_header_displayed,
-        bool *code_point_header_displayed, int64_t code_point) {
+/**
+ * Displays the headers for the given code_point.
+ */
+static void
+display_headers(bool *cos_map_header_displayed,
+        bool *code_point_header_displayed, int64_t code_point)
+{
     if (!*cos_map_header_displayed) {
         vty_out (vty, "qos cos-map%s", VTY_NEWLINE);
         *cos_map_header_displayed = true;
@@ -325,64 +343,72 @@ static void display_headers(bool *cos_map_header_displayed,
     }
 }
 
-static vtysh_ret_val qos_cos_map_show_running_config_callback(void *p_private) {
-    struct ovsrec_qos_cos_map_entry *default_cos_map = qos_create_default_cos_map();
-
+/**
+ * Contains the callback for qos_cos_map_show_running_config.
+ */
+static vtysh_ret_val
+qos_cos_map_show_running_config_callback(
+        void *p_private)
+{
     bool cos_map_header_displayed = false;
-    int i;
-    for (i = 0; i < QOS_COS_MAP_ENTRY_COUNT; i++) {
-        struct ovsrec_qos_cos_map_entry default_cos_map_entry = default_cos_map[i];
+    const struct ovsrec_qos_cos_map_entry *cos_map_row;
+    OVSREC_QOS_COS_MAP_ENTRY_FOR_EACH(cos_map_row, idl) {
+        int64_t code_point = cos_map_row->code_point;
+        bool code_point_header_displayed = false;
 
-        const struct ovsrec_qos_cos_map_entry *cos_map_row;
-        OVSREC_QOS_COS_MAP_ENTRY_FOR_EACH(cos_map_row, idl) {
-            int64_t code_point = cos_map_row->code_point;
-            if (cos_map_row->code_point == default_cos_map_entry.code_point) {
-                bool code_point_header_displayed = false;
+        /* Show local_priority. */
+        int64_t default_local_priority = atoi(smap_get(
+                &cos_map_row->hw_defaults, QOS_DEFAULT_LOCAL_PRIORITY_KEY));
+        if (cos_map_row->local_priority != default_local_priority) {
+            display_headers(&cos_map_header_displayed,
+                    &code_point_header_displayed, code_point);
+            vty_out(vty, "        local_priority %d%s",
+                    (int) cos_map_row->local_priority, VTY_NEWLINE);
+        }
 
-                /* Show local_priority. */
-                if (cos_map_row->local_priority
-                        != default_cos_map_entry.local_priority) {
-                    display_headers(&cos_map_header_displayed,
-                            &code_point_header_displayed, code_point);
-                    vty_out(vty, "        local_priority %d%s",
-                            (int) cos_map_row->local_priority, VTY_NEWLINE);
-                }
+        /* Show color. */
+        const char *default_color =
+                smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY);
+        if (strncmp(cos_map_row->color, default_color,
+                QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            display_headers(&cos_map_header_displayed,
+                    &code_point_header_displayed, code_point);
+            vty_out(vty, "        color %s%s", cos_map_row->color,
+                    VTY_NEWLINE);
+        }
 
-                /* Show color. */
-                if (strcmp(cos_map_row->color, default_cos_map_entry.color)
-                        != 0) {
-                    display_headers(&cos_map_header_displayed,
-                            &code_point_header_displayed, code_point);
-                    vty_out(vty, "        color %s%s", cos_map_row->color,
-                            VTY_NEWLINE);
-                }
-
-                /* Show description. */
-                if (strcmp(cos_map_row->description,
-                        default_cos_map_entry.description) != 0) {
-                    char description[QOS_CLI_STRING_BUFFER_SIZE];
-                    if (strcmp(cos_map_row->description, "") == 0) {
-                        strcpy(description, QOS_CLI_EMPTY_DISPLAY_STRING);
-                    } else {
-                        sprintf(description, "\"%s\"",
-                                cos_map_row->description);
-                    }
-
-                    display_headers(&cos_map_header_displayed,
-                            &code_point_header_displayed, code_point);
-                    vty_out(vty, "        name %s%s", description,
-                            VTY_NEWLINE);
-                }
+        /* Show description. */
+        const char *default_description =
+                smap_get(&cos_map_row->hw_defaults,
+                        QOS_DEFAULT_DESCRIPTION_KEY);
+        if (strncmp(cos_map_row->description, default_description,
+                QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            char description[QOS_CLI_STRING_BUFFER_SIZE];
+            if (strncmp(cos_map_row->description, "",
+                    QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+                strncpy(description, QOS_CLI_EMPTY_DISPLAY_STRING,
+                        sizeof(description));
+            } else {
+                strncpy(description, cos_map_row->description,
+                        sizeof(description));
             }
+
+            display_headers(&cos_map_header_displayed,
+                    &code_point_header_displayed, code_point);
+            vty_out(vty, "        name %s%s", description,
+                    VTY_NEWLINE);
         }
     }
-
-    qos_destroy_default_cos_map(default_cos_map);
 
     return e_vtysh_ok;
 }
 
-void qos_cos_map_show_running_config(void) {
+/**
+ * Installs the callback function for qos_cos_map_show_running_config.
+ */
+void
+qos_cos_map_show_running_config(void)
+{
     vtysh_context_client client;
     memset(&client, 0, sizeof(vtysh_context_client));
     client.p_client_name = "qos_cos_map_show_running_config_callback";
@@ -396,13 +422,23 @@ void qos_cos_map_show_running_config(void) {
     }
 }
 
-void qos_cos_map_vty_init(void) {
+/**
+ * Initializes qos_cos_map_vty.
+ */
+void
+qos_cos_map_vty_init(void)
+{
     install_element(CONFIG_NODE, &qos_cos_map_cmd);
     install_element(CONFIG_NODE, &qos_cos_map_no_cmd);
     install_element (ENABLE_NODE, &qos_cos_map_show_cmd);
 }
 
-void qos_cos_map_ovsdb_init(void) {
+/**
+ * Initializes qos_cos_map_ovsdb.
+ */
+void
+qos_cos_map_ovsdb_init(void)
+{
     ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_qos_cos_map_entries);
 
@@ -411,4 +447,7 @@ void qos_cos_map_ovsdb_init(void) {
     ovsdb_idl_add_column(idl, &ovsrec_qos_cos_map_entry_col_local_priority);
     ovsdb_idl_add_column(idl, &ovsrec_qos_cos_map_entry_col_color);
     ovsdb_idl_add_column(idl, &ovsrec_qos_cos_map_entry_col_description);
+    ovsdb_idl_add_column(idl, &ovsrec_qos_cos_map_entry_col_hw_defaults);
+    ovsdb_idl_add_column(idl, &ovsrec_qos_cos_map_entry_col_other_config);
+    ovsdb_idl_add_column(idl, &ovsrec_qos_cos_map_entry_col_external_ids);
 }

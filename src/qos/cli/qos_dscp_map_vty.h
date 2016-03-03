@@ -21,16 +21,19 @@
 /**
  * Shows the running config for the qos dscp map.
  */
-void qos_dscp_map_show_running_config(void);
+void
+qos_dscp_map_show_running_config(void);
 
 /**
  * Initializes vty functions for qos dscp map.
  */
-void qos_dscp_map_vty_init(void);
+void
+qos_dscp_map_vty_init(void);
 
 /**
  * Initializes ovsdb functions for qos dscp map.
  */
-void qos_dscp_map_ovsdb_init(void);
+void
+qos_dscp_map_ovsdb_init(void);
 
 #endif /* _QOS_DSCP_MAP_VTY_H_ */
