@@ -37,6 +37,8 @@ class QueueValidator(BaseValidator):
 
         self.validate_profile_applied_cannot_be_amended_or_deleted(
             validation_args, profile_row)
+        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
         self.validate_profile_entry_with_wrr_has_weight_less_than_max_weight(
             profile_entry_row)
 
@@ -44,7 +46,12 @@ class QueueValidator(BaseValidator):
     # Validates that the given deletion of a given row is allowed.
     #
     def validate_deletion(self, validation_args):
-        pass
+        profile_row = validation_args.p_resource_row
+
+        self.validate_profile_applied_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
+        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
 
     #
     # Validates that an applied profile cannot be amended or deleted.
@@ -55,9 +62,20 @@ class QueueValidator(BaseValidator):
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #
+    # Validates that a hardware default profile cannot be amended or deleted.
+    #
+    def validate_profile_hw_default_cannot_be_amended_or_deleted(self, validation_args, profile_row):
+        if qos_utils.queue_profile_is_hw_default(validation_args, profile_row):
+            details = "A hardware default profile cannot be amended or deleted."
+            raise ValidationError(error.VERIFICATION_FAILED, details)
+
+    #
     # Validates that a profile entry with wrr has a weight less than max weight.
     #
     def validate_profile_entry_with_wrr_has_weight_less_than_max_weight(self, profile_entry_row):
+        if profile_entry_row.algorithm is None:
+            return
+
         if profile_entry_row.algorithm[0] == qos_utils.QOS_WRR:
             if not profile_entry_row.weight:
                 details = "A wrr profile entry must have a weight."

@@ -15,37 +15,45 @@
  *
  ***************************************************************************/
 
+#include <config.h>
+
+#include "qos_schedule_profile_vty.h"
+
 #include <libaudit.h>
 
-#include "vtysh/command.h"
-#include "vtysh/vtysh.h"
-#include "vtysh/vtysh_user.h"
-#include "vswitch-idl.h"
+#include "memory.h"
+#include "openswitch-idl.h"
+#include "openvswitch/vlog.h"
 #include "ovsdb-idl.h"
-#include "qos_schedule_profile_vty.h"
 #include "qos_utils.h"
 #include "qos_utils_vty.h"
 #include "smap.h"
-#include "memory.h"
-#include "openvswitch/vlog.h"
-#include "openswitch-idl.h"
-#include "vtysh/vtysh_ovsdb_if.h"
+#include "vswitch-idl.h"
+#include "vtysh/command.h"
+#include "vtysh/vtysh.h"
 #include "vtysh/vtysh_ovsdb_config.h"
+#include "vtysh/vtysh_ovsdb_if.h"
+#include "vtysh/vtysh_user.h"
 
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_schedule_profile_cli);
 extern struct ovsdb_idl *idl;
 
+/**
+ * Global state for the profile name.
+ */
 static char g_profile_name[QOS_CLI_STRING_BUFFER_SIZE];
 
-static void qos_schedule_profile_create_factory_default(
-        struct ovsdb_idl_txn *txn,
-        const char *default_name);
-
-struct ovsrec_qos *qos_get_schedule_profile_row(
-        const char *profile_name) {
+/**
+ * Returns the schedule_profile_row for the given profile_name.
+ */
+struct ovsrec_qos *
+qos_get_schedule_profile_row(
+        const char *profile_name)
+{
     const struct ovsrec_qos *profile_row;
     OVSREC_QOS_FOR_EACH(profile_row, idl) {
-        if (strcmp(profile_row->name, profile_name) == 0) {
+        if (strncmp(profile_row->name, profile_name,
+                QOS_CLI_STRING_BUFFER_SIZE) == 0) {
             return (struct ovsrec_qos *) profile_row;
         }
     }
@@ -53,8 +61,14 @@ struct ovsrec_qos *qos_get_schedule_profile_row(
     return NULL;
 }
 
-static struct ovsrec_queue *qos_get_schedule_profile_entry_row(
-        struct ovsrec_qos *profile_row, int64_t queue_num) {
+/**
+ * Returns the schedule_profile_entry_row for the given profile_row and
+ * queue_num.
+ */
+static struct ovsrec_queue *
+qos_get_schedule_profile_entry_row(
+        struct ovsrec_qos *profile_row, int64_t queue_num)
+{
     int i;
     for (i = 0; i < profile_row->n_queues; i++) {
         if (profile_row->key_queues[i] == queue_num) {
@@ -65,8 +79,13 @@ static struct ovsrec_queue *qos_get_schedule_profile_entry_row(
     return NULL;
 }
 
-bool qos_schedule_profile_has_queue_num(struct ovsrec_qos *profile_row,
-        int64_t queue_num) {
+/**
+ * Returns true if the given profile_row has the given queue_num.
+ */
+bool
+qos_schedule_profile_has_queue_num(struct ovsrec_qos *profile_row,
+        int64_t queue_num)
+{
     int j;
     for (j = 0; j < profile_row->n_queues; j++) {
         int64_t profile_queue_num = profile_row->key_queues[j];
@@ -78,7 +97,12 @@ bool qos_schedule_profile_has_queue_num(struct ovsrec_qos *profile_row,
     return false;
 }
 
-static int64_t get_max_queue_num(struct ovsrec_qos *profile_row) {
+/**
+ * Returns the max queue_num for the given profile_row.
+ */
+static int64_t
+get_max_queue_num(struct ovsrec_qos *profile_row)
+{
     int64_t max_queue_num = -1;
 
     int i;
@@ -91,11 +115,14 @@ static int64_t get_max_queue_num(struct ovsrec_qos *profile_row) {
     return max_queue_num;
 }
 
-bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row) {
-    if (profile_row == NULL || profile_row->n_queues == 0) {
-        return false;
-    }
-
+/**
+ * Returns true if the given profile_row is complete. If 'print_error' is
+ * true, then any errors will be printed.
+ */
+bool
+qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row,
+        bool print_error)
+{
     /**
      * The spec is:
      * There are two allowed forms for schedule profiles: 1. All queues use
@@ -114,8 +141,9 @@ bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row) {
     for (i = 0; i < profile_row->n_queues; i++) {
         /* If it's the max and it's strict, then skip it. */
         if (max_queue_num == profile_row->key_queues[i] &&
-                strcmp(profile_row->value_queues[i]->algorithm,
-                        OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
+                strncmp(profile_row->value_queues[i]->algorithm,
+                        OVSREC_QUEUE_ALGORITHM_STRICT,
+                        QOS_CLI_STRING_BUFFER_SIZE) == 0) {
             continue;
         }
 
@@ -123,7 +151,13 @@ bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row) {
             algorithm = profile_row->value_queues[i]->algorithm;
         }
 
-        if (strcmp(profile_row->value_queues[i]->algorithm, algorithm) != 0) {
+        if (strncmp(profile_row->value_queues[i]->algorithm,
+                algorithm, QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            if (print_error) {
+                vty_out(vty, "The schedule profile must have the same\
+ algorithm assigned to each queue.%s",
+                        VTY_NEWLINE);
+            }
             return false;
         }
     }
@@ -131,7 +165,12 @@ bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row) {
     return true;
 }
 
-static bool is_row_applied(const struct ovsrec_qos *profile_row) {
+/**
+ * Returns true if the given profile_row is applied.
+ */
+static bool
+is_row_applied(const struct ovsrec_qos *profile_row)
+{
     if (profile_row == NULL) {
         return false;
     }
@@ -151,16 +190,56 @@ static bool is_row_applied(const struct ovsrec_qos *profile_row) {
     return false;
 }
 
-static bool is_applied(const char *profile_name) {
+/**
+ * Returns true if the given profile_name is applied.
+ */
+static bool
+is_applied(const char *profile_name)
+{
     struct ovsrec_qos *profile_row = qos_get_schedule_profile_row(
             profile_name);
 
     return is_row_applied(profile_row);
 }
 
-static struct ovsrec_queue *insert_queue_row(
+/**
+ * Returns true if the given profile_row is a hw_default row.
+ */
+static bool
+is_row_hw_default(const struct ovsrec_qos *profile_row)
+{
+    if (profile_row == NULL) {
+        return false;
+    }
+
+    if (profile_row->hw_default == NULL) {
+        return false;
+    }
+
+    return *profile_row->hw_default;
+}
+
+/**
+ * Returns true is the row for the given profile_name is a hw_default row.
+ */
+static bool
+is_hw_default(const char *profile_name)
+{
+    struct ovsrec_qos *profile_row = qos_get_schedule_profile_row(
+            profile_name);
+
+    return is_row_hw_default(profile_row);
+}
+
+/**
+ * Inserts into the database and returns the queue_row for the given
+ * profile_row, queue_num, and txn.
+ */
+static struct ovsrec_queue *
+insert_queue_row(
         struct ovsrec_qos *profile_row, int64_t queue_num,
-        struct ovsdb_idl_txn *txn) {
+        struct ovsdb_idl_txn *txn)
+{
     /* Create the queue row. */
     struct ovsrec_queue *queue_row =
             ovsrec_queue_insert(txn);
@@ -188,8 +267,13 @@ static struct ovsrec_queue *insert_queue_row(
     return queue_row;
 }
 
-static bool qos_schedule_profile_command(struct ovsdb_idl_txn *txn,
-        const char *profile_name) {
+/**
+ * Executes the qos_schedule_profile_command for the given profile_name.
+ */
+static bool
+qos_schedule_profile_command(struct ovsdb_idl_txn *txn,
+        const char *profile_name)
+{
     /* Retrieve the row. */
     struct ovsrec_qos *profile_row =
             qos_get_schedule_profile_row(profile_name);
@@ -202,7 +286,13 @@ static bool qos_schedule_profile_command(struct ovsdb_idl_txn *txn,
     return false;
 }
 
-static int qos_schedule_profile_command_commit(const char *profile_name) {
+/**
+ * Executes and commits the qos_schedule_profile_command for the
+ * given profile_name.
+ */
+static int
+qos_schedule_profile_command_commit(const char *profile_name)
+{
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -213,14 +303,22 @@ static int qos_schedule_profile_command_commit(const char *profile_name) {
         return CMD_OVSDB_FAILURE;
     }
 
-    if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
-        vty_out(vty, "profile_name cannot be '%s'.%s",
+    if (strncmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+        vty_out(vty, "The profile name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty,
+                "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -246,20 +344,24 @@ static int qos_schedule_profile_command_commit(const char *profile_name) {
         return CMD_OVSDB_FAILURE;
     }
 
-    snprintf(g_profile_name, QOS_CLI_MAX_STRING_LENGTH, "%s", profile_name);
+    strncpy(g_profile_name, profile_name, sizeof(g_profile_name));
     vty->node = QOS_SCHEDULE_PROFILE_NODE;
     vty->index = g_profile_name;
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile,
+/**
+ * Executes the qos_schedule_profile_command.
+ */
+DEFUN(qos_schedule_profile,
         qos_schedule_profile_cmd,
        "qos schedule-profile NAME",
        "Configure QoS\n"
        "Set the QoS Schedule Profile configuration\n"
-       "The name of the Schedule Profile\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: qos schedule-profile");
+       "The name of the Schedule Profile\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: qos schedule-profile", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -268,40 +370,93 @@ DEFUN (qos_schedule_profile,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     int result = qos_schedule_profile_command_commit(profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static bool qos_schedule_profile_no_command(struct ovsdb_idl_txn *txn,
-        const char *profile_name) {
-    if (strcmp(profile_name, QOS_DEFAULT_NAME) == 0) {
-        qos_schedule_profile_create_factory_default(txn, profile_name);
-    } else {
-        /* Retrieve the row. */
-        struct ovsrec_qos *profile_row =
-                qos_get_schedule_profile_row(profile_name);
-        if (profile_row == NULL) {
+/**
+ * Executes the qos_schedule_profile_no_command for the given
+ * profile_name.
+ */
+static bool
+qos_schedule_profile_no_command(struct ovsdb_idl_txn *txn,
+        const char *profile_name)
+{
+    /* Retrieve the row. */
+    struct ovsrec_qos *profile_row =
+            qos_get_schedule_profile_row(profile_name);
+    if (profile_row == NULL) {
+        vty_out(vty, "Profile %s does not exist.%s",
+                profile_name, VTY_NEWLINE);
+        return true;
+    }
+
+    if (strncmp(profile_name, QOS_DEFAULT_NAME,
+            QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+        /* For the profile named 'default', restore the factory defaults. */
+
+        /* Delete all default profile queue rows. */
+        ovsrec_qos_set_queues(profile_row, NULL, NULL, 0);
+
+        /* Retrieve the factory default row. */
+        struct ovsrec_qos *factory_default_profile_row =
+                qos_get_schedule_profile_row(QOS_FACTORY_DEFAULT_NAME);
+        if (factory_default_profile_row == NULL) {
             vty_out(vty, "Profile %s does not exist.%s",
-                    profile_name, VTY_NEWLINE);
+                    QOS_FACTORY_DEFAULT_NAME, VTY_NEWLINE);
             return true;
         }
 
-        /* Delete the row. */
+        /* Copy all factory defaults into new entry rows. */
+        int64_t queue_row_count =
+                factory_default_profile_row->n_queues;
+        int64_t *key_list =
+                xmalloc(sizeof(int64_t) *
+                        queue_row_count);
+        struct ovsrec_queue **value_list =
+                xmalloc(sizeof *profile_row->value_queues *
+                        queue_row_count);
+        int j;
+        for (j = 0; j < queue_row_count; j++) {
+            struct ovsrec_queue *queue_row =
+                    ovsrec_queue_insert(txn);
+            struct ovsrec_queue *default_row =
+                    factory_default_profile_row->value_queues[j];
+            ovsrec_queue_set_algorithm(queue_row, default_row->algorithm);
+            ovsrec_queue_set_weight(queue_row, default_row->weight, 1);
+            key_list[j] = factory_default_profile_row->key_queues[j];
+            value_list[j] = queue_row;
+        }
+
+        /* Add the new entry rows to the profile row. */
+        ovsrec_qos_set_queues(profile_row, key_list,
+                value_list, queue_row_count);
+        free(key_list);
+        free(value_list);
+    } else {
+        /* If not the profile named 'default', delete the row. */
         ovsrec_qos_delete(profile_row);
     }
 
     return false;
 }
 
-static int qos_schedule_profile_no_command_commit(const char *profile_name) {
+/**
+ * Executes and commits the qos_schedule_profile_no_command for the given
+ * profile_name.
+ */
+static int
+qos_schedule_profile_no_command_commit(const char *profile_name)
+{
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -312,14 +467,22 @@ static int qos_schedule_profile_no_command_commit(const char *profile_name) {
         return CMD_OVSDB_FAILURE;
     }
 
-    if (strcmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
-        vty_out(vty, "profile_name cannot be '%s'.%s",
+    if (strncmp(profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+        vty_out(vty, "The profile name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty,
+                "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -348,15 +511,19 @@ static int qos_schedule_profile_no_command_commit(const char *profile_name) {
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile_no,
+/**
+ * Executes the qos_schedule_profile_no_command.
+ */
+DEFUN(qos_schedule_profile_no,
         qos_schedule_profile_no_cmd,
         "no qos schedule-profile NAME",
         NO_STR
         "Configure QoS\n"
         "Deletes a Schedule Profile, if it is not currently applied\n"
-        "The name of the Schedule Profile to delete\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no qos schedule-profile");
+        "The name of the Schedule Profile to delete\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no qos schedule-profile", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -365,21 +532,28 @@ DEFUN (qos_schedule_profile_no,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     int result = qos_schedule_profile_no_command_commit(profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static bool qos_schedule_profile_strict_command(struct ovsdb_idl_txn *txn,
+/**
+ * Executes the qos_schedule_profile_strict_command for the given
+ * profile_name.
+ */
+static bool
+qos_schedule_profile_strict_command(struct ovsdb_idl_txn *txn,
         const char *profile_name,
-        int64_t queue_num) {
+        int64_t queue_num)
+{
     /* Retrieve the profile row. */
     struct ovsrec_qos *profile_row =
             qos_get_schedule_profile_row(profile_name);
@@ -405,8 +579,15 @@ static bool qos_schedule_profile_strict_command(struct ovsdb_idl_txn *txn,
     return false;
 }
 
-static int qos_schedule_profile_strict_command_commit(const char *profile_name,
-        int64_t queue_num) {
+/**
+ * Executes and commits the qos_schedule_profile_strict_command for the given
+ * profile_name.
+ */
+static int
+qos_schedule_profile_strict_command_commit(
+        const char *profile_name,
+        int64_t queue_num)
+{
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -414,6 +595,13 @@ static int qos_schedule_profile_strict_command_commit(const char *profile_name,
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty,
+                "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -443,14 +631,18 @@ static int qos_schedule_profile_strict_command_commit(const char *profile_name,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile_strict,
+/**
+ * Executes the qos_schedule_profile_strict_command.
+ */
+DEFUN(qos_schedule_profile_strict,
         qos_schedule_profile_strict_cmd,
        "strict queue <0-7>",
        "Configure a queue in a Schedule Profile to use strict scheduling\n"
        "The number of the queue\n"
-       "The number of the queue\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: strict queue");
+       "The number of the queue\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: strict queue", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -459,7 +651,7 @@ DEFUN (qos_schedule_profile_strict,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -468,20 +660,27 @@ DEFUN (qos_schedule_profile_strict,
     if (queue_num != NULL) {
         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
     int64_t queue_num_int = atoi(queue_num);
 
-    int result = qos_schedule_profile_strict_command_commit(profile_name, queue_num_int);
+    int result = qos_schedule_profile_strict_command_commit(
+            profile_name, queue_num_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static bool has_content(struct ovsrec_queue *queue_row) {
+/**
+ * Returns true if the given queue_row is not empty.
+ */
+static bool
+has_content(struct ovsrec_queue *queue_row)
+{
     if ((queue_row->algorithm == NULL) &&
             (queue_row->weight == NULL ||
                     queue_row->n_weight == 0)) {
@@ -491,8 +690,13 @@ static bool has_content(struct ovsrec_queue *queue_row) {
     }
 }
 
-static void delete_queue_row(
-        struct ovsrec_qos *profile_row, int64_t queue_num) {
+/**
+ * Deletes the queue_row for the given queue_num.
+ */
+static void
+delete_queue_row(
+        struct ovsrec_qos *profile_row, int64_t queue_num)
+{
     int64_t *key_list =
             xmalloc(sizeof(int64_t) *
                     (profile_row->n_queues - 1));
@@ -514,9 +718,16 @@ static void delete_queue_row(
     free(value_list);
 }
 
-static bool qos_schedule_profile_strict_no_command(struct ovsdb_idl_txn *txn,
+/**
+ * Executes the qos_schedule_profile_strict_no_command for the given
+ * profile_name and queue_num. Returns true if an error occurred.
+ */
+static bool
+qos_schedule_profile_strict_no_command(
+        struct ovsdb_idl_txn *txn,
         const char *profile_name,
-        int64_t queue_num) {
+        int64_t queue_num)
+{
     /* Retrieve the profile row. */
     struct ovsrec_qos *profile_row =
             qos_get_schedule_profile_row(profile_name);
@@ -537,7 +748,9 @@ static bool qos_schedule_profile_strict_no_command(struct ovsdb_idl_txn *txn,
 
     /* If the algorithm is strict, then clear it. */
     if (queue_row->algorithm != NULL &&
-            strcmp(queue_row->algorithm, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
+            strncmp(queue_row->algorithm,
+                    OVSREC_QUEUE_ALGORITHM_STRICT,
+                    QOS_CLI_STRING_BUFFER_SIZE) == 0) {
         ovsrec_queue_set_algorithm(queue_row, NULL);
         ovsrec_queue_set_weight(queue_row, NULL, 0);
     }
@@ -550,8 +763,15 @@ static bool qos_schedule_profile_strict_no_command(struct ovsdb_idl_txn *txn,
     return false;
 }
 
-static int qos_schedule_profile_strict_no_command_commit(const char *profile_name,
-        int64_t queue_num) {
+/**
+ * Executes and commits the qos_schedule_profile_strict_no_command for
+ * the given profile_name and queue_num.
+ */
+static int
+qos_schedule_profile_strict_no_command_commit(
+        const char *profile_name,
+        int64_t queue_num)
+{
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -559,6 +779,13 @@ static int qos_schedule_profile_strict_no_command_commit(const char *profile_nam
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty,
+                "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -588,15 +815,19 @@ static int qos_schedule_profile_strict_no_command_commit(const char *profile_nam
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile_strict_no,
+/**
+ * Executes the qos_schedule_profile_strict_no_command.
+ */
+DEFUN(qos_schedule_profile_strict_no,
         qos_schedule_profile_strict_no_cmd,
         "no strict queue <0-7>",
         NO_STR
         "Clears the algorithm for a queue, if the algorithm is 'strict'\n"
         "The number of the queue\n"
-        "The number of the queue\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no strict queue");
+        "The number of the queue\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no strict queue", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -605,7 +836,7 @@ DEFUN (qos_schedule_profile_strict_no,
      if (profile_name != NULL) {
          char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
          if (cfg != NULL) {
-             strncat(aubuf, cfg, 130);
+             strncat(aubuf, cfg, sizeof(aubuf));
              free(cfg);
          }
      }
@@ -614,22 +845,30 @@ DEFUN (qos_schedule_profile_strict_no,
      if (queue_num != NULL) {
          char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
          if (cfg != NULL) {
-             strncat(aubuf, cfg, 130);
+             strncat(aubuf, cfg, sizeof(aubuf));
              free(cfg);
          }
      }
      int64_t queue_num_int = atoi(queue_num);
 
-     int result = qos_schedule_profile_strict_no_command_commit(profile_name, queue_num_int);
+     int result = qos_schedule_profile_strict_no_command_commit(
+             profile_name, queue_num_int);
 
-     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+             aubuf, hostname, NULL, NULL, result);
 
      return result;
 }
 
-static bool qos_schedule_profile_wrr_command(struct ovsdb_idl_txn *txn,
+/**
+ * Executes the qos_schedule_profile_wrr_command for the given profile_name,
+ * queue_num, and weight.
+ */
+static bool
+qos_schedule_profile_wrr_command(struct ovsdb_idl_txn *txn,
         const char *profile_name,
-        int64_t queue_num, int64_t weight) {
+        int64_t queue_num, int64_t weight)
+{
     /* Retrieve the profile row. */
     struct ovsrec_qos *profile_row =
             qos_get_schedule_profile_row(profile_name);
@@ -655,8 +894,15 @@ static bool qos_schedule_profile_wrr_command(struct ovsdb_idl_txn *txn,
     return false;
 }
 
-static int qos_schedule_profile_wrr_command_commit(const char *profile_name,
-        int64_t queue_num, int64_t weight) {
+/**
+ * Executes and commits the qos_schedule_profile_wrr_command for
+ * the given profile_name, queue_num, and weight.
+ */
+static int
+qos_schedule_profile_wrr_command_commit(
+        const char *profile_name,
+        int64_t queue_num, int64_t weight)
+{
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -664,6 +910,13 @@ static int qos_schedule_profile_wrr_command_commit(const char *profile_name,
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty,
+                "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -693,16 +946,21 @@ static int qos_schedule_profile_wrr_command_commit(const char *profile_name,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile_wrr,
+/**
+ * Executes and commits the qos_schedule_profile_wrr_command for
+ * the given profile_name, queue_num, and weight.
+ */
+DEFUN(qos_schedule_profile_wrr,
         qos_schedule_profile_wrr_cmd,
        "wrr queue <0-7> weight <1-127>",
        "Configure a queue in a Schedule Profile to use wrr scheduling\n"
        "The number of the queue\n"
        "The number of the queue\n"
        "The weight to configure\n"
-       "The weight to configure\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: wrr queue");
+       "The weight to configure\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: wrr queue", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -711,7 +969,7 @@ DEFUN (qos_schedule_profile_wrr,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -720,7 +978,7 @@ DEFUN (qos_schedule_profile_wrr,
     if (queue_num != NULL) {
         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -730,23 +988,30 @@ DEFUN (qos_schedule_profile_wrr,
     if (weight != NULL) {
         char *cfg = audit_encode_nv_string("weight", weight, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
     int64_t weight_int = atoi(weight);
 
-    int result = qos_schedule_profile_wrr_command_commit(profile_name, queue_num_int,
-            weight_int);
+    int result = qos_schedule_profile_wrr_command_commit(
+            profile_name, queue_num_int, weight_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static bool qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
+/**
+ * Executes the qos_schedule_profile_wrr_no_command for
+ * the given profile_name and queue_num.
+ */
+static bool
+qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
         const char *profile_name,
-        int64_t queue_num) {
+        int64_t queue_num)
+{
     /* Retrieve the profile row. */
     struct ovsrec_qos *profile_row =
             qos_get_schedule_profile_row(profile_name);
@@ -767,7 +1032,9 @@ static bool qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
 
     /* If the algorithm is wrr, then clear it. */
     if (queue_row->algorithm != NULL &&
-            strcmp(queue_row->algorithm, OVSREC_QUEUE_ALGORITHM_WRR) == 0) {
+            strncmp(queue_row->algorithm,
+                    OVSREC_QUEUE_ALGORITHM_WRR,
+                    QOS_CLI_STRING_BUFFER_SIZE) == 0) {
         ovsrec_queue_set_algorithm(queue_row, NULL);
         ovsrec_queue_set_weight(queue_row, NULL, 0);
     }
@@ -780,8 +1047,15 @@ static bool qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
     return false;
 }
 
-static int qos_schedule_profile_wrr_no_command_commit(const char *profile_name,
-        int64_t queue_num) {
+/**
+ * Executes and commits the qos_schedule_profile_wrr_no_command for
+ * the given profile_name and queue_num.
+ */
+static int
+qos_schedule_profile_wrr_no_command_commit(
+        const char *profile_name,
+        int64_t queue_num)
+{
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -789,6 +1063,13 @@ static int qos_schedule_profile_wrr_no_command_commit(const char *profile_name,
 
     if (is_applied(profile_name)) {
         vty_out(vty, "An applied profile cannot be amended or deleted.%s",
+                VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    if (is_hw_default(profile_name)) {
+        vty_out(vty,
+                "A hardware default profile cannot be amended or deleted.%s",
                 VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
@@ -818,7 +1099,11 @@ static int qos_schedule_profile_wrr_no_command_commit(const char *profile_name,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile_wrr_no,
+/**
+ * Executes and commits the qos_schedule_profile_wrr_no_command for
+ * the given profile_name and queue_num.
+ */
+DEFUN(qos_schedule_profile_wrr_no,
         qos_schedule_profile_wrr_no_cmd,
        "no wrr queue <0-7> {weight <1-127>}",
        NO_STR
@@ -826,9 +1111,10 @@ DEFUN (qos_schedule_profile_wrr_no,
        "The number of the queue\n"
        "The number of the queue\n"
        "The weight to configure\n"
-       "The weight to configure\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no wrr queue");
+       "The weight to configure\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no wrr queue", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -837,7 +1123,7 @@ DEFUN (qos_schedule_profile_wrr_no,
     if (profile_name != NULL) {
         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -846,7 +1132,7 @@ DEFUN (qos_schedule_profile_wrr_no,
     if (queue_num != NULL) {
         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
@@ -855,13 +1141,20 @@ DEFUN (qos_schedule_profile_wrr_no,
     int result = qos_schedule_profile_wrr_no_command_commit(profile_name,
             queue_num_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static void print_schedule_profile_entry_row(int64_t queue_num,
-        struct ovsrec_queue *profile_entry_row) {
+/**
+ * Prints the schedule_profile_entry_row for the given queue_num and
+ * profile_entry_row.
+ */
+static void
+print_schedule_profile_entry_row(int64_t queue_num,
+        struct ovsrec_queue *profile_entry_row)
+{
     char buffer[QOS_CLI_STRING_BUFFER_SIZE];
 
     vty_out (vty, "%-9d ", (int) queue_num);
@@ -870,14 +1163,20 @@ static void print_schedule_profile_entry_row(int64_t queue_num,
 
     buffer[0] = '\0';
     if (profile_entry_row->weight != NULL) {
-        sprintf(buffer, "%d", (int) *profile_entry_row->weight);
+        snprintf(buffer, sizeof(buffer),
+                "%d", (int) *profile_entry_row->weight);
     }
     vty_out (vty, "%-6s ", buffer);
 
     vty_out (vty, "%s", VTY_NEWLINE);
 }
 
-static int qos_schedule_profile_show_command(const char *name) {
+/**
+ * Executes the qos_schedule_profile_show_command for the given name.
+ */
+static int
+qos_schedule_profile_show_command(const char *name)
+{
     if (name == NULL) {
         vty_out(vty, "name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -888,25 +1187,11 @@ static int qos_schedule_profile_show_command(const char *name) {
         return CMD_OVSDB_FAILURE;
     }
 
-    if (strcmp(name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
-        vty_out(vty, "profile_name cannot be '%s'.%s",
+    if (strncmp(name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+        vty_out(vty, "The profile name cannot be '%s'.%s",
                 OVSREC_QUEUE_ALGORITHM_STRICT, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
-    }
-
-    struct ovsdb_idl_txn *txn = NULL;
-    if (strcmp(name, QOS_FACTORY_DEFAULT_NAME) == 0) {
-        /* Start a transaction so that a temporary factory-default profile can be created. */
-        txn = cli_do_config_start();
-        if (txn == NULL) {
-            vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-            VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-            cli_do_config_abort(txn);
-            return CMD_OVSDB_FAILURE;
-        }
-
-        qos_schedule_profile_create_factory_default(
-                txn, QOS_FACTORY_DEFAULT_NAME);
     }
 
     struct ovsrec_qos *profile_row = qos_get_schedule_profile_row(name);
@@ -925,37 +1210,31 @@ static int qos_schedule_profile_show_command(const char *name) {
                 profile_row->value_queues[i]);
     }
 
-    if (strcmp(name, QOS_FACTORY_DEFAULT_NAME) == 0) {
-        /* Abort the transaction to get rid of the temporary factory-default profile. */
-        cli_do_config_abort(txn);
-    }
-
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile_show,
+/**
+ * Executes the qos_schedule_profile_show_command for the given name.
+ */
+DEFUN(qos_schedule_profile_show,
     qos_schedule_profile_show_cmd,
     "show qos schedule-profile NAME",
     SHOW_STR
     "Show QoS Configuration\n"
     "Show QoS Schedule Profile Configuration\n"
-    "The name of the Schedule Profile to display\n") {
+    "The name of the Schedule Profile to display\n")
+{
     const char *name = argv[0];
 
     return qos_schedule_profile_show_command(name);
 }
 
-DEFUN (qos_schedule_profile_show_factory_default,
-    qos_schedule_profile_show_factory_default_cmd,
-    "show qos schedule-profile factory-default",
-    SHOW_STR
-    "Show QoS Configuration\n"
-    "Show QoS Schedule Profile Configuration\n"
-    "Show the factory default profile\n") {
-    return qos_schedule_profile_show_command(QOS_FACTORY_DEFAULT_NAME);
-}
-
-static int qos_schedule_profile_show_all_command(void) {
+/**
+ * Executes the qos_schedule_profile_show_all_command.
+ */
+static int
+qos_schedule_profile_show_all_command(void)
+{
     vty_out (vty, "profile_status profile_name%s", VTY_NEWLINE);
     vty_out (vty, "-------------- ------------%s", VTY_NEWLINE);
 
@@ -964,14 +1243,16 @@ static int qos_schedule_profile_show_all_command(void) {
     const struct ovsrec_qos *profile_row;
     OVSREC_QOS_FOR_EACH(profile_row, idl) {
         /* Don't show the strict profile. */
-        if (strcmp(profile_row->name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
+        if (strncmp(profile_row->name,
+                OVSREC_QUEUE_ALGORITHM_STRICT,
+                QOS_CLI_STRING_BUFFER_SIZE) == 0) {
             continue;
         }
 
         if (is_row_applied(profile_row)) {
             vty_out (vty, "applied        ");
         } else if (qos_schedule_profile_is_complete(
-                (struct ovsrec_qos *) profile_row)) {
+                (struct ovsrec_qos *) profile_row, false)) {
             vty_out (vty, "complete       ");
         } else {
             vty_out (vty, "incomplete     ");
@@ -979,8 +1260,11 @@ static int qos_schedule_profile_show_all_command(void) {
 
         buffer[0] = '\0';
         if (profile_row->name != NULL &&
-                strcmp(profile_row->name, "") != 0) {
-            sprintf(buffer, "\"%s\"", profile_row->name);
+                strncmp(profile_row->name, "",
+                        QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            strncpy(buffer,
+                    profile_row->name,
+                    sizeof(buffer));
         }
         vty_out (vty, "%s ", buffer);
 
@@ -990,17 +1274,26 @@ static int qos_schedule_profile_show_all_command(void) {
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_schedule_profile_show_all,
+/**
+ * Executes the qos_schedule_profile_show_all_command.
+ */
+DEFUN(qos_schedule_profile_show_all,
     qos_schedule_profile_show_all_cmd,
     "show qos schedule-profile",
     SHOW_STR
     "Show QoS Configuration\n"
-    "Show QoS Schedule Profile Configuration\n") {
+    "Show QoS Schedule Profile Configuration\n")
+{
     return qos_schedule_profile_show_all_command();
 }
 
-static void display_headers(bool *header_displayed,
-        bool *queue_num_header_displayed, int64_t queue_num) {
+/**
+ * Display headers for the given queue_num.
+ */
+static void
+display_headers(bool *header_displayed,
+        bool *queue_num_header_displayed, int64_t queue_num)
+{
     if (!*header_displayed) {
         vty_out (vty, "qos schedule-profile%s", VTY_NEWLINE);
         *header_displayed = true;
@@ -1012,24 +1305,22 @@ static void display_headers(bool *header_displayed,
     }
 }
 
-static void display_header(bool *header_displayed) {
+/**
+ * Display headers.
+ */
+static void
+display_header(bool *header_displayed)
+{
     bool ignore_queue_num = true;
     display_headers(header_displayed, &ignore_queue_num, -1);
 }
 
-void qos_schedule_profile_show_running_config(void) {
-    /* Start a transaction so that a temporary factory-default profile can be created. */
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return;
-    }
-
-    qos_schedule_profile_create_factory_default(
-            txn, QOS_FACTORY_DEFAULT_NAME);
-
+/**
+ * Shows the running_config for the schedule_profile.
+ */
+void
+qos_schedule_profile_show_running_config(void)
+{
     struct ovsrec_qos *default_profile_row = qos_get_schedule_profile_row(
             QOS_FACTORY_DEFAULT_NAME);
     if (default_profile_row == NULL) {
@@ -1043,8 +1334,10 @@ void qos_schedule_profile_show_running_config(void) {
 
     bool header_displayed = false;
     /* Show profile name. */
-    if (strcmp(applied_profile_row->name, default_profile_row->name) != 0 &&
-            strcmp(applied_profile_row->name, QOS_DEFAULT_NAME) != 0) {
+    if (strncmp(applied_profile_row->name,
+            default_profile_row->name, QOS_CLI_STRING_BUFFER_SIZE) != 0 &&
+            strncmp(applied_profile_row->name,
+                    QOS_DEFAULT_NAME, QOS_CLI_STRING_BUFFER_SIZE) != 0) {
         display_header(&header_displayed);
         vty_out(vty, "    name %s%s",
                 applied_profile_row->name, VTY_NEWLINE);
@@ -1069,8 +1362,9 @@ void qos_schedule_profile_show_running_config(void) {
         bool queue_num_header_displayed = false;
 
         /* Show algorithm. */
-        if (strcmp(applied_profile_entry->algorithm,
-                default_profile_entry->algorithm) != 0) {
+        if (strncmp(applied_profile_entry->algorithm,
+                default_profile_entry->algorithm,
+                QOS_CLI_STRING_BUFFER_SIZE) != 0) {
             display_headers(&header_displayed,
                     &queue_num_header_displayed, default_queue_num);
             vty_out(vty, "        algorithm %s%s",
@@ -1080,83 +1374,84 @@ void qos_schedule_profile_show_running_config(void) {
         /* Show weight. */
         char applied_weight[QOS_CLI_STRING_BUFFER_SIZE];
         if (applied_profile_entry->weight == NULL) {
-            strcpy(applied_weight, QOS_CLI_EMPTY_DISPLAY_STRING);
+            strncpy(applied_weight, QOS_CLI_EMPTY_DISPLAY_STRING,
+                    sizeof(applied_weight));
         } else {
-            sprintf(applied_weight, "%d",
+            snprintf(applied_weight, sizeof(applied_weight), "%d",
                     (int) *applied_profile_entry->weight);
         }
         char default_weight[QOS_CLI_STRING_BUFFER_SIZE];
         if (default_profile_entry->weight == NULL) {
-            strcpy(default_weight, QOS_CLI_EMPTY_DISPLAY_STRING);
+            strncpy(default_weight, QOS_CLI_EMPTY_DISPLAY_STRING,
+                    sizeof(default_weight));
         } else {
-            sprintf(default_weight, "%d",
+            snprintf(default_weight, sizeof(default_weight), "%d",
                     (int) *default_profile_entry->weight);
         }
-        if (strcmp(applied_weight,
-                default_weight) != 0) {
+        if (strncmp(applied_weight,
+                default_weight, sizeof(applied_weight)) != 0) {
             display_headers(&header_displayed,
                     &queue_num_header_displayed, default_queue_num);
             vty_out(vty, "        weight %s%s",
                     applied_weight, VTY_NEWLINE);
         }
     }
-
-    /* Abort the transaction to get rid of the temporary factory-default profile. */
-    cli_do_config_abort(txn);
 }
 
-static void qos_schedule_profile_create_factory_default(
-        struct ovsdb_idl_txn *txn,
-        const char *default_name) {
-    qos_schedule_profile_command(txn, default_name);
-
-    /* Delete all queue rows. */
-    struct ovsrec_qos *profile_row =
-            qos_get_schedule_profile_row(default_name);
-    ovsrec_qos_set_queues(profile_row, NULL,
-            NULL, 0);
-
-    /* Create all queue rows. */
-    qos_schedule_profile_strict_command(txn, default_name, 7);
-    qos_schedule_profile_wrr_command(txn, default_name, 6, 7);
-    qos_schedule_profile_wrr_command(txn, default_name, 5, 6);
-    qos_schedule_profile_wrr_command(txn, default_name, 4, 5);
-    qos_schedule_profile_wrr_command(txn, default_name, 3, 4);
-    qos_schedule_profile_wrr_command(txn, default_name, 2, 3);
-    qos_schedule_profile_wrr_command(txn, default_name, 1, 2);
-    qos_schedule_profile_wrr_command(txn, default_name, 0, 1);
-}
-
-void qos_schedule_profile_create_strict_profile(
-        struct ovsdb_idl_txn *txn) {
+/**
+ * Creates the 'strict' schedule profile.
+ */
+void
+qos_schedule_profile_create_strict_profile(
+        struct ovsdb_idl_txn *txn)
+{
     const char *strict_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
 
     qos_schedule_profile_command(txn, strict_profile_name);
 }
 
-void qos_schedule_profile_vty_init(void) {
+/**
+ * Initializes qos_schedule_profile_vty.
+ */
+void
+qos_schedule_profile_vty_init(void)
+{
     install_element(CONFIG_NODE, &qos_schedule_profile_cmd);
     install_element(CONFIG_NODE, &qos_schedule_profile_no_cmd);
     install_element(ENABLE_NODE, &qos_schedule_profile_show_cmd);
-    install_element(ENABLE_NODE, &qos_schedule_profile_show_factory_default_cmd);
     install_element(ENABLE_NODE, &qos_schedule_profile_show_all_cmd);
 
-    install_element(QOS_SCHEDULE_PROFILE_NODE, &qos_schedule_profile_strict_cmd);
-    install_element(QOS_SCHEDULE_PROFILE_NODE, &qos_schedule_profile_strict_no_cmd);
+    install_element(QOS_SCHEDULE_PROFILE_NODE,
+            &qos_schedule_profile_strict_cmd);
+    install_element(QOS_SCHEDULE_PROFILE_NODE,
+            &qos_schedule_profile_strict_no_cmd);
 
-    install_element(QOS_SCHEDULE_PROFILE_NODE, &qos_schedule_profile_wrr_cmd);
-    install_element(QOS_SCHEDULE_PROFILE_NODE, &qos_schedule_profile_wrr_no_cmd);
+    install_element(QOS_SCHEDULE_PROFILE_NODE,
+            &qos_schedule_profile_wrr_cmd);
+    install_element(QOS_SCHEDULE_PROFILE_NODE,
+            &qos_schedule_profile_wrr_no_cmd);
 }
 
-void qos_schedule_profile_ovsdb_init(void) {
+/**
+ * Initializes qos_schedule_profile_ovsdb.
+ */
+void
+qos_schedule_profile_ovsdb_init(void)
+{
     ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_qos);
 
     ovsdb_idl_add_table(idl, &ovsrec_table_qos);
     ovsdb_idl_add_column(idl, &ovsrec_qos_col_name);
     ovsdb_idl_add_column(idl, &ovsrec_qos_col_queues);
+    ovsdb_idl_add_column(idl, &ovsrec_qos_col_hw_default);
+    ovsdb_idl_add_column(idl, &ovsrec_qos_col_other_config);
+    ovsdb_idl_add_column(idl, &ovsrec_qos_col_external_ids);
 
     ovsdb_idl_add_table(idl, &ovsrec_table_queue);
     ovsdb_idl_add_column(idl, &ovsrec_queue_col_algorithm);
     ovsdb_idl_add_column(idl, &ovsrec_queue_col_weight);
+    ovsdb_idl_add_column(idl, &ovsrec_queue_col_hw_default);
+    ovsdb_idl_add_column(idl, &ovsrec_queue_col_other_config);
+    ovsdb_idl_add_column(idl, &ovsrec_queue_col_external_ids);
 }

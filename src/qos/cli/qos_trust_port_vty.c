@@ -15,28 +15,37 @@
  *
  ***************************************************************************/
 
+#include <config.h>
+
+#include "qos_trust_port_vty.h"
+
 #include <libaudit.h>
 
-#include "vtysh/command.h"
-#include "vtysh/vtysh.h"
-#include "vtysh/vtysh_user.h"
-#include "vswitch-idl.h"
+#include "memory.h"
+#include "openswitch-idl.h"
+#include "openvswitch/vlog.h"
 #include "ovsdb-idl.h"
-#include "qos_trust_port_vty.h"
 #include "qos_utils.h"
 #include "qos_utils_vty.h"
 #include "smap.h"
-#include "memory.h"
-#include "openvswitch/vlog.h"
-#include "openswitch-idl.h"
-#include "vtysh/vtysh_ovsdb_if.h"
+#include "vswitch-idl.h"
+#include "vtysh/command.h"
+#include "vtysh/vtysh.h"
 #include "vtysh/vtysh_ovsdb_config.h"
+#include "vtysh/vtysh_ovsdb_if.h"
+#include "vtysh/vtysh_user.h"
 
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_trust_port_cli);
 extern struct ovsdb_idl *idl;
 
-static int qos_trust_port_command(const char *port_name,
-        const char *qos_trust_name) {
+/**
+ * Executes the trust_port_command for the given port_name and
+ * qos_trust_name.
+ */
+static int
+qos_trust_port_command(const char *port_name,
+        const char *qos_trust_name)
+{
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -85,16 +94,20 @@ static int qos_trust_port_command(const char *port_name,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_trust_port,
+/**
+ * Executes the trust_port_command.
+ */
+DEFUN(qos_trust_port,
         qos_trust_port_cmd,
         "qos trust (none|cos|dscp)",
         "Configure QoS\n"
         "Set the QoS Trust Mode configuration for the port\n"
         "Do not trust any priority fields, and remark all of them to 0\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
-        "Trust DSCP and remark the 802.1p priority to match\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: qos trust");
+        "Trust DSCP and remark the 802.1p priority to match\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: qos trust", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -103,28 +116,35 @@ DEFUN (qos_trust_port,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     const char *qos_trust_name = argv[0];
     if (qos_trust_name != NULL) {
-        char *cfg = audit_encode_nv_string("qos_trust_name", qos_trust_name, 0);
+        char *cfg = audit_encode_nv_string("qos_trust_name",
+                qos_trust_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     int result = qos_trust_port_command(port_name, qos_trust_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static int qos_trust_port_no_command(const char *port_name) {
+/**
+ * Executes the trust_port_no_command for the given port_name.
+ */
+static int
+qos_trust_port_no_command(const char *port_name)
+{
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -168,7 +188,10 @@ static int qos_trust_port_no_command(const char *port_name) {
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_trust_port_no,
+/**
+ * Executes the trust_port_no_command.
+ */
+DEFUN(qos_trust_port_no,
         qos_trust_port_no_cmd,
         "no qos trust {none|cos|dscp}",
         NO_STR
@@ -176,9 +199,10 @@ DEFUN (qos_trust_port_no,
         "Remove the QoS Trust Mode configuration for the port\n"
         "Do not trust any priority fields, and remark all of them to 0\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
-        "Trust DSCP and remark the 802.1p priority to match\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no qos trust");
+        "Trust DSCP and remark the 802.1p priority to match\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no qos trust", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -187,19 +211,25 @@ DEFUN (qos_trust_port_no,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     int result = qos_trust_port_no_command(port_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-void qos_trust_port_show(const struct ovsrec_port *port_row) {
+/**
+ * Executes the trust_port_show command for the given port_row.
+ */
+void
+qos_trust_port_show(const struct ovsrec_port *port_row)
+{
     if (port_row == NULL) {
         return;
     }
@@ -220,7 +250,12 @@ void qos_trust_port_show(const struct ovsrec_port *port_row) {
     vty_out(vty, " qos trust %s%s", qos_trust_name, VTY_NEWLINE);
 }
 
-void qos_trust_port_vty_init(void) {
+/**
+ * Initializes qos_trust_port_vty.
+ */
+void
+qos_trust_port_vty_init(void)
+{
     install_element(INTERFACE_NODE, &qos_trust_port_cmd);
     install_element(INTERFACE_NODE, &qos_trust_port_no_cmd);
 
@@ -228,7 +263,12 @@ void qos_trust_port_vty_init(void) {
     install_element(LINK_AGGREGATION_NODE, &qos_trust_port_no_cmd);
 }
 
-void qos_trust_port_ovsdb_init(void) {
+/**
+ * Initializes qos_trust_port_ovsdb.
+ */
+void
+qos_trust_port_ovsdb_init(void)
+{
     ovsdb_idl_add_table(idl, &ovsrec_table_port);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_qos_config);
 }

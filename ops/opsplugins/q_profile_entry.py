@@ -37,6 +37,8 @@ class QProfileEntryValidator(BaseValidator):
 
         self.validate_profile_applied_cannot_be_amended_or_deleted(
             validation_args, profile_row)
+        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
         self.validate_profile_entry_name_contains_valid_chars(
             profile_entry_row)
         self.validate_profile_entry_does_not_contain_duplicate_local_priorities(
@@ -46,7 +48,12 @@ class QProfileEntryValidator(BaseValidator):
     # Validates that the given deletion of a given row is allowed.
     #
     def validate_deletion(self, validation_args):
-        pass
+        profile_row = validation_args.p_resource_row
+
+        self.validate_profile_applied_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
+        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
 
     #
     # Validates that an applied profile cannot be amended or deleted.
@@ -57,9 +64,20 @@ class QProfileEntryValidator(BaseValidator):
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #
+    # Validates that a hardware default profile cannot be amended or deleted.
+    #
+    def validate_profile_hw_default_cannot_be_amended_or_deleted(self, validation_args, profile_row):
+        if qos_utils.queue_profile_is_hw_default(validation_args, profile_row):
+            details = "A hardware default profile cannot be amended or deleted."
+            raise ValidationError(error.VERIFICATION_FAILED, details)
+
+    #
     # Validates that a profile entry name contains all valid characters.
     #
     def validate_profile_entry_name_contains_valid_chars(self, profile_entry_row):
+        if profile_entry_row.description is None:
+            return
+
         profile_entry_name = profile_entry_row.description[0]
         qos_utils.validate_string_contains_valid_chars(profile_entry_name)
 

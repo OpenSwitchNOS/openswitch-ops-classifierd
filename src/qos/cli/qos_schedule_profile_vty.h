@@ -18,6 +18,12 @@
 #ifndef _QOS_SCHEDULE_PROFILE_VTY_H_
 #define _QOS_SCHEDULE_PROFILE_VTY_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "ovsdb-idl.h"
+#include "vswitch-idl.h"
+
 /**
  * Creates the 'strict' profile, if it does not already exist.
  */
@@ -38,7 +44,8 @@ bool qos_schedule_profile_has_queue_num(struct ovsrec_qos *profile_row,
 /**
  * Returns true if the schedule profile is complete.
  */
-bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row);
+bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row,
+        bool print_error);
 
 /**
  * Retrieves the schedule profile row.

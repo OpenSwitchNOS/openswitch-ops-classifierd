@@ -15,28 +15,37 @@
  *
  ***************************************************************************/
 
+#include <config.h>
+
+#include "qos_dscp_port_vty.h"
+
 #include <libaudit.h>
 
-#include "vtysh/command.h"
-#include "vtysh/vtysh.h"
-#include "vtysh/vtysh_user.h"
-#include "vswitch-idl.h"
+#include "memory.h"
+#include "openswitch-idl.h"
+#include "openvswitch/vlog.h"
 #include "ovsdb-idl.h"
-#include "qos_dscp_port_vty.h"
 #include "qos_utils.h"
 #include "qos_utils_vty.h"
 #include "smap.h"
-#include "memory.h"
-#include "openvswitch/vlog.h"
-#include "openswitch-idl.h"
-#include "vtysh/vtysh_ovsdb_if.h"
+#include "vswitch-idl.h"
+#include "vtysh/command.h"
+#include "vtysh/vtysh.h"
 #include "vtysh/vtysh_ovsdb_config.h"
+#include "vtysh/vtysh_ovsdb_if.h"
+#include "vtysh/vtysh_user.h"
 
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_dscp_port_cli);
 extern struct ovsdb_idl *idl;
 
-static int qos_dscp_port_command(const char *port_name,
-        const char *dscp_map_index) {
+/**
+ * Executes the qos_dscp_port_command for the given port_name and
+ * dscp_map_index.
+ */
+static int
+qos_dscp_port_command(const char *port_name,
+        const char *dscp_map_index)
+{
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -66,9 +75,11 @@ static int qos_dscp_port_command(const char *port_name,
 
     const char *qos_trust_name = smap_get(&port_row->qos_config,
             QOS_TRUST_KEY);
-    if (qos_trust_name == NULL || strcmp(qos_trust_name,
-            QOS_TRUST_NONE_STRING) != 0) {
-        vty_out(vty, "QoS DSCP override is only allowed if the port trust mode is 'none'.%s",
+    if (qos_trust_name == NULL ||
+            strncmp(qos_trust_name, QOS_TRUST_NONE_STRING,
+                    QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+        vty_out(vty, "QoS DSCP override is only allowed\
+ if the port trust mode is 'none'.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
@@ -90,14 +101,19 @@ static int qos_dscp_port_command(const char *port_name,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_dscp_port,
+/**
+ * Executes the qos_dscp_port_command for the given port_name and
+ * dscp_map_index.
+ */
+DEFUN(qos_dscp_port,
         qos_dscp_port_cmd,
         "qos dscp <0-63>",
         "Configure QoS\n"
         "Set the DSCP override for the port\n"
-        "The index into the DSCP Map\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: qos dscp");
+        "The index into the DSCP Map\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: qos dscp", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -106,28 +122,35 @@ DEFUN (qos_dscp_port,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     const char *dscp_map_index = argv[0];
     if (dscp_map_index != NULL) {
-        char *cfg = audit_encode_nv_string("dscp_map_index", dscp_map_index, 0);
+        char *cfg = audit_encode_nv_string(
+                "dscp_map_index", dscp_map_index, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     int result = qos_dscp_port_command(port_name, dscp_map_index);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static int qos_dscp_port_no_command(const char *port_name) {
+/**
+ * Executes the qos_dscp_port_no_command for the given port_name.
+ */
+static int
+qos_dscp_port_no_command(const char *port_name)
+{
     if (port_name == NULL) {
         vty_out(vty, "port_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -171,15 +194,19 @@ static int qos_dscp_port_no_command(const char *port_name) {
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_dscp_port_no,
+/**
+ * Executes the qos_dscp_port_no_command for the given port_name.
+ */
+DEFUN(qos_dscp_port_no,
         qos_dscp_port_no_cmd,
         "no qos dscp {<0-63>}",
         NO_STR
         "Configure QoS\n"
         "Remove the QoS DSCP override for the port\n"
-        "The index into the DSCP Map\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: no qos dscp");
+        "The index into the DSCP Map\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: no qos dscp", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -188,19 +215,25 @@ DEFUN (qos_dscp_port_no,
     if (port_name != NULL) {
         char *cfg = audit_encode_nv_string("port_name", port_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     int result = qos_dscp_port_no_command(port_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-void qos_dscp_port_vty_init(void) {
+/**
+ * Initializes qos_dscp_port_vty.
+ */
+void
+qos_dscp_port_vty_init(void)
+{
     install_element(INTERFACE_NODE, &qos_dscp_port_cmd);
     install_element(INTERFACE_NODE, &qos_dscp_port_no_cmd);
 
@@ -208,7 +241,12 @@ void qos_dscp_port_vty_init(void) {
     install_element(LINK_AGGREGATION_NODE, &qos_dscp_port_no_cmd);
 }
 
-void qos_dscp_port_ovsdb_init(void) {
+/**
+ * Initializes qos_dscp_port_ovsdb.
+ */
+void
+qos_dscp_port_ovsdb_init(void)
+{
     ovsdb_idl_add_table(idl, &ovsrec_table_port);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_qos_config);
 }

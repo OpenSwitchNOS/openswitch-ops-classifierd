@@ -18,6 +18,11 @@
 #ifndef _QOS_QUEUE_PROFILE_VTY_H_
 #define _QOS_QUEUE_PROFILE_VTY_H_
 
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "vswitch-idl.h"
+
 /**
  * Shows the global queue profile running config.
  */
@@ -32,7 +37,8 @@ bool qos_queue_profile_has_queue_num(struct ovsrec_q_profile *profile_row,
 /**
  * Returns true if the queue profile is complete.
  */
-bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row);
+bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row,
+        bool print_error);
 
 /**
  * Retrieves the queue profile row.

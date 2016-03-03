@@ -18,6 +18,10 @@
 #ifndef _QOS_APPLY_GLOBAL_VTY_H_
 #define _QOS_APPLY_GLOBAL_VTY_H_
 
+#include <stdbool.h>
+
+#include "vswitch-idl.h"
+
 /**
  * Returns true if the queue profile and the schedule profile contain the
  * same queues.

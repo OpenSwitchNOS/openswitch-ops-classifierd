@@ -18,9 +18,12 @@
 #ifndef _QOS_UTILS_VTY_H_
 #define _QOS_UTILS_VTY_H_
 
+#include <stdbool.h>
+
 #define QOS_INVALID_STRING_ERROR_MESSAGE \
 "This field can have a length up to 64 characters.\n\
-The allowed characters are alphanumeric, underscore ('_'), and hyphen ('-').%s"
+The allowed characters are alphanumeric, underscore ('_'),\n\
+hyphen ('-'), and dot ('.').%s"
 
 /**
  * Returns true if the string is a valid string.
