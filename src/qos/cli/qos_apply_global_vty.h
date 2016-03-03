@@ -22,23 +22,27 @@
  * Returns true if the queue profile and the schedule profile contain the
  * same queues.
  */
-bool qos_profiles_contain_same_queues(
+bool
+qos_profiles_contain_same_queues(
         struct ovsrec_q_profile * queue_profile_row,
         struct ovsrec_qos *schedule_profile_row);
 
 /**
  * Shows the running config for global qos apply.
  */
-void qos_apply_global_show_running_config(void);
+void
+qos_apply_global_show_running_config(void);
 
 /**
  * Initializes vty functions for global qos apply.
  */
-void qos_apply_global_vty_init(void);
+void
+qos_apply_global_vty_init(void);
 
 /**
  * Initializes ovsdb functions for global qos apply.
  */
-void qos_apply_global_ovsdb_init(void);
+void
+qos_apply_global_ovsdb_init(void);
 
 #endif /* _QOS_APPLY_GLOBAL_VTY_H_ */

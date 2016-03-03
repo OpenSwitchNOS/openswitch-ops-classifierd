@@ -21,11 +21,13 @@
 /**
  * Initializes vty functions for port qos cos.
  */
-void qos_cos_port_vty_init(void);
+void
+qos_cos_port_vty_init(void);
 
 /**
  * Initializes ovsdb functions for port qos cos.
  */
-void qos_cos_port_ovsdb_init(void);
+void
+qos_cos_port_ovsdb_init(void);
 
 #endif /* _QOS_COS_PORT_VTY_H_ */

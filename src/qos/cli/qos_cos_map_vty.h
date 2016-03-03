@@ -21,16 +21,19 @@
 /**
  * Shows the running config for qos cos map.
  */
-void qos_cos_map_show_running_config(void);
+void
+qos_cos_map_show_running_config(void);
 
 /**
  * Initializes vty functions for qos cos map.
  */
-void qos_cos_map_vty_init(void);
+void
+qos_cos_map_vty_init(void);
 
 /**
  * Initializes ovsdb functions for qos cos map.
  */
-void qos_cos_map_ovsdb_init(void);
+void
+qos_cos_map_ovsdb_init(void);
 
 #endif /* _QOS_COS_MAP_VTY_H_ */

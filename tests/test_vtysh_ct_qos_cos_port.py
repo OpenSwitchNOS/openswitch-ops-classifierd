@@ -55,7 +55,7 @@ class QosCosPortCliTest(OpsVsiTest):
         return s1
 
     def qosCosPortCommand(self):
-        # This command is not supported in toronto.
+        # This command is not supported in dill.
         # Artificially pass all tests until this command has been added.
         return
         s1 = self.setUp()

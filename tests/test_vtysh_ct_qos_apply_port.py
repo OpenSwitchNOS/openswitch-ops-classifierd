@@ -47,14 +47,14 @@ class QosApplyPortCliTest(OpsVsiTest):
 
         s1.cmdCLI('no qos schedule-profile p1')
         s1.cmdCLI('qos schedule-profile p1')
-        s1.cmdCLI('wrr queue 4 weight 400')
-        s1.cmdCLI('wrr queue 5 weight 500')
-        s1.cmdCLI('wrr queue 6 weight 600')
-        s1.cmdCLI('wrr queue 7 weight 700')
+        s1.cmdCLI('wrr queue 4 weight 40')
+        s1.cmdCLI('wrr queue 5 weight 50')
+        s1.cmdCLI('wrr queue 6 weight 60')
+        s1.cmdCLI('wrr queue 7 weight 70')
         s1.cmdCLI('wrr queue 0 weight 1')
-        s1.cmdCLI('wrr queue 1 weight 100')
-        s1.cmdCLI('wrr queue 2 weight 200')
-        s1.cmdCLI('wrr queue 3 weight 300')
+        s1.cmdCLI('wrr queue 1 weight 10')
+        s1.cmdCLI('wrr queue 2 weight 20')
+        s1.cmdCLI('wrr queue 3 weight 30')
         s1.cmdCLI('exit')
 
         s1.cmdCLI('end')
@@ -125,7 +125,7 @@ class QosApplyPortCliTest(OpsVsiTest):
         s1.cmdCLI('interface 1')
         s1.cmdCLI('apply qos schedule-profile p1')
         out = s1.cmdCLI('do show qos schedule-profile')
-        assert 'applied        "p1"' in out
+        assert 'applied        p1' in out
 
     def qosApplyPortCommandWithAllWrr(self):
         s1 = self.setUp()
@@ -142,7 +142,7 @@ class QosApplyPortCliTest(OpsVsiTest):
         s1.cmdCLI('interface 1')
         s1.cmdCLI('apply qos schedule-profile p1')
         out = s1.cmdCLI('do show qos schedule-profile')
-        assert 'applied        "p1"' in out
+        assert 'applied        p1' in out
 
     def qosApplyPortCommandWithAllWrrWithMaxStrict(self):
         s1 = self.setUp()
@@ -159,7 +159,7 @@ class QosApplyPortCliTest(OpsVsiTest):
         s1.cmdCLI('interface 1')
         s1.cmdCLI('apply qos schedule-profile p1')
         out = s1.cmdCLI('do show qos schedule-profile')
-        assert 'applied        "p1"' in out
+        assert 'applied        p1' in out
 
     def qosApplyPortCommandWithHigherStrictLowerWrr(self):
         s1 = self.setUp()
@@ -175,7 +175,7 @@ class QosApplyPortCliTest(OpsVsiTest):
         s1.cmdCLI('exit')
         s1.cmdCLI('interface 1')
         out = s1.cmdCLI('apply qos schedule-profile p1')
-        assert 'incomplete' in out
+        assert 'must have the same algorithm assigned to each queue' in out
 
     def qosApplyPortCommandWithLowerStrictHigherWrr(self):
         s1 = self.setUp()
@@ -191,7 +191,7 @@ class QosApplyPortCliTest(OpsVsiTest):
         s1.cmdCLI('exit')
         s1.cmdCLI('interface 1')
         out = s1.cmdCLI('apply qos schedule-profile p1')
-        assert 'incomplete' in out
+        assert 'must have the same algorithm assigned to each queue' in out
 
     def qosApplyPortNoCommand(self):
         s1 = self.setUp()

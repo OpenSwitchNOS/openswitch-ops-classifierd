@@ -49,5 +49,8 @@ class QosCosMapEntryValidator(BaseValidator):
     # Validates that the cos map desctiption contains valid characters.
     #
     def validate_cos_map_description_contains_valid_chars(self, qos_cos_map_entry_row):
+        if qos_cos_map_entry_row.description is None:
+            return
+
         description = qos_cos_map_entry_row.description[0]
         qos_utils.validate_string_contains_valid_chars(description)

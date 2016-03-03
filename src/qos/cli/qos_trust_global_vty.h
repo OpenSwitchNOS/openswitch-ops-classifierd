@@ -21,16 +21,19 @@
 /**
  * Shows the running config for global qos trust.
  */
-void qos_trust_global_show_running_config(void);
+void
+qos_trust_global_show_running_config(void);
 
 /**
  * Initializes vty functions for global qos trust.
  */
-void qos_trust_global_vty_init(void);
+void
+qos_trust_global_vty_init(void);
 
 /**
  * Initializes ovsdb functions for global qos trust.
  */
-void qos_trust_global_ovsdb_init(void);
+void
+qos_trust_global_ovsdb_init(void);
 
 #endif /* _QOS_TRUST_GLOBAL_VTY_H_ */

@@ -35,11 +35,21 @@
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_utils_cli);
 extern struct ovsdb_idl *idl;
 
-static bool is_valid_char(char c) {
-    return isalnum(c) || c == '_' || c == '-';
+/**
+ * Returns true if the given character is valid.
+ */
+static bool
+is_valid_char(char c)
+{
+    return isalnum(c) || c == '_' || c == '-' || c == '.';
 }
 
-bool qos_is_valid_string(const char *string) {
+/**
+ * Returns true if the given string is valid.
+ */
+bool
+qos_is_valid_string(const char *string)
+{
     if (string == NULL) {
         return false;
     }
@@ -61,10 +71,16 @@ bool qos_is_valid_string(const char *string) {
     return true;
 }
 
-struct ovsrec_port *port_row_for_name(const char *port_name) {
+/**
+ * Returns the port_row for the given port_name.
+ */
+struct ovsrec_port *
+port_row_for_name(const char *port_name)
+{
     const struct ovsrec_port *port_row;
     OVSREC_PORT_FOR_EACH(port_row, idl) {
-        if (strcmp(port_row->name, port_name) == 0) {
+        if (strncmp(port_row->name, port_name,
+                sizeof(port_row->name)) == 0) {
             return (struct ovsrec_port *) port_row;
         }
     }
@@ -72,13 +88,20 @@ struct ovsrec_port *port_row_for_name(const char *port_name) {
     return NULL;
 }
 
-bool is_member_of_lag(const char *port_name) {
+/**
+ * Returns true if the port_name is a member of a lag.
+ */
+bool
+is_member_of_lag(const char *port_name)
+{
     const struct ovsrec_port *port_row;
     OVSREC_PORT_FOR_EACH(port_row, idl) {
         int i;
         for (i = 0; i < port_row->n_interfaces; i++) {
-            if ((strcmp(port_row->interfaces[i]->name, port_name) == 0)
-                    && (strcmp(port_row->name, port_name) != 0)) {
+            if ((strncmp(port_row->interfaces[i]->name, port_name,
+                    sizeof(port_row->interfaces[i]->name)) == 0)
+                    && (strncmp(port_row->name, port_name,
+                            sizeof(port_row->name)) != 0)) {
                 return true;
             }
         }

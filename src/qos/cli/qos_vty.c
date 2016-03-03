@@ -45,7 +45,9 @@
 /**
  * Initialize cli.
  */
-void cli_pre_init(void) {
+void
+cli_pre_init(void)
+{
     qos_apply_global_ovsdb_init();
     qos_apply_port_ovsdb_init();
     qos_cos_map_ovsdb_init();
@@ -61,7 +63,9 @@ void cli_pre_init(void) {
 /**
  * Initialize cli.
  */
-void cli_post_init(void) {
+void
+cli_post_init(void)
+{
     qos_apply_global_vty_init();
     qos_apply_port_vty_init();
     qos_cos_map_vty_init();

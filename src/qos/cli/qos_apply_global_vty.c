@@ -37,14 +37,21 @@
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_apply_global_cli);
 extern struct ovsdb_idl *idl;
 
-bool qos_profiles_contain_same_queues(
+/**
+ * Returns true if the given queue_profile_row and schedule_profile_row
+ * contain the same queues.
+ */
+bool
+qos_profiles_contain_same_queues(
         struct ovsrec_q_profile * queue_profile_row,
-        struct ovsrec_qos *schedule_profile_row) {
+        struct ovsrec_qos *schedule_profile_row)
+{
     /* Check that each queue profile queue_num is in the schedule profile. */
     int i;
     for (i = 0; i < queue_profile_row->n_q_profile_entries; i++) {
         int64_t queue_num = queue_profile_row->key_q_profile_entries[i];
-        if (!qos_schedule_profile_has_queue_num(schedule_profile_row, queue_num)) {
+        if (!qos_schedule_profile_has_queue_num(
+                schedule_profile_row, queue_num)) {
             return false;
         }
     }
@@ -60,8 +67,41 @@ bool qos_profiles_contain_same_queues(
     return true;
 }
 
-static int qos_apply_global_command(const char *queue_profile_name,
-        const char *schedule_profile_name) {
+/**
+ * Returns true if the queue_profile_row contains the same queues as all
+ * of the port schedule profiles.
+ */
+static bool
+qos_port_profiles_contain_same_queues(
+        struct ovsrec_q_profile * queue_profile_row)
+{
+    const struct ovsrec_port *port_row;
+    OVSREC_PORT_FOR_EACH(port_row, idl) {
+        struct ovsrec_qos *port_schedule_profile = port_row->qos;
+        if (port_schedule_profile == NULL) {
+            continue;
+        }
+
+        if (!qos_profiles_contain_same_queues(
+                queue_profile_row, port_schedule_profile)) {
+            vty_out(vty, "The queue profile and the schedule\
+ profile applied on port %s cannot contain different queues.%s",
+                    port_row->name, VTY_NEWLINE);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Executes the qos_apply_global_command for the given queue_profile_name
+ * and schedule_profile_name.
+ */
+static int
+qos_apply_global_command(const char *queue_profile_name,
+        const char *schedule_profile_name)
+{
     if (queue_profile_name == NULL) {
         vty_out(vty, "queue_profile_name cannot be NULL.%s", VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
@@ -100,14 +140,14 @@ static int qos_apply_global_command(const char *queue_profile_name,
     }
 
     /* Check that the profile is complete. */
-    if (!qos_queue_profile_is_complete(queue_profile_row)) {
-        vty_out(vty, "queue_profile_row cannot be incomplete.%s", VTY_NEWLINE);
+    if (!qos_queue_profile_is_complete(queue_profile_row, true)) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
     /* If the profile is strict, make sure the 'strict' profile exists. */
-    if (strcmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) == 0) {
+    if (strncmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            sizeof(schedule_profile_name)) == 0) {
         qos_schedule_profile_create_strict_profile(txn);
     }
 
@@ -120,12 +160,12 @@ static int qos_apply_global_command(const char *queue_profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    /* Perform some checks, but only if the profile is not strict. The strict */
-    /* profile does not contain any queues. */
-    if (strcmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT) != 0) {
+    /* Perform some checks, but only if the profile is not strict.
+     * The strict profile does not contain any queues. */
+    if (strncmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            sizeof(schedule_profile_name)) != 0) {
         /* Check that the profile is complete. */
-        if (!qos_schedule_profile_is_complete(schedule_profile_row)) {
-            vty_out(vty, "schedule_profile_row cannot be incomplete.%s", VTY_NEWLINE);
+        if (!qos_schedule_profile_is_complete(schedule_profile_row, true)) {
             cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
@@ -133,10 +173,19 @@ static int qos_apply_global_command(const char *queue_profile_name,
         /* Check that profiles contain all the same queues. */
         if (!qos_profiles_contain_same_queues(queue_profile_row,
                 schedule_profile_row)) {
-            vty_out(vty, "queue_profile_row and schedule_profile_row cannot contain different queues.%s", VTY_NEWLINE);
+            vty_out(vty, "The queue profile and the schedule\
+ profile cannot contain different queues.%s",
+                    VTY_NEWLINE);
             cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
+    }
+
+    /* Validate that the queue profile is consistent with any other
+     * port-applied schedule profiles. */
+    if (!qos_port_profiles_contain_same_queues(queue_profile_row)) {
+        cli_do_config_abort(txn);
+        return CMD_OVSDB_FAILURE;
     }
 
     /* Retrieve the system row. */
@@ -161,7 +210,11 @@ static int qos_apply_global_command(const char *queue_profile_name,
     return CMD_SUCCESS;
 }
 
-DEFUN (qos_apply_global,
+/**
+ * Executes the qos_apply_global_command for the given queue_profile_name
+ * and schedule_profile_name.
+ */
+DEFUN(qos_apply_global,
         qos_apply_global_cmd,
         "apply qos queue-profile NAME schedule-profile NAME",
         "Apply a configuration\n"
@@ -169,39 +222,48 @@ DEFUN (qos_apply_global,
         "The queue-profile to apply\n"
         "The queue-profile to apply\n"
         "The schedule-profile to apply\n"
-        "The schedule-profile to apply\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: apply qos");
+        "The schedule-profile to apply\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: apply qos", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *queue_profile_name = argv[0];
     if (queue_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("queue_profile_name", queue_profile_name, 0);
+        char *cfg = audit_encode_nv_string(
+                "queue_profile_name", queue_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     const char *schedule_profile_name = argv[1];
     if (schedule_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
+        char *cfg = audit_encode_nv_string(
+                "schedule_profile_name", schedule_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
-    int result = qos_apply_global_command(queue_profile_name, schedule_profile_name);
+    int result = qos_apply_global_command(
+            queue_profile_name, schedule_profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-DEFUN (qos_apply_global_strict,
+/**
+ * Executes the qos_apply_global_strict_command for the given
+ * queue_profile_name and schedule_profile_name.
+ */
+DEFUN(qos_apply_global_strict,
         qos_apply_global_strict_cmd,
         "apply qos queue-profile NAME schedule-profile strict",
         "Apply a configuration\n"
@@ -209,47 +271,63 @@ DEFUN (qos_apply_global_strict,
         "The queue-profile to apply\n"
         "The queue-profile to apply\n"
         "The schedule-profile to apply\n"
-        "Use the strict schedule profile which has all queues configured to use the strict algorithm\n") {
-    char aubuf[160];
-    strcpy(aubuf, "op=CLI: appy qos");
+        "Use the strict schedule profile which has all\
+ queues configured to use the strict algorithm\n")
+{
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
+    strncpy(aubuf, "op=CLI: appy qos", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *queue_profile_name = argv[0];
     if (queue_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("queue_profile_name", queue_profile_name, 0);
+        char *cfg = audit_encode_nv_string(
+                "queue_profile_name", queue_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
     const char *schedule_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
     if (schedule_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("schedule_profile_name", schedule_profile_name, 0);
+        char *cfg = audit_encode_nv_string(
+                "schedule_profile_name", schedule_profile_name, 0);
         if (cfg != NULL) {
-            strncat(aubuf, cfg, 130);
+            strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
 
-    int result = qos_apply_global_command(queue_profile_name, schedule_profile_name);
+    int result = qos_apply_global_command(
+            queue_profile_name, schedule_profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname, NULL, NULL, result);
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, result);
 
     return result;
 }
 
-static vtysh_ret_val qos_apply_global_show_running_config_callback(
-        void *p_private) {
+/**
+ * Contains the callback function for qos_apply_global_show_running_config.
+ */
+static vtysh_ret_val
+qos_apply_global_show_running_config_callback(
+        void *p_private)
+{
     qos_queue_profile_show_running_config();
     qos_schedule_profile_show_running_config();
 
     return e_vtysh_ok;
 }
 
-void qos_apply_global_show_running_config(void) {
+/**
+ * Installs the callback function for qos_apply_global_show_running_config.
+ */
+void
+qos_apply_global_show_running_config(void)
+{
     vtysh_context_client client;
     memset(&client, 0, sizeof(vtysh_context_client));
     client.p_client_name = "qos_apply_global_show_running_config_callback";
@@ -263,12 +341,22 @@ void qos_apply_global_show_running_config(void) {
     }
 }
 
-void qos_apply_global_vty_init(void) {
+/**
+ * Initializes qos_apply_global_vty.
+ */
+void
+qos_apply_global_vty_init(void)
+{
     install_element(CONFIG_NODE, &qos_apply_global_cmd);
     install_element(CONFIG_NODE, &qos_apply_global_strict_cmd);
 }
 
-void qos_apply_global_ovsdb_init(void) {
+/**
+ * Initializes qos_apply_global_ovsdb.
+ */
+void
+qos_apply_global_ovsdb_init(void)
+{
     ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_q_profile);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_qos);

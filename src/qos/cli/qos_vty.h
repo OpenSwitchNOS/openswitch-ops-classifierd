@@ -21,11 +21,13 @@
 /**
  * Initialize cli.
  */
-void cli_pre_init(void);
+void
+cli_pre_init(void);
 
 /**
  * Initialize cli.
  */
-void cli_post_init(void);
+void
+cli_post_init(void);
 
 #endif /* _QOS_VTY_H_ */

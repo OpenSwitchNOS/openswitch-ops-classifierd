@@ -21,44 +21,53 @@
 /**
  * Creates the 'strict' profile, if it does not already exist.
  */
-void qos_schedule_profile_create_strict_profile(
+void
+qos_schedule_profile_create_strict_profile(
         struct ovsdb_idl_txn *txn);
 
 /**
  * Shows the global schedule profile running config.
  */
-void qos_schedule_profile_show_running_config(void);
+void
+qos_schedule_profile_show_running_config(void);
 
 /**
  * Returns true if the schedule profile contains the queue_num.
  */
-bool qos_schedule_profile_has_queue_num(struct ovsrec_qos *profile_row,
+bool
+qos_schedule_profile_has_queue_num(struct ovsrec_qos *profile_row,
         int64_t queue_num);
 
 /**
  * Returns true if the schedule profile is complete.
  */
-bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row);
+bool
+qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row,
+        bool print_error);
 
 /**
  * Retrieves the schedule profile row.
  */
-struct ovsrec_qos *qos_get_schedule_profile_row(
+struct ovsrec_qos *
+qos_get_schedule_profile_row(
         const char *profile_name);
 
 /**
  * Shows the running config for qos schedule profile.
  */
-void qos_schedule_profile_show_running_config(void);
+void
+qos_schedule_profile_show_running_config(void);
 
 /**
  * Initializes vty functions for qos schedule profile.
  */
-void qos_schedule_profile_vty_init(void);
+void
+os_schedule_profile_vty_init(void);
 
 /**
  * Initializes ovsdb functions for qos schedule profile.
  */
-void qos_schedule_profile_ovsdb_init(void);
+void
+qos_schedule_profile_ovsdb_init(void);
 
 #endif /* _QOS_SCHEDULE_PROFILE_VTY_H_ */

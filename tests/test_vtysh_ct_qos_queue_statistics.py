@@ -84,7 +84,7 @@ class Test_qos_queue_statistics_cli:
     def __del__(self):
         del self.test
 
-    def qosShowQueueStatisticsCommandWithSingleInterface(self):
+    def test_qosShowQueueStatisticsCommandWithSingleInterface(self):
         self.test.qosShowQueueStatisticsCommandWithSingleInterface()
-    def qosShowQueueStatisticsCommandWithAllInterfaces(self):
+    def test_qosShowQueueStatisticsCommandWithAllInterfaces(self):
         self.test.qosShowQueueStatisticsCommandWithAllInterfaces()
