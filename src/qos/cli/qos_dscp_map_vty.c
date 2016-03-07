@@ -362,17 +362,17 @@ static void
 print_dscp_map_row(struct ovsrec_qos_dscp_map_entry *dscp_map_row,
         bool is_default)
 {
-    int code_point = is_default ?
-            atoi(smap_get(&dscp_map_row->hw_defaults,
-                    QOS_DEFAULT_CODE_POINT_KEY)) :
-                    (int) dscp_map_row->code_point;
-    vty_out (vty, "%-10d ", code_point);
+    int64_t code_point = is_default
+            ? atoi(smap_get(&dscp_map_row->hw_defaults,
+                    QOS_DEFAULT_CODE_POINT_KEY))
+            : dscp_map_row->code_point;
+    vty_out (vty, "%-10" PRId64 " ", code_point);
 
-    int local_priority = is_default ?
-            atoi(smap_get(&dscp_map_row->hw_defaults,
-                    QOS_DEFAULT_LOCAL_PRIORITY_KEY)) :
-                    (int) dscp_map_row->local_priority;
-    vty_out (vty, "%-14d ", local_priority);
+    int64_t local_priority = is_default
+            ? atoi(smap_get(&dscp_map_row->hw_defaults,
+                    QOS_DEFAULT_LOCAL_PRIORITY_KEY))
+            : dscp_map_row->local_priority;
+    vty_out (vty, "%-14" PRId64 " ", local_priority);
 
 #ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
     /* Disabled for dill. */
@@ -386,22 +386,21 @@ print_dscp_map_row(struct ovsrec_qos_dscp_map_entry *dscp_map_row,
                 sizeof(buffer));
     } else {
         if (dscp_map_row->priority_code_point != NULL) {
-            snprintf(buffer, sizeof(buffer), "%d",
-                    (int) *dscp_map_row->priority_code_point);
+            snprintf(buffer, sizeof(buffer), "%" PRId64,
+                    *dscp_map_row->priority_code_point);
         }
     }
     vty_out (vty, "%-3s ", buffer);
 #endif
 
-    const char *color = is_default ?
-            smap_get(&dscp_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY) :
-            dscp_map_row->color;
+    const char *color = is_default
+            ? smap_get(&dscp_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY)
+            : dscp_map_row->color;
     vty_out (vty, "%-7s ", color);
 
-    const char *description = is_default ?
-            smap_get(&dscp_map_row->hw_defaults,
-                    QOS_DEFAULT_DESCRIPTION_KEY) :
-                    dscp_map_row->description;
+    const char *description = is_default
+            ? smap_get(&dscp_map_row->hw_defaults, QOS_DEFAULT_DESCRIPTION_KEY)
+            : dscp_map_row->description;
     vty_out (vty, "%s ", description);
 
     vty_out (vty, "%s", VTY_NEWLINE);
@@ -471,7 +470,7 @@ display_headers(bool *dscp_map_header_displayed,
     }
 
     if (!*code_point_header_displayed) {
-        vty_out (vty, "    code_point %d%s", (int) code_point, VTY_NEWLINE);
+        vty_out (vty, "    code_point %" PRId64 "%s", code_point, VTY_NEWLINE);
         *code_point_header_displayed = true;
     }
 }
@@ -495,8 +494,8 @@ qos_dscp_map_show_running_config_callback(
         if (dscp_map_row->local_priority != default_local_priority) {
             display_headers(&dscp_map_header_displayed,
                     &code_point_header_displayed, code_point);
-            vty_out(vty, "        local_priority %d%s",
-                    (int) dscp_map_row->local_priority, VTY_NEWLINE);
+            vty_out(vty, "        local_priority %" PRId64 "%s",
+                    dscp_map_row->local_priority, VTY_NEWLINE);
         }
 
 #ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
@@ -510,8 +509,8 @@ qos_dscp_map_show_running_config_callback(
                     sizeof(current_priority_code_point));
         } else {
             snprintf(current_priority_code_point,
-                    sizeof(current_priority_code_point), "%d",
-                    (int) *dscp_map_row->priority_code_point);
+                    sizeof(current_priority_code_point), "%" PRId64,
+                    *dscp_map_row->priority_code_point);
         }
         char default_priority_code_point[QOS_CLI_STRING_BUFFER_SIZE];
         int64_t default_priority_code_point_int =

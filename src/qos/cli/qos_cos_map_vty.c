@@ -258,26 +258,26 @@ static void
 print_cos_map_row(struct ovsrec_qos_cos_map_entry *cos_map_row,
         bool is_default)
 {
-    int64_t code_point = is_default ?
-            atoi(smap_get(&cos_map_row->hw_defaults,
-                    QOS_DEFAULT_CODE_POINT_KEY)) :
-                    cos_map_row->code_point;
+    int64_t code_point = is_default
+            ? atoi(smap_get(&cos_map_row->hw_defaults,
+                    QOS_DEFAULT_CODE_POINT_KEY))
+            : cos_map_row->code_point;
     vty_out (vty, "%-10" PRId64 " ", code_point);
 
-    int local_priority = is_default ?
-            atoi(smap_get(&cos_map_row->hw_defaults,
-                    QOS_DEFAULT_LOCAL_PRIORITY_KEY)) :
-                    (int) cos_map_row->local_priority;
-    vty_out (vty, "%-14d ", local_priority);
+    int64_t local_priority = is_default
+            ? atoi(smap_get(&cos_map_row->hw_defaults,
+                    QOS_DEFAULT_LOCAL_PRIORITY_KEY))
+            : cos_map_row->local_priority;
+    vty_out (vty, "%-14" PRId64 " ", local_priority);
 
-    const char *color = is_default ?
-            smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY) :
-            cos_map_row->color;
+    const char *color = is_default
+            ? smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY)
+            : cos_map_row->color;
     vty_out (vty, "%-7s ", color);
 
-    const char *description = is_default ?
-            smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_DESCRIPTION_KEY) :
-            cos_map_row->description;
+    const char *description = is_default
+            ? smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_DESCRIPTION_KEY)
+            : cos_map_row->description;
     vty_out (vty, "%s ", description);
 
     vty_out (vty, "%s", VTY_NEWLINE);
@@ -341,7 +341,7 @@ display_headers(bool *cos_map_header_displayed,
     }
 
     if (!*code_point_header_displayed) {
-        vty_out (vty, "    code_point %d%s", (int) code_point, VTY_NEWLINE);
+        vty_out (vty, "    code_point %" PRId64 "%s", code_point, VTY_NEWLINE);
         *code_point_header_displayed = true;
     }
 }
@@ -365,8 +365,8 @@ qos_cos_map_show_running_config_callback(
         if (cos_map_row->local_priority != default_local_priority) {
             display_headers(&cos_map_header_displayed,
                     &code_point_header_displayed, code_point);
-            vty_out(vty, "        local_priority %d%s",
-                    (int) cos_map_row->local_priority, VTY_NEWLINE);
+            vty_out(vty, "        local_priority %" PRId64 "%s",
+                    cos_map_row->local_priority, VTY_NEWLINE);
         }
 
         /* Show color. */

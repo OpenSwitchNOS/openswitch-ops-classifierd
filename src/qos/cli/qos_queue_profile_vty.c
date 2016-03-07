@@ -138,9 +138,9 @@ qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row,
             int64_t local_priority = queue_row->local_priorities[i];
             if (found_local_priorities[local_priority] == true) {
                 if (print_error) {
-                    vty_out(vty, "The queue profile has local priority %d\
- assigned more than once.%s",
-                            (int) local_priority, VTY_NEWLINE);
+                    vty_out(vty, "The queue profile\
+ has local priority %" PRId64 " assigned more than once.%s",
+                            local_priority, VTY_NEWLINE);
                 }
                 return false;
             }
@@ -764,8 +764,9 @@ qos_queue_profile_name_no_command(struct ovsdb_idl_txn *txn,
     struct ovsrec_q_profile_entry *queue_row =
             qos_get_queue_profile_entry_row(profile_row, queue_num);
     if (queue_row == NULL) {
-        vty_out(vty, "Profile %s does not have queue_num %d configured.%s",
-                profile_name, (int) queue_num, VTY_NEWLINE);
+        vty_out(vty,
+                "Profile %s does not have queue_num %" PRId64 " configured.%s",
+                profile_name, queue_num, VTY_NEWLINE);
         return true;
     }
 
@@ -1096,8 +1097,9 @@ qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
     struct ovsrec_q_profile_entry *queue_row =
             qos_get_queue_profile_entry_row(profile_row, queue_num);
     if (queue_row == NULL) {
-        vty_out(vty, "Profile %s does not have queue_num %d configured.%s",
-                profile_name, (int) queue_num, VTY_NEWLINE);
+        vty_out(vty,
+                "Profile %s does not have queue_num %" PRId64 " configured.%s",
+                profile_name, queue_num, VTY_NEWLINE);
         return true;
     }
 
@@ -1245,7 +1247,7 @@ snprintf_local_priorities(char *buffer, int64_t n,
     int i;
     for (i = 0; i < profile_entry_row->n_local_priorities; i++) {
         buffer += snprintf(buffer, n,
-                "%d", (int) profile_entry_row->local_priorities[i]);
+                "%" PRId64, profile_entry_row->local_priorities[i]);
 
         /* If not the last one, then print a comma. */
         if (i < profile_entry_row->n_local_priorities - 1) {
@@ -1263,7 +1265,7 @@ print_queue_profile_entry_row(int64_t queue_num,
 {
     char buffer[QOS_CLI_STRING_BUFFER_SIZE];
 
-    vty_out (vty, "%-9d ", (int) queue_num);
+    vty_out (vty, "%-9" PRId64 " ", queue_num);
 
     buffer[0] = '\0';
     snprintf_local_priorities(buffer,
@@ -1398,7 +1400,7 @@ display_headers(bool *header_displayed,
     }
 
     if (!*queue_num_header_displayed) {
-        vty_out (vty, "    queue_num %d%s", (int) queue_num, VTY_NEWLINE);
+        vty_out (vty, "    queue_num %" PRId64 "%s", queue_num, VTY_NEWLINE);
         *queue_num_header_displayed = true;
     }
 }

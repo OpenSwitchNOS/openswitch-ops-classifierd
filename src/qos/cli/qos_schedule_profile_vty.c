@@ -741,8 +741,9 @@ qos_schedule_profile_strict_no_command(
     struct ovsrec_queue *queue_row =
             qos_get_schedule_profile_entry_row(profile_row, queue_num);
     if (queue_row == NULL) {
-        vty_out(vty, "Profile %s does not have queue_num %d configured.%s",
-                profile_name, (int) queue_num, VTY_NEWLINE);
+        vty_out(vty,
+                "Profile %s does not have queue_num %" PRId64 " configured.%s",
+                profile_name, queue_num, VTY_NEWLINE);
         return true;
     }
 
@@ -1025,8 +1026,9 @@ qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
     struct ovsrec_queue *queue_row =
             qos_get_schedule_profile_entry_row(profile_row, queue_num);
     if (queue_row == NULL) {
-        vty_out(vty, "Profile %s does not have queue_num %d configured.%s",
-                profile_name, (int) queue_num, VTY_NEWLINE);
+        vty_out(vty,
+                "Profile %s does not have queue_num %" PRId64 " configured.%s",
+                profile_name, queue_num, VTY_NEWLINE);
         return true;
     }
 
@@ -1157,14 +1159,14 @@ print_schedule_profile_entry_row(int64_t queue_num,
 {
     char buffer[QOS_CLI_STRING_BUFFER_SIZE];
 
-    vty_out (vty, "%-9d ", (int) queue_num);
+    vty_out (vty, "%-9" PRId64 " ", queue_num);
 
     vty_out (vty, "%-9s ", profile_entry_row->algorithm);
 
     buffer[0] = '\0';
     if (profile_entry_row->weight != NULL) {
         snprintf(buffer, sizeof(buffer),
-                "%d", (int) *profile_entry_row->weight);
+                "%" PRId64,  *profile_entry_row->weight);
     }
     vty_out (vty, "%-6s ", buffer);
 
@@ -1300,7 +1302,7 @@ display_headers(bool *header_displayed,
     }
 
     if (!*queue_num_header_displayed) {
-        vty_out (vty, "    queue_num %d%s", (int) queue_num, VTY_NEWLINE);
+        vty_out (vty, "    queue_num %" PRId64 "%s", queue_num, VTY_NEWLINE);
         *queue_num_header_displayed = true;
     }
 }
@@ -1377,16 +1379,16 @@ qos_schedule_profile_show_running_config(void)
             strncpy(applied_weight, QOS_CLI_EMPTY_DISPLAY_STRING,
                     sizeof(applied_weight));
         } else {
-            snprintf(applied_weight, sizeof(applied_weight), "%d",
-                    (int) *applied_profile_entry->weight);
+            snprintf(applied_weight, sizeof(applied_weight), "%" PRId64,
+                    *applied_profile_entry->weight);
         }
         char default_weight[QOS_CLI_STRING_BUFFER_SIZE];
         if (default_profile_entry->weight == NULL) {
             strncpy(default_weight, QOS_CLI_EMPTY_DISPLAY_STRING,
                     sizeof(default_weight));
         } else {
-            snprintf(default_weight, sizeof(default_weight), "%d",
-                    (int) *default_profile_entry->weight);
+            snprintf(default_weight, sizeof(default_weight), "%" PRId64,
+                    *default_profile_entry->weight);
         }
         if (strncmp(applied_weight,
                 default_weight, sizeof(applied_weight)) != 0) {
