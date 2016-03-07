@@ -412,16 +412,14 @@ qos_cos_map_show_running_config_callback(
 void
 qos_cos_map_show_running_config(void)
 {
-    vtysh_context_client client;
-    memset(&client, 0, sizeof(vtysh_context_client));
-    client.p_client_name = "qos_cos_map_show_running_config_callback";
-    client.client_id = e_vtysh_config_context_qos_cos_map;
-    client.p_callback = &qos_cos_map_show_running_config_callback;
-
-    vtysh_ret_val retval = vtysh_context_addclient(e_vtysh_config_context,
-            e_vtysh_config_context_qos_cos_map, &client);
-    if(retval != e_vtysh_ok) {
-        vty_out(vty, "Unable to add client callback.%s", VTY_NEWLINE);
+    vtysh_ret_val retval = install_show_run_config_context(
+                              e_vtysh_qos_cos_map_context,
+                              &qos_cos_map_show_running_config_callback,
+                              NULL, NULL);
+    if (retval != e_vtysh_ok) {
+        vtysh_ovsdb_config_logmsg(VTYSH_OVSDB_CONFIG_ERR,
+                           "Context unable "\
+                           "to add config callback");
     }
 }
 

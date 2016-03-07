@@ -282,7 +282,7 @@ qos_queue_profile_command(struct ovsdb_idl_txn *txn,
         ovsrec_q_profile_set_name(profile_row, profile_name);
     }
 
-    return false;
+    return true;
 }
 
 /**
@@ -330,8 +330,8 @@ qos_queue_profile_command_commit(const char *profile_name)
         return CMD_OVSDB_FAILURE;
     }
 
-    bool error = qos_queue_profile_command(txn, profile_name);
-    if (error) {
+    bool success = qos_queue_profile_command(txn, profile_name);
+    if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -397,7 +397,7 @@ qos_queue_profile_no_command(struct ovsdb_idl_txn *txn,
     if (profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 profile_name, VTY_NEWLINE);
-        return true;
+        return false;
     }
 
     if (strncmp(profile_name, QOS_DEFAULT_NAME,
@@ -413,7 +413,7 @@ qos_queue_profile_no_command(struct ovsdb_idl_txn *txn,
         if (factory_default_profile_row == NULL) {
             vty_out(vty, "Profile %s does not exist.%s",
                     QOS_FACTORY_DEFAULT_NAME, VTY_NEWLINE);
-            return true;
+            return false;
         }
 
         /* Copy all factory defaults into new entry rows. */
@@ -451,7 +451,7 @@ qos_queue_profile_no_command(struct ovsdb_idl_txn *txn,
         ovsrec_q_profile_delete(profile_row);
     }
 
-    return false;
+    return true;
 }
 
 /**
@@ -499,8 +499,8 @@ qos_queue_profile_no_command_commit(const char *profile_name)
         return CMD_OVSDB_FAILURE;
     }
 
-    bool error = qos_queue_profile_no_command(txn, profile_name);
-    if (error) {
+    bool success = qos_queue_profile_no_command(txn, profile_name);
+    if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -565,7 +565,7 @@ qos_queue_profile_name_command(struct ovsdb_idl_txn *txn,
     if (profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 profile_name, VTY_NEWLINE);
-        return true;
+        return false;
     }
 
     /* Retrieve the existing queue row. */
@@ -580,7 +580,7 @@ qos_queue_profile_name_command(struct ovsdb_idl_txn *txn,
     /* Update the queue row. */
     ovsrec_q_profile_entry_set_description(queue_row, queue_name);
 
-    return false;
+    return true;
 }
 
 /**
@@ -627,9 +627,9 @@ qos_queue_profile_name_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    bool error = qos_queue_profile_name_command(txn, profile_name,
+    bool success = qos_queue_profile_name_command(txn, profile_name,
             queue_num, queue_name);
-    if (error) {
+    if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -757,7 +757,7 @@ qos_queue_profile_name_no_command(struct ovsdb_idl_txn *txn,
     if (profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 profile_name, VTY_NEWLINE);
-        return true;;
+        return false;
     }
 
     /* Retrieve the existing queue row. */
@@ -767,7 +767,7 @@ qos_queue_profile_name_no_command(struct ovsdb_idl_txn *txn,
         vty_out(vty,
                 "Profile %s does not have queue_num %" PRId64 " configured.%s",
                 profile_name, queue_num, VTY_NEWLINE);
-        return true;
+        return false;
     }
 
     /* Update the queue row. */
@@ -778,7 +778,7 @@ qos_queue_profile_name_no_command(struct ovsdb_idl_txn *txn,
         delete_queue_row(profile_row, queue_num);
     }
 
-    return false;
+    return true;
 }
 
 /**
@@ -815,9 +815,9 @@ qos_queue_profile_name_no_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    bool error = qos_queue_profile_name_no_command(txn,
+    bool success = qos_queue_profile_name_no_command(txn,
             profile_name, queue_num);
-    if (error) {
+    if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -919,7 +919,7 @@ qos_queue_profile_map_command(struct ovsdb_idl_txn *txn,
     if (profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 profile_name, VTY_NEWLINE);
-        return true;
+        return false;
     }
 
     /* Retrieve the existing queue row. */
@@ -934,7 +934,7 @@ qos_queue_profile_map_command(struct ovsdb_idl_txn *txn,
     /* Update the queue row. */
     add_local_priority(queue_row, local_priority);
 
-    return false;
+    return true;
 }
 
 /**
@@ -971,9 +971,9 @@ qos_queue_profile_map_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    bool error = qos_queue_profile_map_command(txn, profile_name,
+    bool success = qos_queue_profile_map_command(txn, profile_name,
             queue_num, local_priority);
-    if (error) {
+    if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -1090,7 +1090,7 @@ qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
     if (profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 profile_name, VTY_NEWLINE);
-        return true;
+        return false;
     }
 
     /* Retrieve the existing queue row. */
@@ -1100,7 +1100,7 @@ qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
         vty_out(vty,
                 "Profile %s does not have queue_num %" PRId64 " configured.%s",
                 profile_name, queue_num, VTY_NEWLINE);
-        return true;
+        return false;
     }
 
     /* Update the queue row. */
@@ -1118,7 +1118,7 @@ qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
         delete_queue_row(profile_row, queue_num);
     }
 
-    return false;
+    return true;
 }
 
 /**
@@ -1155,9 +1155,9 @@ qos_queue_profile_map_no_command_commit(const char *profile_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    bool error = qos_queue_profile_map_no_command(txn, profile_name,
+    bool success = qos_queue_profile_map_no_command(txn, profile_name,
             queue_num, local_priority);
-    if (error) {
+    if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
