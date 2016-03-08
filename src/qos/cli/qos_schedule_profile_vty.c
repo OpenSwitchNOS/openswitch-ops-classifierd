@@ -432,7 +432,8 @@ qos_schedule_profile_no_command(struct ovsdb_idl_txn *txn,
             struct ovsrec_queue *default_row =
                     factory_default_profile_row->value_queues[j];
             ovsrec_queue_set_algorithm(queue_row, default_row->algorithm);
-            ovsrec_queue_set_weight(queue_row, default_row->weight, 1);
+            ovsrec_queue_set_weight(queue_row, default_row->weight,
+                    default_row->weight == NULL ? 0 : 1);
             key_list[j] = factory_default_profile_row->key_queues[j];
             value_list[j] = queue_row;
         }
