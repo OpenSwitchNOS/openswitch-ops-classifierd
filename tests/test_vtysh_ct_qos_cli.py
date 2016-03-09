@@ -199,8 +199,10 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommand(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'p1' in out
+        out = self.s1.cmdCLI('do show qos queue-profile')
+        assert 'applied        p1' in out
+        out = self.s1.cmdCLI('do show qos schedule-profile')
+        assert 'applied        p1' in out
 
     def test_qosApplyGlobalCommandWithDuplicateQueueProfileQueue(self):
         self.setUp_qosApplyGlobal()
@@ -259,9 +261,9 @@ class Test_qos_cli():
 
     def test_qosApplyGlobalCommandWithStrictScheduleProfile(self):
         self.setUp_qosApplyGlobal()
-        self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile strict')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'strict' in out
+        self.s1.cmdCLI('apply qos queue-profile default schedule-profile strict')
+        out = self.s1.cmdCLI('do show qos schedule-profile')
+        assert 'applied        strict' in out
 
     def test_qosApplyGlobalCommandWithAllStrict(self):
         self.setUp_qosApplyGlobal()
@@ -282,14 +284,14 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommandWithAllWrr(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 400')
-        self.s1.cmdCLI('wrr queue 5 weight 500')
-        self.s1.cmdCLI('wrr queue 6 weight 600')
-        self.s1.cmdCLI('wrr queue 7 weight 700')
+        self.s1.cmdCLI('wrr queue 4 weight 40')
+        self.s1.cmdCLI('wrr queue 5 weight 50')
+        self.s1.cmdCLI('wrr queue 6 weight 60')
+        self.s1.cmdCLI('wrr queue 7 weight 70')
         self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 100')
-        self.s1.cmdCLI('wrr queue 2 weight 200')
-        self.s1.cmdCLI('wrr queue 3 weight 300')
+        self.s1.cmdCLI('wrr queue 1 weight 10')
+        self.s1.cmdCLI('wrr queue 2 weight 20')
+        self.s1.cmdCLI('wrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = self.s1.cmdCLI('do show qos schedule-profile')
@@ -298,14 +300,14 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommandWithAllWrrWithMaxStrict(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 400')
-        self.s1.cmdCLI('wrr queue 5 weight 500')
-        self.s1.cmdCLI('wrr queue 6 weight 600')
+        self.s1.cmdCLI('wrr queue 4 weight 40')
+        self.s1.cmdCLI('wrr queue 5 weight 50')
+        self.s1.cmdCLI('wrr queue 6 weight 60')
         self.s1.cmdCLI('strict queue 7')
         self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 100')
-        self.s1.cmdCLI('wrr queue 2 weight 200')
-        self.s1.cmdCLI('wrr queue 3 weight 300')
+        self.s1.cmdCLI('wrr queue 1 weight 10')
+        self.s1.cmdCLI('wrr queue 2 weight 20')
+        self.s1.cmdCLI('wrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = self.s1.cmdCLI('do show qos schedule-profile')
@@ -319,9 +321,9 @@ class Test_qos_cli():
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
         self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 100')
-        self.s1.cmdCLI('wrr queue 2 weight 200')
-        self.s1.cmdCLI('wrr queue 3 weight 300')
+        self.s1.cmdCLI('wrr queue 1 weight 10')
+        self.s1.cmdCLI('wrr queue 2 weight 20')
+        self.s1.cmdCLI('wrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         out = self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         assert 'must have the same algorithm assigned to each queue' in out
@@ -329,10 +331,10 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommandWithLowerStrictHigherWrr(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 400')
-        self.s1.cmdCLI('wrr queue 5 weight 500')
-        self.s1.cmdCLI('wrr queue 6 weight 600')
-        self.s1.cmdCLI('wrr queue 7 weight 700')
+        self.s1.cmdCLI('wrr queue 4 weight 40')
+        self.s1.cmdCLI('wrr queue 5 weight 50')
+        self.s1.cmdCLI('wrr queue 6 weight 60')
+        self.s1.cmdCLI('wrr queue 7 weight 70')
         self.s1.cmdCLI('strict queue 0')
         self.s1.cmdCLI('strict queue 1')
         self.s1.cmdCLI('strict queue 2')
@@ -368,8 +370,8 @@ class Test_qos_cli():
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('apply qos schedule-profile p1')
-        out = self.s1.cmdCLI('do show running-config interface 1')
-        assert 'p1' in out
+        out = self.s1.cmdCLI('do show qos schedule-profile')
+        assert 'applied        p1' in out
 
     def test_qosApplyPortCommandWithMissingScheduleProfileQueue(self):
         self.setUp_qosApplyPort()
@@ -409,8 +411,8 @@ class Test_qos_cli():
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('apply qos schedule-profile strict')
-        out = self.s1.cmdCLI('do show running-config interface 1')
-        assert 'strict' in out
+        out = self.s1.cmdCLI('do show qos schedule-profile')
+        assert 'applied        strict' in out
 
     def test_qosApplyPortCommandWithAllStrict(self):
         self.setUp_qosApplyPort()
@@ -432,14 +434,14 @@ class Test_qos_cli():
     def test_qosApplyPortCommandWithAllWrr(self):
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 400')
-        self.s1.cmdCLI('wrr queue 5 weight 500')
-        self.s1.cmdCLI('wrr queue 6 weight 600')
-        self.s1.cmdCLI('wrr queue 7 weight 700')
+        self.s1.cmdCLI('wrr queue 4 weight 40')
+        self.s1.cmdCLI('wrr queue 5 weight 50')
+        self.s1.cmdCLI('wrr queue 6 weight 60')
+        self.s1.cmdCLI('wrr queue 7 weight 70')
         self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 100')
-        self.s1.cmdCLI('wrr queue 2 weight 200')
-        self.s1.cmdCLI('wrr queue 3 weight 300')
+        self.s1.cmdCLI('wrr queue 1 weight 10')
+        self.s1.cmdCLI('wrr queue 2 weight 20')
+        self.s1.cmdCLI('wrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('apply qos schedule-profile p1')
@@ -449,14 +451,14 @@ class Test_qos_cli():
     def test_qosApplyPortCommandWithAllWrrWithMaxStrict(self):
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 400')
-        self.s1.cmdCLI('wrr queue 5 weight 500')
-        self.s1.cmdCLI('wrr queue 6 weight 600')
+        self.s1.cmdCLI('wrr queue 4 weight 40')
+        self.s1.cmdCLI('wrr queue 5 weight 50')
+        self.s1.cmdCLI('wrr queue 6 weight 60')
         self.s1.cmdCLI('strict queue 7')
         self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 100')
-        self.s1.cmdCLI('wrr queue 2 weight 200')
-        self.s1.cmdCLI('wrr queue 3 weight 300')
+        self.s1.cmdCLI('wrr queue 1 weight 10')
+        self.s1.cmdCLI('wrr queue 2 weight 20')
+        self.s1.cmdCLI('wrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('apply qos schedule-profile p1')
@@ -471,9 +473,9 @@ class Test_qos_cli():
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
         self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 100')
-        self.s1.cmdCLI('wrr queue 2 weight 200')
-        self.s1.cmdCLI('wrr queue 3 weight 300')
+        self.s1.cmdCLI('wrr queue 1 weight 10')
+        self.s1.cmdCLI('wrr queue 2 weight 20')
+        self.s1.cmdCLI('wrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('interface 1')
         out = self.s1.cmdCLI('apply qos schedule-profile p1')
@@ -482,10 +484,10 @@ class Test_qos_cli():
     def test_qosApplyPortCommandWithLowerStrictHigherWrr(self):
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 400')
-        self.s1.cmdCLI('wrr queue 5 weight 500')
-        self.s1.cmdCLI('wrr queue 6 weight 600')
-        self.s1.cmdCLI('wrr queue 7 weight 700')
+        self.s1.cmdCLI('wrr queue 4 weight 40')
+        self.s1.cmdCLI('wrr queue 5 weight 50')
+        self.s1.cmdCLI('wrr queue 6 weight 60')
+        self.s1.cmdCLI('wrr queue 7 weight 70')
         self.s1.cmdCLI('strict queue 0')
         self.s1.cmdCLI('strict queue 1')
         self.s1.cmdCLI('strict queue 2')
@@ -500,8 +502,8 @@ class Test_qos_cli():
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('apply schedule-profile p1')
         self.s1.cmdCLI('no apply qos schedule-profile')
-        out = self.s1.cmdCLI('do show running-config interface 1')
-        assert 'p1' not in out
+        out = self.s1.cmdCLI('do show qos schedule-profile')
+        assert 'complete       p1' in out
 
     def test_qosApplyPortNoCommandWithInterfaceInLag(self):
         self.setUp_qosApplyPort()
@@ -515,14 +517,13 @@ class Test_qos_cli():
         self.setUp_qosCosMap()
         self.s1.cmdCLI('qos cos-map 7 local-priority 1 color red name MyName1')
         self.s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow name MyName2')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point 7' in out
-        assert 'local_priority 2' in out
-        assert 'color yellow' in out
-        assert 'name MyName2' in out
+        out = self.s1.cmdCLI('do show qos cos-map')
+        assert '7          2              yellow  MyName2' in out
 
     def test_qosCosMapCommandWithIllegalCodePoint(self):
         self.setUp_qosCosMap()
+        out = self.s1.cmdCLI('qos cos-map -1 local-priority 2 color yellow name MyName2')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('qos cos-map 8 local-priority 2 color yellow name MyName2')
         assert 'Unknown command' in out
 
@@ -531,9 +532,25 @@ class Test_qos_cli():
         out = self.s1.cmdCLI('qos cos-map local-priority 2 color yellow name MyName2')
         assert 'Unknown command' in out
 
+    def get_max_local_priority(self, printed_show_output):
+        max_local_priority = -1
+        lines = printed_show_output.split('\n')
+        for line in lines:
+            if line[0].isdigit():
+                local_priority = line.split(' ')[1]
+                if local_priority > max_local_priority:
+                    max_local_priority = local_priority
+        return max_local_priority
+
     def test_qosCosMapCommandWithIllegalLocalPriority(self):
         self.setUp_qosCosMap()
-        out = self.s1.cmdCLI('qos cos-map 7 local-priority 8 color yellow name MyName2')
+        out = self.s1.cmdCLI('do show qos cos-map default')
+        max_local_priority = self.get_max_local_priority(out)
+
+        out = self.s1.cmdCLI('qos cos-map 7 local-priority -1 color yellow name MyName2')
+        assert 'Unknown command' in out
+        out = self.s1.cmdCLI('qos cos-map 7 local-priority ' + \
+            str(max_local_priority) + ' color yellow name MyName2')
         assert 'Unknown command' in out
 
     def test_qosCosMapCommandWithNullLocalPriority(self):
@@ -543,17 +560,17 @@ class Test_qos_cli():
 
     def test_qosCosMapCommandWithIllegalColor(self):
         self.setUp_qosCosMap()
-        out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 color illegal name MyName2')
+        out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 name MyName2 color illegal')
         assert 'Unknown command' in out
 
     def test_qosCosMapCommandWithNullColor(self):
         self.setUp_qosCosMap()
         out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 name MyName2')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point 7' in out
-        assert 'local_priority 2' in out
-        assert 'color' not in out
-        assert 'name MyName2' in out
+        out = self.s1.cmdCLI('do show qos cos-map')
+        assert '7          2              green   MyName2' in out
+
+        out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 name MyName2 color')
+        assert 'incomplete.' in out
 
     def test_qosCosMapCommandWithIllegalName(self):
         self.setUp_qosCosMap()
@@ -564,21 +581,18 @@ class Test_qos_cli():
     def test_qosCosMapCommandWithNullName(self):
         self.setUp_qosCosMap()
         out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point 7' in out
-        assert 'local_priority 2' in out
-        assert 'color yellow' in out
-        assert 'name <empty>' in out
+        out = self.s1.cmdCLI('do show qos cos-map')
+        assert '7          2              yellow' in out
+
+        out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow name')
+        assert 'incomplete.' in out
 
     def test_qosCosMapNoCommand(self):
         self.setUp_qosCosMap()
         self.s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow name MyName2')
         self.s1.cmdCLI('no qos cos-map 7')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point' not in out
-        assert 'local_priority' not in out
-        assert 'color' not in out
-        assert 'name' not in out
+        out = self.s1.cmdCLI('do show qos cos-map')
+        assert '7          7              green   Network_Control' in out
 
     def test_qosCosMapShowCommand(self):
         self.setUp_qosCosMap()
@@ -604,7 +618,6 @@ class Test_qos_cli():
 
     def test_qosCosPortCommand(self):
         # This command is not supported in dill.
-        # Artificially pass all tests until this command has been added.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -614,6 +627,7 @@ class Test_qos_cli():
         assert 'override 1' in out
 
     def test_qosCosPortCommandWithTrustEmpty(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -621,6 +635,7 @@ class Test_qos_cli():
         assert 'only allowed' in out
 
     def test_qosCosPortCommandWithTrustCos(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -629,6 +644,7 @@ class Test_qos_cli():
         assert 'only allowed' in out
 
     def test_qosCosPortCommandWithIllegalQosCos(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -637,6 +653,7 @@ class Test_qos_cli():
         assert 'Unknown command' in out
 
     def test_qosCosPortCommandWithNullQosCos(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -645,6 +662,7 @@ class Test_qos_cli():
         assert 'Command incomplete' in out
 
     def test_qosCosPortCommandWithInterfaceInLag(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -654,6 +672,7 @@ class Test_qos_cli():
         assert 'cannot' in out
 
     def test_qosCosPortNoCommand(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -664,6 +683,7 @@ class Test_qos_cli():
         assert 'override' not in out
 
     def test_qosCosPortNoCommandWithInterfaceInLag(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -673,6 +693,7 @@ class Test_qos_cli():
         assert 'cannot' in out
 
     def test_qosCosPortShowRunningConfig(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -682,6 +703,7 @@ class Test_qos_cli():
         assert 'override' in out
 
     def test_qosCosPortShowRunningConfigInterface(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -691,6 +713,7 @@ class Test_qos_cli():
         assert 'override' in out
 
     def test_qosCosPortShowInterface(self):
+        # This command is not supported in dill.
         return
         self.setup_qosCosPort()
         self.s1.cmdCLI('interface 1')
@@ -702,23 +725,18 @@ class Test_qos_cli():
 
     def test_qosDscpMapCommand(self):
         self.setUp_qosDscpMap()
-        # The cos option is not supported in dill.
-#         self.s1.cmdCLI('qos dscp-map 38 local-priority 1 cos 2 color green name MyName1')
-#         self.s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
         self.s1.cmdCLI(
             'qos dscp-map 38 local-priority 1 color green name MyName1')
         self.s1.cmdCLI(
             'qos dscp-map 38 local-priority 2 color yellow name MyName2')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point 38' in out
-        assert 'local_priority 2' in out
-        # The cos option is not supported in dill.
-#        assert 'cos 3' in out
-        assert 'color yellow' in out
-        assert 'name MyName2' in out
+        out = self.s1.cmdCLI('do show qos dscp-map')
+        assert '38         2              yellow  MyName2' in out
 
     def test_qosDscpMapCommandWithIllegalCodePoint(self):
         self.setUp_qosDscpMap()
+        out = self.s1.cmdCLI(
+            'qos dscp-map -1 local-priority 2 cos 3 color yellow name MyName2')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI(
             'qos dscp-map 64 local-priority 2 cos 3 color yellow name MyName2')
         assert 'Unknown command' in out
@@ -731,8 +749,13 @@ class Test_qos_cli():
 
     def test_qosDscpMapCommandWithIllegalLocalPriority(self):
         self.setUp_qosDscpMap()
-        out = self.s1.cmdCLI(
-            'qos dscp-map 38 local-priority 8 cos 3 color yellow name MyName2')
+        out = self.s1.cmdCLI('do show qos dscp-map default')
+        max_local_priority = self.get_max_local_priority(out)
+
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority -1 color yellow name MyName2')
+        assert 'Unknown command' in out
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority ' + \
+            str(max_local_priority) + ' color yellow name MyName2')
         assert 'Unknown command' in out
 
     def test_qosDscpMapCommandWithNullLocalPriority(self):
@@ -741,6 +764,8 @@ class Test_qos_cli():
         assert 'Unknown command' in out
 
     def test_qosDscpMapCommandWithIllegalCos(self):
+        # The cos option is not supported in dill.
+        return
         self.setUp_qosDscpMap()
         out = self.s1.cmdCLI(
             'qos dscp-map 38 local-priority 2 cos 8 color yellow name MyName2')
@@ -762,69 +787,48 @@ class Test_qos_cli():
     def test_qosDscpMapCommandWithIllegalColor(self):
         self.setUp_qosDscpMap()
         out = self.s1.cmdCLI(
-            'qos dscp-map 38 local-priority 2 cos 3 color illegal name MyName2')
+            'qos dscp-map 38 local-priority 2 name MyName2 color illegal')
         assert 'Unknown command' in out
 
     def test_qosDscpMapCommandWithNullColor(self):
-        # The cos option is not supported in dill.
-        return
         self.setUp_qosDscpMap()
-        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 name MyName2')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point 38' in out
-        assert 'local_priority 2' in out
-        assert 'cos 3' in out
-        assert 'color green' in out
-        assert 'name MyName2' in out
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 name MyName2')
+        out = self.s1.cmdCLI('do show qos dscp-map')
+        assert '38         2              green   MyName2 ' in out
+
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 name MyName2 color')
+        assert 'incomplete.' in out
 
     def test_qosDscpMapCommandWithIllegalName(self):
-        # The cos option is not supported in dill.
-        return
         self.setUp_qosDscpMap()
-        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow '
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow '
                         'name NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
         assert 'allowed' in out
 
     def test_qosDscpMapCommandWithNullName(self):
-        # The cos option is not supported in dill.
-        return
         self.setUp_qosDscpMap()
-        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point 38' in out
-        assert 'local_priority 2' in out
-        assert 'cos 3' in out
-        assert 'color yellow' in out
-        assert 'name <empty>' in out
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow')
+        out = self.s1.cmdCLI('do show qos dscp-map')
+        assert '38         2              yellow' in out
+
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color green name')
+        assert 'incomplete.' in out
 
     def test_qosDscpMapNoCommand(self):
         self.setUp_qosDscpMap()
-        self.s1.cmdCLI(
-            'qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
+        self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow name MyName2')
         self.s1.cmdCLI('no qos dscp-map 38')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point' not in out
-        assert 'local_priority' not in out
-        assert 'cos' not in out
-        assert 'color' not in out
-        assert 'name' not in out
+        out = self.s1.cmdCLI('do show qos dscp-map')
+        assert '38         4              red     AF43' in out
 
     def test_qosDscpMapShowCommand(self):
-        # The cos option is not supported in dill.
         self.setUp_qosDscpMap()
-#         self.s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
-#         out = self.s1.cmdCLI('do show qos dscp-map')
-#         assert '38         2              3   yellow  "MyName2"' in out
         self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow name MyName2')
         out = self.s1.cmdCLI('do show qos dscp-map')
         assert '38         2              yellow  MyName2' in out
 
     def test_qosDscpMapShowCommandWithDefault(self):
-        # The cos option is not supported in dill.
         self.setUp_qosDscpMap()
-#         self.s1.cmdCLI('qos dscp-map 38 local-priority 2 cos 3 color yellow name MyName2')
-#         out = self.s1.cmdCLI('do show qos dscp-map default')
-#         assert '38         4              4   red     AF43' in out
         self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow name MyName2')
         out = self.s1.cmdCLI('do show qos dscp-map default')
         assert '38         4              red     AF43' in out
@@ -845,7 +849,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('qos dscp 1')
-        out = self.s1.cmdCLI('do show running-config interface 1')
+        out = self.s1.cmdCLI('do show interface 1')
         assert 'override 1' in out
 
     def test_qosDscpPortCommandWithTrustEmpty(self):
@@ -865,6 +869,8 @@ class Test_qos_cli():
         self.setUp_qosDscpPort()
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust none')
+        out = self.s1.cmdCLI('qos dscp -1')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('qos dscp 64')
         assert 'Unknown command' in out
 
@@ -889,7 +895,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('qos dscp 1')
         self.s1.cmdCLI('no qos dscp')
-        out = self.s1.cmdCLI('do show running-config interface 1')
+        out = self.s1.cmdCLI('do show interface 1')
         assert 'override' not in out
 
     def test_qosDscpPortNoCommandWithInterfaceInLag(self):
@@ -1005,6 +1011,8 @@ class Test_qos_cli():
     def test_qosQueueProfileNameCommandWithIllegalQueue(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
+        out = self.s1.cmdCLI('name queue -1 QueueName')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('name queue 8 QueueName')
         assert 'Unknown command' in out
 
@@ -1025,6 +1033,8 @@ class Test_qos_cli():
     def test_qosQueueProfileNameNoCommandWithIllegalQueue(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
+        out = self.s1.cmdCLI('no name queue -1')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('no name queue 8')
         assert 'Unknown command' in out
 
@@ -1050,6 +1060,8 @@ class Test_qos_cli():
     def test_qosQueueProfileMapCommandWithIllegalQueue(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
+        out = self.s1.cmdCLI('map queue -1 local-priority 2')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('map queue 8 local-priority 2')
         assert 'Unknown command' in out
 
@@ -1062,6 +1074,8 @@ class Test_qos_cli():
     def test_qosQueueProfileMapCommandWithIllegalPriority(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
+        out = self.s1.cmdCLI('map queue 1 local-priority -1')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('map queue 1 local-priority 8')
         assert 'Unknown command' in out
 
@@ -1082,6 +1096,8 @@ class Test_qos_cli():
     def test_qosQueueProfileMapNoCommandWithIllegalQueue(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
+        out = self.s1.cmdCLI('no map queue -1 local-priority 2')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('no map queue 8 local-priority 2')
         assert 'Unknown command' in out
 
@@ -1094,6 +1110,8 @@ class Test_qos_cli():
     def test_qosQueueProfileMapNoCommandWithIllegalPriority(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
+        out = self.s1.cmdCLI('no map queue 1 local-priority -1')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('no map queue 1 local-priority 8')
         assert 'Unknown command' in out
 
@@ -1251,6 +1269,8 @@ class Test_qos_cli():
     def test_qosScheduleProfileStrictCommandWithIllegalQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
+        out = self.s1.cmdCLI('strict queue -1')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('strict queue 8')
         assert 'Unknown command' in out
 
@@ -1271,6 +1291,8 @@ class Test_qos_cli():
     def test_qosScheduleProfileStrictNoCommandWithIllegalQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
+        out = self.s1.cmdCLI('no strict queue -1')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('no strict queue 8')
         assert 'Unknown command' in out
 
@@ -1298,6 +1320,8 @@ class Test_qos_cli():
     def test_qosScheduleProfileWrrCommandWithIllegalQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
+        out = self.s1.cmdCLI('wrr queue -1 weight 2')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('wrr queue 8 weight 2')
         assert 'Unknown command' in out
 
@@ -1310,7 +1334,9 @@ class Test_qos_cli():
     def test_qosScheduleProfileWrrCommandWithIllegalWeight(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('wrr queue 1 weight 1024')
+        out = self.s1.cmdCLI('wrr queue 1 weight 0')
+        assert 'Unknown command' in out
+        out = self.s1.cmdCLI('wrr queue 1 weight 128')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrCommandWithNullWeight(self):
@@ -1330,6 +1356,8 @@ class Test_qos_cli():
     def test_qosScheduleProfileWrrNoCommandWithIllegalQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
+        out = self.s1.cmdCLI('no wrr queue -1 weight 2')
+        assert 'Unknown command' in out
         out = self.s1.cmdCLI('no wrr queue 8 weight 2')
         assert 'Unknown command' in out
 
@@ -1342,7 +1370,9 @@ class Test_qos_cli():
     def test_qosScheduleProfileWrrNoCommandWithIllegalWeight(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('no wrr queue 1 weight 1024')
+        out = self.s1.cmdCLI('no wrr queue 1 weight 0')
+        assert 'Unknown command' in out
+        out = self.s1.cmdCLI('no wrr queue 1 weight 128')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrNoCommandWithNullWeight(self):
@@ -1391,7 +1421,7 @@ class Test_qos_cli():
         self.setUp_qosTrustGlobal()
         self.s1.cmdCLI('qos trust dscp')
         self.s1.cmdCLI('qos trust cos')
-        out = self.s1.cmdCLI('do show running-config')
+        out = self.s1.cmdCLI('do show qos trust')
         assert 'qos trust cos' in out
 
     def test_qosTrustGlobalCommandWithIllegalQosTrust(self):
@@ -1408,8 +1438,8 @@ class Test_qos_cli():
         self.setUp_qosTrustGlobal()
         self.s1.cmdCLI('qos trust dscp')
         self.s1.cmdCLI('no qos trust')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'qos trust' not in out
+        out = self.s1.cmdCLI('do show qos trust')
+        assert 'qos trust none' in out
 
     def test_qosTrustGlobalShowCommand(self):
         self.setUp_qosTrustGlobal()
@@ -1436,7 +1466,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust dscp')
         self.s1.cmdCLI('qos trust cos')
-        out = self.s1.cmdCLI('do show running-config interface 1')
+        out = self.s1.cmdCLI('do show interface 1')
         assert 'qos trust cos' in out
 
     def test_qosTrustPortCommandWithIllegalQosTrust(self):
@@ -1463,8 +1493,8 @@ class Test_qos_cli():
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust dscp')
         self.s1.cmdCLI('no qos trust')
-        out = self.s1.cmdCLI('do show running-config interface 1')
-        assert 'qos trust' not in out
+        out = self.s1.cmdCLI('do show interface 1')
+        assert 'qos trust none' in out
 
     def test_qosTrustPortNoCommandWithInterfaceInLag(self):
         self.setUp_qosTrustPort()

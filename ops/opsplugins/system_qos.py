@@ -43,7 +43,7 @@ class SystemQosValidator(BaseValidator):
         self.validate_apply_global_profiles_contain_same_queues(
             system_row)
         self.validate_apply_port_profiles_contain_same_queues(
-            system_row)
+            system_row, validation_args)
 
     #
     # Validates that the given deletion of a given row is allowed.
@@ -150,7 +150,10 @@ class SystemQosValidator(BaseValidator):
     #
     # Validates that the port profiles contain the same queues.
     #
-    def validate_apply_port_profiles_contain_same_queues(self, system_row):
+    def validate_apply_port_profiles_contain_same_queues(
+        self, system_row, validation_args):
+        idl = validation_args.idl
+
         q_profile = utils.get_column_data_from_row(system_row, "q_profile")
         if q_profile is None:
             return

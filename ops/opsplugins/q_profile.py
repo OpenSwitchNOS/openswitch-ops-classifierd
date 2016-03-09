@@ -35,10 +35,13 @@ class QProfileValidator(BaseValidator):
         profile_row = validation_args.resource_row
         self.validate_profile_applied_cannot_be_amended_or_deleted(
             validation_args, profile_row)
-        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
-            validation_args, profile_row)
         self.validate_profile_name_contains_valid_chars(profile_row)
         self.validate_profile_name_cannot_be_strict(profile_row)
+
+        # If it is new, then it cannot have hw_default set.
+        if not validation_args.is_new:
+            self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+                validation_args, profile_row)
 
     #
     # Validates that the given deletion of a given row is allowed.

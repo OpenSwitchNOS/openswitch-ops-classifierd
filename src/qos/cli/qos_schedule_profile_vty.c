@@ -1245,13 +1245,6 @@ qos_schedule_profile_show_all_command(void)
 
     const struct ovsrec_qos *profile_row;
     OVSREC_QOS_FOR_EACH(profile_row, idl) {
-        /* Don't show the strict profile. */
-        if (strncmp(profile_row->name,
-                OVSREC_QUEUE_ALGORITHM_STRICT,
-                QOS_CLI_STRING_BUFFER_SIZE) == 0) {
-            continue;
-        }
-
         if (is_row_applied(profile_row)) {
             vty_out (vty, "applied        ");
         } else if (qos_schedule_profile_is_complete(
