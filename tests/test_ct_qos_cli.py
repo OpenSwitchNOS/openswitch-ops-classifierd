@@ -196,6 +196,34 @@ class Test_qos_cli():
     def __del__(self):
         del self.test
 
+    def get_local_priority_range(self):
+        printed_show_output = self.s1.cmdCLI('do show qos cos-map default')
+
+        min_local_priority = sys.maxint
+        max_local_priority = None
+        lines = printed_show_output.split('\n')
+        for line in lines:
+            if line[0].isdigit():
+                line_split = line.split(' ')
+
+                local_priority = -1
+                ints_found_count = 0
+                for split in line_split:
+                    if split.isdigit():
+                        ints_found_count += 1
+                    if ints_found_count == 2:
+                        local_priority = int(split)
+                        break
+
+                if local_priority > max_local_priority:
+                    max_local_priority = local_priority
+
+                if local_priority < min_local_priority:
+                    min_local_priority = local_priority
+
+        local_priority_range = [min_local_priority, max_local_priority]
+        return local_priority_range
+
     def test_qosApplyGlobalCommand(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
@@ -513,6 +541,17 @@ class Test_qos_cli():
         assert 'cannot' in out
         self.setUp_qosApplyPort()
 
+    def test_qosCosMapShowRunningConfigWithDefault(self):
+        self.setUp_qosCosMap()
+        self.s1.cmdCLI('qos cos-map 1 local-priority 0 color green name "Background"')
+        out = self.s1.cmdCLI('do show running-config')
+        assert 'qos' not in out
+        assert 'cos-map' not in out
+        assert 'code_point' not in out
+        assert 'local_priority' not in out
+        assert 'color' not in out
+        assert 'name' not in out
+
     def test_qosCosMapCommand(self):
         self.setUp_qosCosMap()
         self.s1.cmdCLI('qos cos-map 7 local-priority 1 color red name MyName1')
@@ -532,25 +571,15 @@ class Test_qos_cli():
         out = self.s1.cmdCLI('qos cos-map local-priority 2 color yellow name MyName2')
         assert 'Unknown command' in out
 
-    def get_max_local_priority(self, printed_show_output):
-        max_local_priority = -1
-        lines = printed_show_output.split('\n')
-        for line in lines:
-            if line[0].isdigit():
-                local_priority = line.split(' ')[1]
-                if local_priority > max_local_priority:
-                    max_local_priority = local_priority
-        return max_local_priority
-
     def test_qosCosMapCommandWithIllegalLocalPriority(self):
         self.setUp_qosCosMap()
-        out = self.s1.cmdCLI('do show qos cos-map default')
-        max_local_priority = self.get_max_local_priority(out)
+        local_priority_range = self.get_local_priority_range()
 
-        out = self.s1.cmdCLI('qos cos-map 7 local-priority -1 color yellow name MyName2')
+        out = self.s1.cmdCLI('qos cos-map 7 local-priority ' + \
+            str(local_priority_range[0] - 1) + ' color yellow name MyName2')
         assert 'Unknown command' in out
         out = self.s1.cmdCLI('qos cos-map 7 local-priority ' + \
-            str(max_local_priority) + ' color yellow name MyName2')
+            str(local_priority_range[1] + 1) + ' color yellow name MyName2')
         assert 'Unknown command' in out
 
     def test_qosCosMapCommandWithNullLocalPriority(self):
@@ -575,8 +604,11 @@ class Test_qos_cli():
     def test_qosCosMapCommandWithIllegalName(self):
         self.setUp_qosCosMap()
         out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow '
-                'name NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
-        assert 'allowed' in out
+            'name NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow '
+            'name NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosCosMapCommandWithNullName(self):
         self.setUp_qosCosMap()
@@ -605,15 +637,6 @@ class Test_qos_cli():
         self.s1.cmdCLI('qos cos-map 7 local-priority 2 color yellow name MyName2')
         out = self.s1.cmdCLI('do show qos cos-map default')
         assert '7          7              green   Network_Control' in out
-
-    def test_qosCosMapShowRunningConfigWithDefault(self):
-        self.setUp_qosCosMap()
-        self.s1.cmdCLI('qos cos-map 1 local-priority 0 color green name "Background"')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point' not in out
-        assert 'local_priority' not in out
-        assert 'color' not in out
-        assert 'name' not in out
         self.setUp_qosCosMap()
 
     def test_qosCosPortCommand(self):
@@ -723,6 +746,18 @@ class Test_qos_cli():
         assert 'override' in out
         self.setup_qosCosPort()
 
+    def test_qosDscpMapShowRunningConfigWithDefault(self):
+        self.setUp_qosDscpMap()
+        self.s1.cmdCLI('qos dscp-map 38 local-priority 4 cos 4 color red name AF43')
+        out = self.s1.cmdCLI('do show running-config')
+        assert 'qos' not in out
+        assert 'dscp-map' not in out
+        assert 'code_point' not in out
+        assert 'local_priority' not in out
+        assert 'cos' not in out
+        assert 'color' not in out
+        assert 'name' not in out
+
     def test_qosDscpMapCommand(self):
         self.setUp_qosDscpMap()
         self.s1.cmdCLI(
@@ -749,13 +784,13 @@ class Test_qos_cli():
 
     def test_qosDscpMapCommandWithIllegalLocalPriority(self):
         self.setUp_qosDscpMap()
-        out = self.s1.cmdCLI('do show qos dscp-map default')
-        max_local_priority = self.get_max_local_priority(out)
+        local_priority_range = self.get_local_priority_range()
 
-        out = self.s1.cmdCLI('qos dscp-map 38 local-priority -1 color yellow name MyName2')
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority ' + \
+            str(local_priority_range[0] - 1) + ' color yellow name MyName2')
         assert 'Unknown command' in out
         out = self.s1.cmdCLI('qos dscp-map 38 local-priority ' + \
-            str(max_local_priority) + ' color yellow name MyName2')
+            str(local_priority_range[1] + 1) + ' color yellow name MyName2')
         assert 'Unknown command' in out
 
     def test_qosDscpMapCommandWithNullLocalPriority(self):
@@ -802,8 +837,11 @@ class Test_qos_cli():
     def test_qosDscpMapCommandWithIllegalName(self):
         self.setUp_qosDscpMap()
         out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow '
-                        'name NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
-        assert 'allowed' in out
+            'name NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow '
+            'name NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosDscpMapCommandWithNullName(self):
         self.setUp_qosDscpMap()
@@ -832,16 +870,6 @@ class Test_qos_cli():
         self.s1.cmdCLI('qos dscp-map 38 local-priority 2 color yellow name MyName2')
         out = self.s1.cmdCLI('do show qos dscp-map default')
         assert '38         4              red     AF43' in out
-
-    def test_qosDscpMapShowRunningConfigWithDefault(self):
-        self.setUp_qosDscpMap()
-        self.s1.cmdCLI('qos dscp-map 38 local-priority 4 cos 4 color red name AF43')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'code_point' not in out
-        assert 'local_priority' not in out
-        assert 'cos' not in out
-        assert 'color' not in out
-        assert 'name' not in out
         self.setUp_qosDscpMap()
 
     def test_qosDscpPortCommand(self):
@@ -939,8 +967,12 @@ class Test_qos_cli():
 
     def test_qosQueueProfileCommandWithIllegalName(self):
         self.setUp_qosQueueProfile()
-        out = self.s1.cmdCLI('qos queue-profile p^%$#1')
-        assert 'allowed' in out
+        out = self.s1.cmdCLI('qos queue-profile '
+            'NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('qos queue-profile '
+            'NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosQueueProfileCommandWithNullName(self):
         self.setUp_qosQueueProfile()
@@ -966,8 +998,12 @@ class Test_qos_cli():
 
     def test_qosQueueProfileNoCommandWithIllegalName(self):
         self.setUp_qosQueueProfile()
-        out = self.s1.cmdCLI('no qos queue-profile p^%$#1')
-        assert 'allowed' in out
+        out = self.s1.cmdCLI('no qos queue-profile '
+            'NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('no qos queue-profile '
+            'NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosQueueProfileNoCommandWithNullName(self):
         self.setUp_qosQueueProfile()
@@ -999,8 +1035,12 @@ class Test_qos_cli():
     def test_qosQueueProfileNameCommandWithIllegalName(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
-        out = self.s1.cmdCLI('name queue 1 Queue^%$#Name')
-        assert 'allowed' in out
+        out = self.s1.cmdCLI('name queue 1 '
+            'NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('name queue 1 '
+            'NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosQueueProfileNameCommandWithNullName(self):
         self.setUp_qosQueueProfile()
@@ -1073,10 +1113,13 @@ class Test_qos_cli():
 
     def test_qosQueueProfileMapCommandWithIllegalPriority(self):
         self.setUp_qosQueueProfile()
+        local_priority_range = self.get_local_priority_range()
         self.s1.cmdCLI('qos queue-profile p1')
-        out = self.s1.cmdCLI('map queue 1 local-priority -1')
+        out = self.s1.cmdCLI('map queue 1 local-priority ' + \
+            str(local_priority_range[0] - 1))
         assert 'Unknown command' in out
-        out = self.s1.cmdCLI('map queue 1 local-priority 8')
+        out = self.s1.cmdCLI('map queue 1 local-priority ' + \
+            str(local_priority_range[1] + 1))
         assert 'Unknown command' in out
 
     def test_qosQueueProfileMapCommandWithNullPriority(self):
@@ -1109,10 +1152,13 @@ class Test_qos_cli():
 
     def test_qosQueueProfileMapNoCommandWithIllegalPriority(self):
         self.setUp_qosQueueProfile()
+        local_priority_range = self.get_local_priority_range()
         self.s1.cmdCLI('qos queue-profile p1')
-        out = self.s1.cmdCLI('no map queue 1 local-priority -1')
+        out = self.s1.cmdCLI('no map queue 1 local-priority ' + \
+            str(local_priority_range[0] - 1))
         assert 'Unknown command' in out
-        out = self.s1.cmdCLI('no map queue 1 local-priority 8')
+        out = self.s1.cmdCLI('no map queue 1 local-priority ' + \
+            str(local_priority_range[1] + 1))
         assert 'Unknown command' in out
 
     def test_qosQueueProfileMapNoCommandWithNullPriority(self):
@@ -1128,6 +1174,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('map queue 1 local-priority 3')
         self.s1.cmdCLI('no map queue 1 local-priority 2')
         out = self.s1.cmdCLI('do show qos queue-profile p1')
+        assert '1         2' not in out
         assert '1         3' in out
 
     def test_qosQueueProfileMapNoCommandDeletesAllPriorities(self):
@@ -1155,8 +1202,12 @@ class Test_qos_cli():
 
     def test_qosQueueProfileShowCommandWithIllegalName(self):
         self.setUp_qosQueueProfile()
-        out = self.s1.cmdCLI('do show qos queue-profile p^%$#1')
-        assert 'allowed' in out
+        out = self.s1.cmdCLI('do show qos queue-profile '
+            'NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('do show qos queue-profile '
+            'NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosQueueProfileShowCommandShowsAllProfiles(self):
         self.setUp_qosQueueProfile()
@@ -1208,8 +1259,12 @@ class Test_qos_cli():
 
     def test_qosScheduleProfileCommandWithIllegalName(self):
         self.setUp_qosScheduleProfile()
-        out = self.s1.cmdCLI('qos schedule-profile p^%$#1')
-        assert 'allowed' in out
+        out = self.s1.cmdCLI('qos schedule-profile '
+            'NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('qos schedule-profile '
+            'NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosScheduleProfileCommandWithNullName(self):
         self.setUp_qosScheduleProfile()
@@ -1235,8 +1290,12 @@ class Test_qos_cli():
 
     def test_qosScheduleProfileNoCommandWithIllegalName(self):
         self.setUp_qosScheduleProfile()
-        out = self.s1.cmdCLI('no qos schedule-profile p^%$#1')
-        assert 'allowed' in out
+        out = self.s1.cmdCLI('no qos schedule-profile '
+            'NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('no qos schedule-profile '
+            'NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosScheduleProfileNoCommandWithNullName(self):
         self.setUp_qosScheduleProfile()
@@ -1397,8 +1456,12 @@ class Test_qos_cli():
 
     def test_qosScheduleProfileShowCommandWithIllegalName(self):
         self.setUp_qosScheduleProfile()
-        out = self.s1.cmdCLI('do show qos schedule-profile p^%$#1')
-        assert 'allowed' in out
+        out = self.s1.cmdCLI('do show qos schedule-profile '
+            'NameThatIsLongerThan64Characterssssssssssssssssssssssssssssssssss')
+        assert 'length up to' in out
+        out = self.s1.cmdCLI('do show qos schedule-profile '
+            'NameWithIllegalCh@r@cter$')
+        assert 'The allowed characters are' in out
 
     def test_qosScheduleProfileShowCommandShowsAllProfiles(self):
         self.setUp_qosScheduleProfile()
@@ -1416,6 +1479,13 @@ class Test_qos_cli():
         out = self.s1.cmdCLI('do show qos schedule-profile NonExistent')
         assert 'does not exist' in out
         self.setUp_qosScheduleProfile()
+
+    def test_qosTrustGlobalShowRunningConfigWithDefault(self):
+        self.setUp_qosTrustGlobal()
+        self.s1.cmdCLI('qos trust none')
+        out = self.s1.cmdCLI('do show running-config')
+        assert 'qos' not in out
+        assert 'trust' not in out
 
     def test_qosTrustGlobalCommand(self):
         self.setUp_qosTrustGlobal()
@@ -1453,13 +1523,15 @@ class Test_qos_cli():
         self.s1.cmdCLI('qos trust dscp')
         out = self.s1.cmdCLI('do show qos trust default')
         assert 'qos trust none' in out
-
-    def test_qosTrustGlobalShowRunningConfigWithDefault(self):
         self.setUp_qosTrustGlobal()
+
+    def test_qosTrustPortShowRunningConfigWithDefault(self):
+        self.setUp_qosTrustPort()
+        self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust none')
         out = self.s1.cmdCLI('do show running-config')
-        assert 'qos trust' not in out
-        self.setUp_qosTrustGlobal()
+        assert 'qos' in out
+        assert 'trust' in out
 
     def test_qosTrustPortCommand(self):
         self.setUp_qosTrustPort()
@@ -1502,13 +1574,6 @@ class Test_qos_cli():
         self.s1.cmdCLI('lag 10')
         out = self.s1.cmdCLI('no qos trust')
         assert 'QoS Trust cannot be configured on a member of a LAG' in out
-
-    def test_qosTrustPortShowRunningConfigWithDefault(self):
-        self.setUp_qosTrustPort()
-        self.s1.cmdCLI('interface 1')
-        self.s1.cmdCLI('qos trust none')
-        out = self.s1.cmdCLI('do show running-config')
-        assert 'qos trust' in out
 
     def test_qosTrustPortShowRunningConfigWithNonDefault(self):
         self.setUp_qosTrustPort()
