@@ -22,5 +22,5 @@ MESSAGE("PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
 MESSAGE("INCL_DIR=${INCL_DIR}")
 
 add_subdirectory(cli)
-add_subdirectory(switchd)
+add_subdirectory(switchd-plugin)
 add_subdirectory(util)

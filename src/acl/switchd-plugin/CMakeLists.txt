@@ -14,10 +14,11 @@
 
 cmake_minimum_required (VERSION 2.8)
 
-set (ACL acl-plugins)
+set (ACL acl_plugin)
+set (INCLUDE_DIR include)
 project (${ACL})
 
-MESSAGE("got to switchd")
+MESSAGE("got to switchd-plugin")
 MESSAGE("PROJECT_BINARY_DIR = ${PROJECT_BINARY_DIR}")
 MESSAGE("PROJECT_SOURCE_DIR = ${PROJECT_SOURCE_DIR}")
 MESSAGE("INCL_DIR = ${INCL_DIR}")
@@ -35,11 +36,13 @@ include_directories(
    ${PROJECT_SOURCE_DIR}
    ${INCL_DIR}/util
    ${OVSCOMMON_INCLUDE_DIRS}
+   ${INCLUDE_DIR}
 )
 
 # Sources to build acl
+set(SRC_DIR src)
+file(GLOB SOURCES "${SRC_DIR}/*.c")
+add_library(${ACL} SHARED ${SOURCES})
+install(TARGETS ${ACL} LIBRARY DESTINATION lib/openvswitch/plugins)
 
-#add_library(${ACL} SHARED ${SOURCES})
-#install(TARGETS ${ACL} LIBRARY DESTINATION lib)
-
-MESSAGE("done with switchd")
+MESSAGE("done with switchd-plugin")
