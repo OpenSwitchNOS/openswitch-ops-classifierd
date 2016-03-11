@@ -14,11 +14,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from opsvalidator.base import *
+from opsvalidator.base import BaseValidator
 from opsvalidator import error
 from opsvalidator.error import ValidationError
-from opsrest.utils import *
-from tornado.log import app_log
 
 import qos_utils
 
@@ -34,6 +32,10 @@ class QosCosMapEntryValidator(BaseValidator):
     # Validates that the given modification to a given row is allowed.
     #
     def validate_modification(self, validation_args):
+        if validation_args.is_new:
+            details = "COS Map Entries cannot be created."
+            raise ValidationError(error.VERIFICATION_FAILED, details)
+
         qos_cos_map_entry_row = validation_args.resource_row
         self.validate_cos_map_description_contains_valid_chars(
             qos_cos_map_entry_row)
@@ -48,7 +50,8 @@ class QosCosMapEntryValidator(BaseValidator):
     #
     # Validates that the cos map desctiption contains valid characters.
     #
-    def validate_cos_map_description_contains_valid_chars(self, qos_cos_map_entry_row):
+    def validate_cos_map_description_contains_valid_chars(
+            self, qos_cos_map_entry_row):
         if qos_cos_map_entry_row.description is None:
             return
 

@@ -14,17 +14,18 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from opsvalidator.base import *
+from opsrest.utils import utils
+from opsvalidator.base import BaseValidator
 from opsvalidator import error
 from opsvalidator.error import ValidationError
-from opsrest.utils import *
-from tornado.log import app_log
 
 import qos_utils
 
 #
 # REST Custom Validator for QoS for the System table.
 #
+
+
 class SystemQosValidator(BaseValidator):
     resource = "system"
 
@@ -36,9 +37,9 @@ class SystemQosValidator(BaseValidator):
         self.validate_trust_global_is_not_empty(system_row)
         self.validate_apply_global_queue_profile_has_all_local_priorities(
             system_row)
-        self.validate_apply_global_queue_profile_has_no_duplicate_local_priorities(
+        self.validate_apply_global_q_p_has_no_duplicate_local_priorities(
             system_row)
-        self.validate_apply_global_schedule_profile_has_same_algorithm_on_all_queues(
+        self.validate_apply_global_s_p_has_same_algorithm_on_all_queues(
             system_row)
         self.validate_apply_global_profiles_contain_same_queues(
             system_row)
@@ -65,21 +66,25 @@ class SystemQosValidator(BaseValidator):
     # Validates that the global apply has a queue profile that contains
     # all local priorities.
     #
-    def validate_apply_global_queue_profile_has_all_local_priorities(self, system_row):
+    def validate_apply_global_queue_profile_has_all_local_priorities(
+            self, system_row):
         q_profile = utils.get_column_data_from_row(system_row, "q_profile")
         if q_profile is None:
             return
 
         for local_priority in range(0, qos_utils.QOS_MAX_LOCAL_PRIORITY + 1):
-            if not self.profile_has_local_priority(q_profile[0], local_priority):
-                details = "The queue profile is missing local priority " + str(local_priority) + "."
+            if not self.profile_has_local_priority(
+                    q_profile[0], local_priority):
+                details = "The queue profile is missing local priority " + \
+                    str(local_priority) + "."
                 raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #
     # Validates that the global apply has a queue profile that does not
     # contain any duplicate local priorities.
     #
-    def validate_apply_global_queue_profile_has_no_duplicate_local_priorities(self, system_row):
+    def validate_apply_global_q_p_has_no_duplicate_local_priorities(
+            self, system_row):
         found_local_priorities = []
 
         q_profile = utils.get_column_data_from_row(system_row, "q_profile")
@@ -92,7 +97,8 @@ class SystemQosValidator(BaseValidator):
             local_priorities = q_profile_entry.local_priorities
             for local_priority in local_priorities:
                 if local_priority in found_local_priorities:
-                    details = "The queue profile has local priority " + str(local_priority) + " assigned more than once."
+                    details = "The queue profile has local priority " + \
+                        str(local_priority) + " assigned more than once."
                     raise ValidationError(error.VERIFICATION_FAILED, details)
                 found_local_priorities.append(local_priority)
 
@@ -124,7 +130,8 @@ class SystemQosValidator(BaseValidator):
     # Validates that the global apply schedule profile
     # contains the same algorithm on all queues.
     #
-    def validate_apply_global_schedule_profile_has_same_algorithm_on_all_queues(self, system_row):
+    def validate_apply_global_s_p_has_same_algorithm_on_all_queues(
+            self, system_row):
         schedule_profile = utils.get_column_data_from_row(system_row, "qos")
         if schedule_profile is None:
             return
@@ -151,7 +158,7 @@ class SystemQosValidator(BaseValidator):
     # Validates that the port profiles contain the same queues.
     #
     def validate_apply_port_profiles_contain_same_queues(
-        self, system_row, validation_args):
+            self, system_row, validation_args):
         idl = validation_args.idl
 
         q_profile = utils.get_column_data_from_row(system_row, "q_profile")

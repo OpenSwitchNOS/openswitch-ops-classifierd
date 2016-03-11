@@ -14,11 +14,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from opsvalidator.base import *
+from opsvalidator.base import BaseValidator
 from opsvalidator import error
 from opsvalidator.error import ValidationError
-from opsrest.utils import *
-from tornado.log import app_log
 
 import qos_utils
 
@@ -48,7 +46,8 @@ class QosDscpMapEntryValidator(BaseValidator):
     #
     # Validates that the dscp map desctiption contains valid characters.
     #
-    def validate_dscp_map_description_contains_valid_chars(self, qos_dscp_map_entry_row):
+    def validate_dscp_map_description_contains_valid_chars(
+            self, qos_dscp_map_entry_row):
         if qos_dscp_map_entry_row.description is None:
             return
 

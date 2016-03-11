@@ -14,11 +14,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from opsvalidator.base import *
+from opsrest.utils import utils
 from opsvalidator import error
 from opsvalidator.error import ValidationError
-from opsrest.utils import *
-from tornado.log import app_log
 
 QOS_FACTORY_DEFAULT_NAME = "factory-default"
 QOS_DEFAULT_NAME = "default"
@@ -47,30 +45,39 @@ QOS_DSCP_MAP_ENTRY_COUNT = 64
 #
 # Validates that a string contains only valid characters.
 #
+
+
 def validate_string_contains_valid_chars(string):
     for c in string:
         if not is_valid_char(c):
-            details = "The allowed characters are alphanumeric, underscore ('_'), hyphen ('-'), and dot ('.')."
+            details = "The allowed characters are alphanumeric, " + \
+                "underscore ('_'), hyphen ('-'), and dot ('.')."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
 #
 # Returns True is the given characeter is valid.
 #
+
+
 def is_valid_char(c):
     return c.isalnum() or c == "_" or c == "-" or c == "."
 
 #
 # Returns True if the given queue_profile_row is applied.
 #
+
+
 def queue_profile_is_applied(validation_args, queue_profile_row):
     idl = validation_args.idl
 
     for system_row in idl.tables["System"].rows.itervalues():
-        if system_row.q_profile is not None and system_row.q_profile[0] == queue_profile_row:
+        if system_row.q_profile is not None and \
+                system_row.q_profile[0] == queue_profile_row:
             return True
 
     for port_row in idl.tables["Port"].rows.itervalues():
-        if len(port_row.q_profile) != 0 and port_row.q_profile[0] == queue_profile_row:
+        if len(port_row.q_profile) != 0 and \
+                port_row.q_profile[0] == queue_profile_row:
             return True
 
     return False
@@ -78,15 +85,19 @@ def queue_profile_is_applied(validation_args, queue_profile_row):
 #
 # Returns True if the given schedule_profile_row is applied.
 #
+
+
 def schedule_profile_is_applied(validation_args, schedule_profile_row):
     idl = validation_args.idl
 
     for system_row in idl.tables["System"].rows.itervalues():
-        if system_row.qos is not None and system_row.qos[0] == schedule_profile_row:
+        if system_row.qos is not None and \
+                system_row.qos[0] == schedule_profile_row:
             return True
 
     for port_row in idl.tables["Port"].rows.itervalues():
-        if len(port_row.qos) != 0 and port_row.qos[0] == schedule_profile_row:
+        if len(port_row.qos) != 0 and \
+                port_row.qos[0] == schedule_profile_row:
             return True
 
     return False
@@ -94,19 +105,26 @@ def schedule_profile_is_applied(validation_args, schedule_profile_row):
 #
 # Returns True if the given queue_profile_row is a hw_default.
 #
+
+
 def queue_profile_is_hw_default(validation_args, queue_profile_row):
-    return queue_profile_row.hw_default;
+    return queue_profile_row.hw_default
 
 #
 # Returns True if the given schedule_profile_row is a hw_default.
 #
+
+
 def schedule_profile_is_hw_default(validation_args, schedule_profile_row):
-    return schedule_profile_row.hw_default;
+    return schedule_profile_row.hw_default
 
 #
 # Validates that the schedule profile has the same algorithm on all queues.
 #
-def validate_schedule_profile_has_same_algorithm_on_all_queues(schedule_profile):
+
+
+def validate_schedule_profile_has_same_algorithm_on_all_queues(
+        schedule_profile):
     # The profile named 'strict' is exempt, since it is a special case. #
     if schedule_profile.name == QOS_STRICT:
         return
@@ -127,19 +145,23 @@ def validate_schedule_profile_has_same_algorithm_on_all_queues(schedule_profile)
         schedule_profile_entry_algorithm = schedule_profile_entry.algorithm[0]
 
         # If it's the max and it's strict, then skip it. #
-        if max_queue_num == queue_num and schedule_profile_entry_algorithm == QOS_STRICT:
+        if max_queue_num == queue_num and \
+                schedule_profile_entry_algorithm == QOS_STRICT:
             continue
 
         if algorithm == "":
             algorithm = schedule_profile_entry_algorithm
 
         if schedule_profile_entry_algorithm != algorithm:
-            details = "The schedule profile must have the same algorithm on all queues."
+            details = "The schedule profile must have " + \
+                "the same algorithm on all queues."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
 #
 # Returns the max queue num for the given schedule_profile.
 #
+
+
 def get_max_queue_num(schedule_profile):
     max_queue_num = -1
 
@@ -152,6 +174,8 @@ def get_max_queue_num(schedule_profile):
 #
 # Validates that the profiles contain the same queues.
 #
+
+
 def validate_profiles_contain_same_queues(q_profile, schedule_profile):
     # The profile named 'strict' is exempt, since it is a special case. #
     if schedule_profile.name == QOS_STRICT:
@@ -160,19 +184,23 @@ def validate_profiles_contain_same_queues(q_profile, schedule_profile):
     queues = utils.get_column_data_from_row(schedule_profile, "queues")
     for queue_num in queues.keys():
         if not queue_profile_has_queue_num(q_profile, queue_num):
-            details = "The queue profile must contain all of the schedule profile queue numbers."
+            details = "The queue profile must contain " + \
+                "all of the schedule profile queue numbers."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     q_profile_entries = utils.get_column_data_from_row(
         q_profile, "q_profile_entries")
     for queue_num in q_profile_entries.keys():
         if not schedule_profile_has_queue_num(schedule_profile, queue_num):
-            details = "The schedule profile must contain all of the queue profile queue numbers."
+            details = "The schedule profile must contain " + \
+                "all of the queue profile queue numbers."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
 #
 # Returns True if the given q_profile contains the given queue_num.
 #
+
+
 def queue_profile_has_queue_num(q_profile, queue_num):
     q_profile_entries = utils.get_column_data_from_row(
         q_profile, "q_profile_entries")
@@ -184,6 +212,8 @@ def queue_profile_has_queue_num(q_profile, queue_num):
 #
 # Returns True if the given schedule_profile contains the given queue_num.
 #
+
+
 def schedule_profile_has_queue_num(schedule_profile, queue_num):
     schedule_profile_entries = utils.get_column_data_from_row(
         schedule_profile, "queues")

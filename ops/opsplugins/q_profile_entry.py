@@ -14,17 +14,17 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from opsvalidator.base import *
+from opsvalidator.base import BaseValidator
 from opsvalidator import error
 from opsvalidator.error import ValidationError
-from opsrest.utils import *
-from tornado.log import app_log
 
 import qos_utils
 
 #
 # REST Custom Validator for QoS for the Q Profile Entry table.
 #
+
+
 class QProfileEntryValidator(BaseValidator):
     resource = "q_profile_entry"
 
@@ -39,11 +39,8 @@ class QProfileEntryValidator(BaseValidator):
             validation_args, profile_row)
         self.validate_profile_entry_name_contains_valid_chars(
             profile_entry_row)
-
-        # If it is new, then it cannot have hw_default set.
-        if not validation_args.is_new:
-            self.validate_profile_hw_default_cannot_be_amended_or_deleted(
-                validation_args, profile_row)
+        self.validate_profile_hw_default_cannot_be_amended_or_deleted(
+            validation_args, profile_row)
 
     #
     # Validates that the given deletion of a given row is allowed.
@@ -59,7 +56,8 @@ class QProfileEntryValidator(BaseValidator):
     #
     # Validates that an applied profile cannot be amended or deleted.
     #
-    def validate_profile_applied_cannot_be_amended_or_deleted(self, validation_args, profile_row):
+    def validate_profile_applied_cannot_be_amended_or_deleted(
+            self, validation_args, profile_row):
         if qos_utils.queue_profile_is_applied(validation_args, profile_row):
             details = "An applied profile cannot be amended or deleted."
             raise ValidationError(error.VERIFICATION_FAILED, details)
@@ -67,15 +65,18 @@ class QProfileEntryValidator(BaseValidator):
     #
     # Validates that a hardware default profile cannot be amended or deleted.
     #
-    def validate_profile_hw_default_cannot_be_amended_or_deleted(self, validation_args, profile_row):
+    def validate_profile_hw_default_cannot_be_amended_or_deleted(
+            self, validation_args, profile_row):
         if qos_utils.queue_profile_is_hw_default(validation_args, profile_row):
-            details = "A hardware default profile cannot be amended or deleted."
+            details = "A hardware default profile cannot " + \
+                "be amended or deleted."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #
     # Validates that a profile entry name contains all valid characters.
     #
-    def validate_profile_entry_name_contains_valid_chars(self, profile_entry_row):
+    def validate_profile_entry_name_contains_valid_chars(
+            self, profile_entry_row):
         if profile_entry_row.description is None:
             return
 

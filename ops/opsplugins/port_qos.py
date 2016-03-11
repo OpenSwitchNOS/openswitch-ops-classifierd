@@ -14,11 +14,10 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from opsvalidator.base import *
+from opsrest.utils import utils
+from opsvalidator.base import BaseValidator
 from opsvalidator import error
 from opsvalidator.error import ValidationError
-from opsrest.utils import *
-from tornado.log import app_log
 
 import qos_utils
 
@@ -45,9 +44,8 @@ class PortQosValidator(BaseValidator):
             port_row, qos_utils.QOS_COS_OVERRIDE_KEY, "COS")
         self.validate_port_override_has_port_trust_mode_none(
             port_row, qos_utils.QOS_DSCP_OVERRIDE_KEY, "DSCP")
-        self.validate_apply_port_queue_profile_is_null(
-            port_row)
-        self.validate_apply_port_schedule_profile_has_same_algorithm_on_all_queues(
+        self.validate_apply_port_queue_profile_is_null(port_row)
+        self.validate_apply_port_s_p_has_all_same_algorithm_on_all_queues(
             port_row)
         self.validate_apply_port_profiles_contain_same_queues(
             port_row, system_row)
@@ -62,7 +60,8 @@ class PortQosValidator(BaseValidator):
     # Validates that port overrides are only allowed when the port trust
     # mode is 'none'.
     #
-    def validate_port_override_has_port_trust_mode_none(self, port_row, qos_config_key, display_string):
+    def validate_port_override_has_port_trust_mode_none(
+            self, port_row, qos_config_key, display_string):
         qos_config = utils.get_column_data_from_row(port_row, "qos_config")
 
         qos_override = qos_config.get(qos_config_key, None)
@@ -76,7 +75,8 @@ class PortQosValidator(BaseValidator):
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
         qos_trust_value = qos_config.get(qos_utils.QOS_TRUST_KEY, None)
-        if qos_trust_value is None or qos_trust_value != qos_utils.QOS_TRUST_NONE_STRING:
+        if qos_trust_value is None or \
+                qos_trust_value != qos_utils.QOS_TRUST_NONE_STRING:
             details = "QoS " + display_string + \
                 " override is only allowed if the port trust mode is 'none'."
             raise ValidationError(error.VERIFICATION_FAILED, details)
@@ -94,7 +94,8 @@ class PortQosValidator(BaseValidator):
     # Validates that the port schedule profile has the same algorithm on
     # all queues.
     #
-    def validate_apply_port_schedule_profile_has_same_algorithm_on_all_queues(self, port_row):
+    def validate_apply_port_s_p_has_all_same_algorithm_on_all_queues(
+            self, port_row):
         schedule_profile = utils.get_column_data_from_row(port_row, "qos")
         if schedule_profile == []:
             return
@@ -106,7 +107,8 @@ class PortQosValidator(BaseValidator):
     # Validates that the port queue profile contains all of the schedule
     # profile queues.
     #
-    def validate_apply_port_profiles_contain_same_queues(self, port_row, system_row):
+    def validate_apply_port_profiles_contain_same_queues(
+            self, port_row, system_row):
         schedule_profile = utils.get_column_data_from_row(port_row, "qos")
         if schedule_profile == []:
             return

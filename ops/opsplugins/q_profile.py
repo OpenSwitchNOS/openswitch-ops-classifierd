@@ -14,17 +14,17 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from opsvalidator.base import *
+from opsvalidator.base import BaseValidator
 from opsvalidator import error
 from opsvalidator.error import ValidationError
-from opsrest.utils import *
-from tornado.log import app_log
 
 import qos_utils
 
 #
 # REST Custom Validator for QoS for the Q Profile table.
 #
+
+
 class QProfileValidator(BaseValidator):
     resource = "q_profile"
 
@@ -58,7 +58,8 @@ class QProfileValidator(BaseValidator):
     #
     # Validates that an applied profile cannot be amended or deleted.
     #
-    def validate_profile_applied_cannot_be_amended_or_deleted(self, validation_args, profile_row):
+    def validate_profile_applied_cannot_be_amended_or_deleted(
+            self, validation_args, profile_row):
         if qos_utils.queue_profile_is_applied(validation_args, profile_row):
             details = "An applied profile cannot be amended or deleted."
             raise ValidationError(error.VERIFICATION_FAILED, details)
@@ -66,15 +67,18 @@ class QProfileValidator(BaseValidator):
     #
     # Validates that a hardware default profile cannot be amended or deleted.
     #
-    def validate_profile_hw_default_cannot_be_amended_or_deleted(self, validation_args, profile_row):
+    def validate_profile_hw_default_cannot_be_amended_or_deleted(
+            self, validation_args, profile_row):
         if qos_utils.queue_profile_is_hw_default(validation_args, profile_row):
-            details = "A hardware default profile cannot be amended or deleted."
+            details = "A hardware default profile cannot " + \
+                "be amended or deleted."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #
     # Validates that the default profile cannot be deleted.
     #
-    def validate_profile_default_cannot_be_deleted(self, validation_args, profile_row):
+    def validate_profile_default_cannot_be_deleted(
+            self, validation_args, profile_row):
         profile_name = profile_row.name
         if profile_name == qos_utils.QOS_DEFAULT_NAME:
             details = "The default profile cannot be deleted."
