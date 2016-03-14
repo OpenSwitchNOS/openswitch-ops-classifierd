@@ -192,6 +192,13 @@ class Test_qos_rest_custom_validators:
     def __del__(self):
         del self.test
 
+    def check_system_qos_status_has(self, s):
+        response_status, response_data = execute_request(
+            system_url, "GET",
+            None, self.switch_ip)
+
+        assert s in response_data
+
     def test_port_qos_patch(self):
         data = [{"op": "add", "path": "/qos_config",
                  "value": {"qos_trust": "none"}}]
@@ -1162,6 +1169,9 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.NO_CONTENT
         assert response_data is ''
 
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
+
     def test_system_qos_patch_validate_trust_global_is_not_empty(self):
         # Once custom validators support PATCH (taiga 661), enable this test.
         return
@@ -1174,6 +1184,9 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'The qos trust value cannot be empty.' in response_data
+
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
 
     def test_system_qos_patch_validate_apply_global_q_p_has_all_local_p(self):
         # Once custom validators support PATCH (taiga 661), enable this test.
@@ -1199,6 +1212,9 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'The queue profile is missing local priority' in response_data
+
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
 
     def test_system_qos_patch_validate_apply_global_q_p_has_no_dup_local_p(
             self):
@@ -1227,6 +1243,9 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'assigned more than once' in response_data
 
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
+
     def test_system_qos_patch_validate_apply_global_s_p_has_all_same_alg(
             self):
         # Once custom validators support PATCH (taiga 661), enable this test.
@@ -1253,6 +1272,9 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'must have the same algorithm on all queues.' in response_data
 
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
+
     def test_system_qos_patch_validate_apply_global_profiles_have_same_queues(
             self):
         # Once custom validators support PATCH (taiga 661), enable this test.
@@ -1271,6 +1293,9 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'must contain all of the' in response_data
+
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
 
     def test_system_qos_patch_validate_apply_port_profiles_have_same_queues(
             self):
@@ -1312,6 +1337,9 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'must contain all of the' in response_data
 
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
+
     def test_system_qos_put(self):
         data = deepcopy(system_data)
 
@@ -1321,6 +1349,9 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.OK
         assert response_data is ''
+
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
 
     def test_system_qos_put_validate_trust_global_is_not_empty(self):
         data = deepcopy(system_data)
@@ -1332,6 +1363,9 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'The qos trust value cannot be empty.' in response_data
+
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
 
     def test_system_qos_put_validate_apply_global_q_p_has_all_local_p(self):
         self.s1.cmdCLI('no qos queue-profile p2')
@@ -1355,6 +1389,9 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'The queue profile is missing local priority' in response_data
+
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
 
     def test_system_qos_put_validate_apply_global_q_p_has_no_dup_local_p(self):
         self.s1.cmdCLI('no qos queue-profile p2')
@@ -1380,6 +1417,9 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'assigned more than once' in response_data
 
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
+
     def test_system_qos_put_validate_apply_global_s_p_has_all_same_algorithms(
             self):
         self.s1.cmdCLI('no qos schedule-profile p2')
@@ -1404,6 +1444,9 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'must have the same algorithm on all queues.' in response_data
 
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
+
     def test_system_qos_put_validate_apply_global_profiles_have_same_queues(
             self):
         self.s1.cmdCLI('no qos schedule-profile p2')
@@ -1420,6 +1463,9 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'must contain all of the' in response_data
+
+        self.check_system_qos_status_has("\"queue_profile\": \"default\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"default\"")
 
     def test_system_qos_put_validate_apply_port_profiles_have_same_queues(
             self):
@@ -1457,3 +1503,6 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'must contain all of the' in response_data
+
+        self.check_system_qos_status_has("\"queue_profile\": \"p2\"")
+        self.check_system_qos_status_has("\"schedule_profile\": \"p2\"")

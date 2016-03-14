@@ -72,7 +72,7 @@ qos_cos_port_command(const char *port_name,
 
     struct ovsrec_port *port_row = port_row_for_name(port_name);
     if (port_row == NULL) {
-        vty_out(vty, "Port row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "Port %s does not exist.%s", port_name, VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -175,7 +175,7 @@ qos_cos_port_no_command(const char *port_name)
 
     struct ovsrec_port *port_row = port_row_for_name(port_name);
     if (port_row == NULL) {
-        vty_out(vty, "Port row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "Port %s does not exist.%s", port_name, VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }

@@ -82,7 +82,8 @@ qos_cos_map_command(int64_t code_point, int64_t local_priority,
     struct ovsrec_qos_cos_map_entry *cos_map_row =
             qos_cos_map_row_for_code_point(code_point);
     if (cos_map_row == NULL) {
-        vty_out(vty, "cos map row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "COS Map code point %" PRId64 " does not exist.%s",
+                code_point, VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -188,7 +189,8 @@ qos_cos_map_no_command(int64_t code_point)
     struct ovsrec_qos_cos_map_entry *cos_map_row =
             qos_cos_map_row_for_code_point(code_point);
     if (cos_map_row == NULL) {
-        vty_out(vty, "cos map row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "COS Map code point %" PRId64 " does not exist.%s",
+                code_point, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
 
