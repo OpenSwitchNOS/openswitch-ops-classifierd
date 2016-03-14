@@ -59,7 +59,7 @@ qos_trust_global_command(const char *qos_trust_name)
 
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
     if (system_row == NULL) {
-        vty_out(vty, "System row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "System config does not exist.%s", VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -168,7 +168,7 @@ qos_trust_global_show_command(const char *default_parameter)
         /* Show the active value. */
         const struct ovsrec_system *system_row = ovsrec_system_first(idl);
         if (system_row == NULL) {
-            vty_out(vty, "system row cannot be NULL.%s", VTY_NEWLINE);
+            vty_out(vty, "System config does not exist.%s", VTY_NEWLINE);
             return CMD_OVSDB_FAILURE;
         }
 

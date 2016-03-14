@@ -88,7 +88,8 @@ qos_dscp_map_command(int64_t code_point, int64_t local_priority,
     struct ovsrec_qos_dscp_map_entry *dscp_map_row =
             qos_dscp_map_row_for_code_point(code_point);
     if (dscp_map_row == NULL) {
-        vty_out(vty, "dscp map row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "DSCP Map code point %" PRId64 " does not exist.%s",
+                code_point, VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -288,7 +289,8 @@ qos_dscp_map_no_command(int64_t code_point)
     struct ovsrec_qos_dscp_map_entry *dscp_map_row =
             qos_dscp_map_row_for_code_point(code_point);
     if (dscp_map_row == NULL) {
-        vty_out(vty, "dscp map row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "DSCP Map code point %" PRId64 " does not exist.%s",
+                code_point, VTY_NEWLINE);
         return CMD_OVSDB_FAILURE;
     }
 

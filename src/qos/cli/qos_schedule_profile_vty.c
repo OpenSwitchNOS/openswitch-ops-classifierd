@@ -123,6 +123,14 @@ bool
 qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row,
         bool print_error)
 {
+    if (profile_row->n_queues == 0) {
+        if (print_error) {
+            vty_out(vty, "The schedule profile must have at least\
+one queue.%s", VTY_NEWLINE);
+        }
+        return false;
+    }
+
     /**
      * The spec is:
      * There are two allowed forms for schedule profiles: 1. All queues use

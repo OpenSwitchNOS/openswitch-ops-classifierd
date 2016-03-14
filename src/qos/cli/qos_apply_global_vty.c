@@ -137,7 +137,8 @@ qos_apply_global_command(const char *queue_profile_name,
     struct ovsrec_q_profile *queue_profile_row = qos_get_queue_profile_row(
             queue_profile_name);
     if (queue_profile_row == NULL) {
-        vty_out(vty, "queue_profile_row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "Profile %s does not exist.%s",
+                queue_profile_name, VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -158,7 +159,8 @@ qos_apply_global_command(const char *queue_profile_name,
     struct ovsrec_qos *schedule_profile_row = qos_get_schedule_profile_row(
             schedule_profile_name);
     if (schedule_profile_row == NULL) {
-        vty_out(vty, "schedule_profile_row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "Profile %s does not exist.%s",
+                schedule_profile_name, VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -194,7 +196,7 @@ qos_apply_global_command(const char *queue_profile_name,
     /* Retrieve the system row. */
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
     if (system_row == NULL) {
-        vty_out(vty, "System row cannot be NULL.%s", VTY_NEWLINE);
+        vty_out(vty, "System config does not exist.%s", VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
