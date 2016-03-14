@@ -42,13 +42,16 @@ include_directories (${CMAKE_INCL_DIR}
                      ${OPSCLI_INCLUDE_DIRS}
                     )
 
-# CLI libraries source files
+# CLI library source files
+set (SOURCES_CLI
+                 ${PROJECT_SOURCE_DIR}/access_list_vty.c
+    )
 
-#add_library (${LIBACLCLI} SHARED $(SOURCE_FILES))
+add_library (${LIBACLCLI} SHARED ${SOURCES_CLI})
 
-#target_link_libraries(${LIBACLCLI} audit)
+target_link_libraries(${LIBACLCLI} audit)
 
 # Installation
-#install(TARGETS ${LIBACLCLI}
-#        LIBRARY DESTINATION lib/cli/plugins
-#       )
+install(TARGETS ${LIBACLCLI}
+        LIBRARY DESTINATION lib/cli/plugins
+       )
