@@ -172,24 +172,26 @@ qos_get_schedule_profile_settings(const struct ovsrec_qos *ovsrec_qos,
     /* start constructing the variable-length settings for the API call */
     settings = calloc(1, sizeof *settings);
 
-    settings->n_entries = (int)ovsrec_qos->n_queues;
-    settings->entries = malloc(settings->n_entries * sizeof(void *));
-
     VLOG_INFO("%s %s %d", __FUNCTION__,
               ovsrec_qos->name, settings->n_entries);
     if (!strcmp(ovsrec_qos->name, OVSREC_QUEUE_ALGORITHM_STRICT)) {
-        /* 'strict' profile - synthesize a schedule profile. */
-        sp_entry = calloc(1, sizeof(struct schedule_profile_entry));
-        sp_entry->algorithm = ALGORITHM_STRICT;
-        sp_entry->weight = 0;
-        sp_entry->other_config = NULL;
+        settings->n_entries = n_queues;
+        settings->entries = malloc(settings->n_entries * sizeof(void *));
 
-        /* set each profile entry to the same 'strict' entry. */
+        /* 'strict' profile - synthesize a schedule profile. */
         for (q_index = 0; q_index < n_queues; q_index++) {
+            /* set each profile entry to the same 'strict' entry. */
+            sp_entry = calloc(1, sizeof(struct schedule_profile_entry));
+            sp_entry->algorithm = ALGORITHM_STRICT;
+            sp_entry->weight = 0;
+            sp_entry->other_config = NULL;
             settings->entries[q_index] = sp_entry;
         }
     }
     else {
+        settings->n_entries = (int)ovsrec_qos->n_queues;
+        settings->entries = malloc(settings->n_entries * sizeof(void *));
+
         /* collect all queues in the profiles whether or not they changed */
         for (q_index = 0; q_index < settings->n_entries; q_index++) {
 
@@ -512,8 +514,11 @@ qos_configure_port_profiles(struct ofproto *ofproto,
         }
     }
 
-    /* a sanity check: queue & schedule profiles must have same # of queues. */
-    if (ovsrec_qos->n_queues != ovsrec_q_profile->n_q_profile_entries) {
+    /* a sanity check: queue & schedule profiles must have same # of queues.
+     * Exception for "strict" profile as it doesn't have any queue rows.
+     */
+    if (strcmp(ovsrec_qos->name, OVSREC_QUEUE_ALGORITHM_STRICT) &&
+        (ovsrec_qos->n_queues != ovsrec_q_profile->n_q_profile_entries)) {
         VLOG_INFO("%s: port %s #-queues mismatched Q=%d S=%d", __FUNCTION__,
                   port_cfg->name,
                   (int)ovsrec_qos->n_queues,
