@@ -765,7 +765,7 @@ qos_queue_profile_name_no_command(struct ovsdb_idl_txn *txn,
             qos_get_queue_profile_entry_row(profile_row, queue_num);
     if (queue_row == NULL) {
         vty_out(vty,
-                "Profile %s does not have queue_num %" PRId64 " configured.%s",
+                "Profile %s does not have queue %" PRId64 " configured.%s",
                 profile_name, queue_num, VTY_NEWLINE);
         return false;
     }
@@ -1098,7 +1098,7 @@ qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
             qos_get_queue_profile_entry_row(profile_row, queue_num);
     if (queue_row == NULL) {
         vty_out(vty,
-                "Profile %s does not have queue_num %" PRId64 " configured.%s",
+                "Profile %s does not have queue %" PRId64 " configured.%s",
                 profile_name, queue_num, VTY_NEWLINE);
         return false;
     }

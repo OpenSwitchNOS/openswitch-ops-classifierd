@@ -1027,7 +1027,7 @@ class Test_qos_cli():
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
         out = self.s1.cmdCLI('no name queue 2')
-        assert 'does not have queue_num' in out
+        assert 'does not have queue' in out
 
     def test_qosQueueProfileMapCommand(self):
         self.setUp_qosQueueProfile()
@@ -1136,7 +1136,7 @@ class Test_qos_cli():
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
         out = self.s1.cmdCLI('no map queue 2')
-        assert 'does not have queue_num' in out
+        assert 'does not have queue' in out
 
     def test_qosScheduleProfileCommand(self):
         self.setUp_qosScheduleProfile()
@@ -1258,7 +1258,7 @@ class Test_qos_cli():
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
         out = self.s1.cmdCLI('no strict queue 2')
-        assert 'does not have queue_num' in out
+        assert 'does not have queue' in out
 
     def test_qosScheduleProfileWrrCommand(self):
         self.setUp_qosScheduleProfile()
@@ -1339,7 +1339,7 @@ class Test_qos_cli():
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
         out = self.s1.cmdCLI('no wrr queue 2')
-        assert 'does not have queue_num' in out
+        assert 'does not have queue' in out
 
     def test_qosTrustGlobalCommand(self):
         self.setUp_qosTrustGlobal()
