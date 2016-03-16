@@ -62,6 +62,7 @@ qos_get_queue_profile_settings(const struct ovsrec_q_profile *ovsrec_q_profile)
         /* each queue gets a separate entry in settings parameter */
         qp_entry = calloc(1, sizeof(struct queue_profile_entry));
         settings->entries[q_index] = qp_entry;
+        qp_entry->queue = q_index;
 
         /* point at a q_settings entry in the q_profile row */
         ovsrec_q_profile_entry =
@@ -182,6 +183,7 @@ qos_get_schedule_profile_settings(const struct ovsrec_qos *ovsrec_qos,
         for (q_index = 0; q_index < n_queues; q_index++) {
             /* set each profile entry to the same 'strict' entry. */
             sp_entry = calloc(1, sizeof(struct schedule_profile_entry));
+            sp_entry->queue = (unsigned)ovsrec_qos->key_queues[q_index];
             sp_entry->algorithm = ALGORITHM_STRICT;
             sp_entry->weight = 0;
             sp_entry->other_config = NULL;

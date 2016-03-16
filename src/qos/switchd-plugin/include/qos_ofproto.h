@@ -121,9 +121,10 @@ enum schedule_algorithm {
 
 /* single schedule-profile row (from QoS->Queue table) */
 struct schedule_profile_entry {
-   enum schedule_algorithm algorithm; /* must have some scheduling algorithm */
-   int weight;                /* weight, if queue type is WRR */
-   struct smap *other_config; /* pass-through from Queue row */
+    unsigned queue;            /* queue number */
+    enum schedule_algorithm algorithm; /* must have some scheduling algorithm */
+    int weight;                /* weight, if queue type is WRR */
+    struct smap *other_config; /* pass-through from Queue row */
 };
 
 /* 1 or more rows in QoS passed to set_schedule_profile API */
