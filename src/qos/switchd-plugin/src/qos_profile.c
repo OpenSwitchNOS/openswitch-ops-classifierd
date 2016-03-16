@@ -62,6 +62,7 @@ qos_get_queue_profile_settings(const struct ovsrec_q_profile *ovsrec_q_profile)
         /* each queue gets a separate entry in settings parameter */
         qp_entry = calloc(1, sizeof(struct queue_profile_entry));
         settings->entries[q_index] = qp_entry;
+        qp_entry->queue = q_index;
 
         /* point at a q_settings entry in the q_profile row */
         ovsrec_q_profile_entry =
