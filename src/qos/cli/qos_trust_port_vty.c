@@ -103,7 +103,8 @@ DEFUN(qos_trust_port,
         "qos trust (none|cos|dscp)",
         "Configure QoS\n"
         "Set the QoS Trust Mode configuration for the port\n"
-        "Do not trust any priority fields, and remark all of them to 0\n"
+        "Do not trust any priority fields, and \
+remark all of them to 0 (Default)\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
@@ -198,7 +199,8 @@ DEFUN(qos_trust_port_no,
         NO_STR
         "Configure QoS\n"
         "Remove the QoS Trust Mode configuration for the port\n"
-        "Do not trust any priority fields, and remark all of them to 0\n"
+        "Do not trust any priority fields, and \
+remark all of them to 0 (Default)\n"
         "Trust 802.1p priority and preserve DSCP or IP-ToS\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {

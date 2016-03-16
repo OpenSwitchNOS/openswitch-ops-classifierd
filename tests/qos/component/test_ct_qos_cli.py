@@ -1067,6 +1067,14 @@ class Test_qos_cli():
         out = self.s1.cmdCLI('map queue 1 local-priority')
         assert 'incomplete' in out
 
+    def test_qosQueueProfileMapCommandAddsListOfPriorities(self):
+        self.setUp_qosQueueProfile()
+        self.s1.cmdCLI('qos queue-profile p1')
+        self.s1.cmdCLI('map queue 1 local-priority 1,2')
+        self.s1.cmdCLI('map queue 1 local-priority 3,4')
+        out = self.s1.cmdCLI('do show qos queue-profile p1')
+        assert '1         1,2,3,4' in out
+
     def test_qosQueueProfileMapNoCommand(self):
         self.setUp_qosQueueProfile()
         self.s1.cmdCLI('qos queue-profile p1')
@@ -1131,6 +1139,17 @@ class Test_qos_cli():
         out = self.s1.cmdCLI('do show qos queue-profile p1')
         assert '1         2' not in out
         assert '1         3' not in out
+
+    def test_qosQueueProfileMapNoCommandDeletesListOfPriorities(self):
+        self.setUp_qosQueueProfile()
+        self.s1.cmdCLI('qos queue-profile p1')
+        self.s1.cmdCLI('map queue 1 local-priority 1,2')
+        self.s1.cmdCLI('map queue 1 local-priority 3,4')
+        out = self.s1.cmdCLI('do show qos queue-profile p1')
+        assert '1         1,2,3,4' in out
+        self.s1.cmdCLI('no map queue 1 local-priority 2,3')
+        out = self.s1.cmdCLI('do show qos queue-profile p1')
+        assert '1         1,4' in out
 
     def test_qosQueueProfileMapNoCommandWithMissingQueue(self):
         self.setUp_qosQueueProfile()

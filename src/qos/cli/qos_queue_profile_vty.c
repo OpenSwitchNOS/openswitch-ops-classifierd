@@ -911,7 +911,7 @@ add_local_priority(struct ovsrec_q_profile_entry *queue_row,
 static bool
 qos_queue_profile_map_command(struct ovsdb_idl_txn *txn,
         const char *profile_name,
-        int64_t queue_num, int64_t local_priority)
+        int64_t queue_num, const char *local_priorities)
 {
     /* Retrieve the profile row. */
     struct ovsrec_q_profile *profile_row =
@@ -931,8 +931,20 @@ qos_queue_profile_map_command(struct ovsdb_idl_txn *txn,
         queue_row = insert_queue_row(profile_row, queue_num, txn);
     }
 
-    /* Update the queue row. */
-    add_local_priority(queue_row, local_priority);
+    /* Make a copy, since strtok modifies the string. */
+    char buffer[QOS_CLI_STRING_BUFFER_SIZE];
+    strncpy(buffer, local_priorities, sizeof(buffer));
+
+    /* Parse the comma-separated list of priorities. */
+    char *token = strtok(buffer, ",");
+    while (token != NULL) {
+        int64_t local_priority = atoi(token);
+
+        /* Update the queue row. */
+        add_local_priority(queue_row, local_priority);
+
+        token = strtok(NULL, ",");
+    }
 
     return true;
 }
@@ -943,7 +955,7 @@ qos_queue_profile_map_command(struct ovsdb_idl_txn *txn,
  */
 static int
 qos_queue_profile_map_command_commit(const char *profile_name,
-        int64_t queue_num, int64_t local_priority)
+        int64_t queue_num, const char *local_priorities)
 {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
@@ -972,7 +984,7 @@ qos_queue_profile_map_command_commit(const char *profile_name,
     }
 
     bool success = qos_queue_profile_map_command(txn, profile_name,
-            queue_num, local_priority);
+            queue_num, local_priorities);
     if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
@@ -994,7 +1006,7 @@ qos_queue_profile_map_command_commit(const char *profile_name,
  */
 DEFUN(qos_queue_profile_map,
         qos_queue_profile_map_cmd,
-       "map queue <0-7> local-priority <0-7>",
+       "map queue <0-7> local-priority <C:0-7>",
        "Configure the local-priority map for a queue in a Queue Profile\n"
        "Configure the local-priority map for a queue in a Queue Profile\n"
        "The number of the queue\n"
@@ -1035,10 +1047,10 @@ DEFUN(qos_queue_profile_map,
             free(cfg);
         }
     }
-    int64_t local_priority_int = atoi(local_priority);
+    const char * local_priorities = local_priority;
 
     int result = qos_queue_profile_map_command_commit(
-            profile_name, queue_num_int, local_priority_int);
+            profile_name, queue_num_int, local_priorities);
 
     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
             aubuf, hostname, NULL, NULL, result);
@@ -1082,7 +1094,7 @@ remove_local_priority(
 static bool
 qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
         const char *profile_name,
-        int64_t queue_num, int64_t *local_priority)
+        int64_t queue_num, const char *local_priorities)
 {
     /* Retrieve the profile row. */
     struct ovsrec_q_profile *profile_row =
@@ -1104,13 +1116,25 @@ qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
     }
 
     /* Update the queue row. */
-    if (local_priority == NULL) {
+    if (local_priorities == NULL) {
         /* Delete all local-priorities. */
         ovsrec_q_profile_entry_set_local_priorities(
                 queue_row, NULL, 0);
     } else {
-        /* Delete a single local-priority. */
-        remove_local_priority(queue_row, *local_priority);
+        /* Make a copy, since strtok modifies the string. */
+        char buffer[QOS_CLI_STRING_BUFFER_SIZE];
+        strncpy(buffer, local_priorities, sizeof(buffer));
+
+        /* Parse the comma-separated list of priorities. */
+        char *token = strtok(buffer, ",");
+        while (token != NULL) {
+            int64_t local_priority = atoi(token);
+
+            /* Delete a single local-priority. */
+            remove_local_priority(queue_row, local_priority);
+
+            token = strtok(NULL, ",");
+        }
     }
 
     /* If row has no content, then delete the queue row. */
@@ -1127,7 +1151,7 @@ qos_queue_profile_map_no_command(struct ovsdb_idl_txn *txn,
  */
 static int
 qos_queue_profile_map_no_command_commit(const char *profile_name,
-        int64_t queue_num, int64_t *local_priority)
+        int64_t queue_num, const char *local_priorities)
 {
     if (profile_name == NULL) {
         vty_out(vty, "profile_name cannot be NULL.%s", VTY_NEWLINE);
@@ -1156,7 +1180,7 @@ qos_queue_profile_map_no_command_commit(const char *profile_name,
     }
 
     bool success = qos_queue_profile_map_no_command(txn, profile_name,
-            queue_num, local_priority);
+            queue_num, local_priorities);
     if (!success) {
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
@@ -1178,7 +1202,7 @@ qos_queue_profile_map_no_command_commit(const char *profile_name,
  */
 DEFUN(qos_queue_profile_map_no,
         qos_queue_profile_map_no_cmd,
-       "no map queue <0-7> {local-priority <0-7>}",
+       "no map queue <0-7> {local-priority <C:0-7>}",
        NO_STR
        "Configure the local-priority map for a queue in a Queue Profile\n"
        "Deletes the local-priority for a queue in a Queue Profile\n"
@@ -1211,24 +1235,19 @@ DEFUN(qos_queue_profile_map_no,
     }
     int64_t queue_num_int = atoi(queue_num);
 
-    const char *local_priority_string = argv[1];
-    int64_t *local_priority = NULL;
-    int64_t local_priority_value;
-    if (local_priority_string != NULL) {
-        local_priority = &local_priority_value;
-        local_priority_value = atoi(local_priority_string);
-    }
-    if (local_priority_string != NULL) {
+    const char *local_priority = argv[1];
+    if (local_priority != NULL) {
         char *cfg = audit_encode_nv_string(
-                "local_priority_string", local_priority_string, 0);
+                "local_priority", local_priority, 0);
         if (cfg != NULL) {
             strncat(aubuf, cfg, sizeof(aubuf));
             free(cfg);
         }
     }
+    const char * local_priorities = local_priority;
 
     int result = qos_queue_profile_map_no_command_commit(
-            profile_name, queue_num_int, local_priority);
+            profile_name, queue_num_int, local_priorities);
 
     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
             aubuf, hostname, NULL, NULL, result);
@@ -1388,34 +1407,6 @@ DEFUN(qos_queue_profile_show_all,
 }
 
 /**
- * Displays headers for the given queue_num.
- */
-static void
-display_headers(bool *header_displayed,
-        bool *queue_num_header_displayed, int64_t queue_num)
-{
-    if (!*header_displayed) {
-        vty_out (vty, "qos queue-profile%s", VTY_NEWLINE);
-        *header_displayed = true;
-    }
-
-    if (!*queue_num_header_displayed) {
-        vty_out (vty, "    queue_num %" PRId64 "%s", queue_num, VTY_NEWLINE);
-        *queue_num_header_displayed = true;
-    }
-}
-
-/**
- * Displays the header.
- */
-static void
-display_header(bool *header_displayed)
-{
-    bool ignore_queue_num = true;
-    display_headers(header_displayed, &ignore_queue_num, -1);
-}
-
-/**
  * Shows the running config for queue_profile.
  */
 void
@@ -1432,15 +1423,14 @@ qos_queue_profile_show_running_config(void)
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
     struct ovsrec_q_profile *applied_profile_row = system_row->q_profile;
 
-    bool header_displayed = false;
-    /* Show profile name. */
+    bool differs_from_default = false;
+
+    /* Compare profile name. */
     if (strncmp(applied_profile_row->name, default_profile_row->name,
             QOS_CLI_STRING_BUFFER_SIZE) != 0 &&
             strncmp(applied_profile_row->name, QOS_DEFAULT_NAME,
                     QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-        display_header(&header_displayed);
-        vty_out(vty, "    name %s%s",
-                applied_profile_row->name, VTY_NEWLINE);
+        differs_from_default = true;
     }
 
     int i;
@@ -1455,13 +1445,13 @@ qos_queue_profile_show_running_config(void)
                         applied_profile_row, default_queue_num);
         if (applied_profile_entry == NULL) {
             /* If the applied profile does not contain a queue_num from the */
-            /* default profile, then skip to the next queue_num. */
-            continue;
+            /* default profile, then a difference was found and the loop */
+            /* can be terminated. */
+            differs_from_default = true;
+            break;
         }
 
-        bool queue_num_header_displayed = false;
-
-        /* Show local-priorities. */
+        /* Compare local-priorities. */
         char default_buffer[QOS_CLI_STRING_BUFFER_SIZE];
         default_buffer[0] = '\0';
         char applied_buffer[QOS_CLI_STRING_BUFFER_SIZE];
@@ -1472,35 +1462,51 @@ qos_queue_profile_show_running_config(void)
                 sizeof(applied_buffer), applied_profile_entry);
         if (strncmp(applied_buffer, default_buffer,
                 sizeof(applied_buffer)) != 0) {
-            display_headers(&header_displayed,
-                    &queue_num_header_displayed, default_queue_num);
-            vty_out(vty, "        local_priorities %s%s",
-                    applied_buffer, VTY_NEWLINE);
+            differs_from_default = true;
         }
 
-        /* Show description. */
-        char applied_description[QOS_CLI_STRING_BUFFER_SIZE];
-        if (applied_profile_entry->description == NULL) {
-            strncpy(applied_description, QOS_CLI_EMPTY_DISPLAY_STRING,
-                    sizeof(applied_description));
-        } else {
-            snprintf(applied_description, sizeof(applied_description), "%d",
-                    *applied_profile_entry->description);
+        /* Compare description. */
+        if (applied_profile_entry->description != NULL &&
+                strncmp(applied_profile_entry->description,
+                        default_profile_entry->description,
+                        QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            differs_from_default = true;
         }
-        char default_description[QOS_CLI_STRING_BUFFER_SIZE];
-        if (default_profile_entry->description == NULL) {
-            strncpy(default_description, QOS_CLI_EMPTY_DISPLAY_STRING,
-                    sizeof(default_description));
-        } else {
-            snprintf(default_description, sizeof(default_description), "%d",
-                    *default_profile_entry->description);
-        }
-        if (strncmp(applied_description, default_description,
-                sizeof(applied_description)) != 0) {
-            display_headers(&header_displayed,
-                    &queue_num_header_displayed, default_queue_num);
-            vty_out(vty, "        name %s%s",
-                    applied_description, VTY_NEWLINE);
+    }
+
+    /* Show the command if it differs from the default. */
+    if (differs_from_default) {
+        /* Show profile name. */
+        vty_out(vty, "qos queue-profile %s%s", applied_profile_row->name,
+                VTY_NEWLINE);
+
+        int i;
+        for (i = 0; i < applied_profile_row->n_q_profile_entries; i++) {
+            int64_t queue_num =
+                    applied_profile_row->key_q_profile_entries[i];
+            struct ovsrec_q_profile_entry *applied_profile_entry =
+                    applied_profile_row->value_q_profile_entries[i];
+
+            /* Show local-priorities. */
+            char applied_buffer[QOS_CLI_STRING_BUFFER_SIZE];
+            applied_buffer[0] = '\0';
+            snprintf_local_priorities(applied_buffer,
+                    sizeof(applied_buffer), applied_profile_entry);
+            if (applied_buffer != NULL &&
+                    strncmp(applied_buffer, "",
+                            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+                vty_out(vty, "    map queue %" PRId64 " local-priority %s%s",
+                        queue_num, applied_buffer, VTY_NEWLINE);
+            }
+
+            /* Show description. */
+            if (applied_profile_entry->description != NULL &&
+                    strncmp(applied_profile_entry->description, "",
+                            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+                vty_out(vty, "    name queue %" PRId64 " %s%s",
+                        queue_num, applied_profile_entry->description,
+                        VTY_NEWLINE);
+            }
         }
     }
 }

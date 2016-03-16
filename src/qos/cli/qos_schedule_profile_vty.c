@@ -1292,35 +1292,7 @@ DEFUN(qos_schedule_profile_show_all,
 }
 
 /**
- * Display headers for the given queue_num.
- */
-static void
-display_headers(bool *header_displayed,
-        bool *queue_num_header_displayed, int64_t queue_num)
-{
-    if (!*header_displayed) {
-        vty_out (vty, "qos schedule-profile%s", VTY_NEWLINE);
-        *header_displayed = true;
-    }
-
-    if (!*queue_num_header_displayed) {
-        vty_out (vty, "    queue_num %" PRId64 "%s", queue_num, VTY_NEWLINE);
-        *queue_num_header_displayed = true;
-    }
-}
-
-/**
- * Display headers.
- */
-static void
-display_header(bool *header_displayed)
-{
-    bool ignore_queue_num = true;
-    display_headers(header_displayed, &ignore_queue_num, -1);
-}
-
-/**
- * Shows the running_config for the schedule_profile.
+ * Shows the running config for schedule_profile.
  */
 void
 qos_schedule_profile_show_running_config(void)
@@ -1336,15 +1308,14 @@ qos_schedule_profile_show_running_config(void)
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
     struct ovsrec_qos *applied_profile_row = system_row->qos;
 
-    bool header_displayed = false;
-    /* Show profile name. */
-    if (strncmp(applied_profile_row->name,
-            default_profile_row->name, QOS_CLI_STRING_BUFFER_SIZE) != 0 &&
-            strncmp(applied_profile_row->name,
-                    QOS_DEFAULT_NAME, QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-        display_header(&header_displayed);
-        vty_out(vty, "    name %s%s",
-                applied_profile_row->name, VTY_NEWLINE);
+    bool differs_from_default = false;
+
+    /* Compare profile name. */
+    if (strncmp(applied_profile_row->name, default_profile_row->name,
+            QOS_CLI_STRING_BUFFER_SIZE) != 0 &&
+            strncmp(applied_profile_row->name, QOS_DEFAULT_NAME,
+                    QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+        differs_from_default = true;
     }
 
     int i;
@@ -1359,45 +1330,62 @@ qos_schedule_profile_show_running_config(void)
                         applied_profile_row, default_queue_num);
         if (applied_profile_entry == NULL) {
             /* If the applied profile does not contain a queue_num from the */
-            /* default profile, then skip to the next queue_num. */
-            continue;
+            /* default profile, then a difference was found and the loop */
+            /* can be terminated. */
+            differs_from_default = true;
+            break;
         }
 
-        bool queue_num_header_displayed = false;
-
-        /* Show algorithm. */
-        if (strncmp(applied_profile_entry->algorithm,
-                default_profile_entry->algorithm,
-                QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-            display_headers(&header_displayed,
-                    &queue_num_header_displayed, default_queue_num);
-            vty_out(vty, "        algorithm %s%s",
-                    applied_profile_entry->algorithm, VTY_NEWLINE);
+        /* Compare algorithm. */
+        if (applied_profile_entry->algorithm != NULL &&
+                strncmp(applied_profile_entry->algorithm,
+                        default_profile_entry->algorithm,
+                        QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            differs_from_default = true;
         }
 
-        /* Show weight. */
-        char applied_weight[QOS_CLI_STRING_BUFFER_SIZE];
-        if (applied_profile_entry->weight == NULL) {
-            strncpy(applied_weight, QOS_CLI_EMPTY_DISPLAY_STRING,
-                    sizeof(applied_weight));
-        } else {
-            snprintf(applied_weight, sizeof(applied_weight), "%" PRId64,
-                    *applied_profile_entry->weight);
+        /* Compare weight. */
+        if (applied_profile_entry->weight !=
+                default_profile_entry->weight) {
+            if (applied_profile_entry->weight == NULL ||
+                    default_profile_entry->weight == NULL) {
+                differs_from_default = true;
+            } else if (*applied_profile_entry->weight !=
+                    *default_profile_entry->weight) {
+                differs_from_default = true;
+            }
         }
-        char default_weight[QOS_CLI_STRING_BUFFER_SIZE];
-        if (default_profile_entry->weight == NULL) {
-            strncpy(default_weight, QOS_CLI_EMPTY_DISPLAY_STRING,
-                    sizeof(default_weight));
-        } else {
-            snprintf(default_weight, sizeof(default_weight), "%" PRId64,
-                    *default_profile_entry->weight);
-        }
-        if (strncmp(applied_weight,
-                default_weight, sizeof(applied_weight)) != 0) {
-            display_headers(&header_displayed,
-                    &queue_num_header_displayed, default_queue_num);
-            vty_out(vty, "        weight %s%s",
-                    applied_weight, VTY_NEWLINE);
+    }
+
+    /* Show the command if it differs from the default. */
+    if (differs_from_default) {
+        /* Show profile name. */
+        vty_out(vty, "qos schedule-profile %s%s", applied_profile_row->name,
+                VTY_NEWLINE);
+
+        int i;
+        for (i = 0; i < applied_profile_row->n_queues; i++) {
+            int64_t queue_num =
+                    applied_profile_row->key_queues[i];
+            struct ovsrec_queue *applied_profile_entry =
+                    applied_profile_row->value_queues[i];
+
+            /* Show algorithm. */
+            if (applied_profile_entry->algorithm != NULL &&
+                    strncmp(applied_profile_entry->algorithm, "",
+                            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+                vty_out(vty, "    %s queue %" PRId64 " ",
+                        applied_profile_entry->algorithm, queue_num);
+            }
+
+            /* Show weight. */
+            if (applied_profile_entry->weight != NULL) {
+                vty_out(vty, "weight %" PRId64 " ",
+                        *applied_profile_entry->weight);
+            }
+
+            /* End with a new line. */
+            vty_out(vty, "%s", VTY_NEWLINE);
         }
     }
 }

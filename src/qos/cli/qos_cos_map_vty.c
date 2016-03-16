@@ -119,7 +119,7 @@ DEFUN(qos_cos_map,
         "Configure QoS COS Map local-priority\n"
         "The QoS COS Map local-priority\n"
         "Configure QoS COS Map color\n"
-        "Set color to green\n"
+        "Set color to green (Default)\n"
         "Set color to yellow\n"
         "Set color to red\n"
         "Configure QoS COS Map name\n"
@@ -222,7 +222,7 @@ DEFUN(qos_cos_map_no,
         "Configure QoS COS Map local-priority\n"
         "The QoS COS Map local-priority\n"
         "Configure QoS COS Map color\n"
-        "Set color to green\n"
+        "Set color to green (Default)\n"
         "Set color to yellow\n"
         "Set color to red\n"
         "Configure QoS COS Map name\n"
@@ -331,77 +331,67 @@ DEFUN(qos_cos_map_show,
 }
 
 /**
- * Displays the headers for the given code_point.
- */
-static void
-display_headers(bool *cos_map_header_displayed,
-        bool *code_point_header_displayed, int64_t code_point)
-{
-    if (!*cos_map_header_displayed) {
-        vty_out (vty, "qos cos-map%s", VTY_NEWLINE);
-        *cos_map_header_displayed = true;
-    }
-
-    if (!*code_point_header_displayed) {
-        vty_out (vty, "    code_point %" PRId64 "%s", code_point, VTY_NEWLINE);
-        *code_point_header_displayed = true;
-    }
-}
-
-/**
  * Contains the callback for qos_cos_map_show_running_config.
  */
 static vtysh_ret_val
 qos_cos_map_show_running_config_callback(
         void *p_private)
 {
-    bool cos_map_header_displayed = false;
+    /* Create an ordered array of rows. */
+    struct ovsrec_qos_cos_map_entry *cos_map_rows[QOS_COS_MAP_ENTRY_COUNT];
     const struct ovsrec_qos_cos_map_entry *cos_map_row;
     OVSREC_QOS_COS_MAP_ENTRY_FOR_EACH(cos_map_row, idl) {
-        int64_t code_point = cos_map_row->code_point;
-        bool code_point_header_displayed = false;
+        cos_map_rows[cos_map_row->code_point] =
+                (struct ovsrec_qos_cos_map_entry *) cos_map_row;
+    }
 
-        /* Show local_priority. */
+    /* Check the ordered rows. */
+    int i;
+    for (i = 0; i < QOS_COS_MAP_ENTRY_COUNT; i++) {
+        const struct ovsrec_qos_cos_map_entry *cos_map_row = cos_map_rows[i];
+        int64_t code_point = cos_map_row->code_point;
+        bool differs_from_default = false;
+
+        /* Compare local_priority. */
         int64_t default_local_priority = atoi(smap_get(
                 &cos_map_row->hw_defaults, QOS_DEFAULT_LOCAL_PRIORITY_KEY));
         if (cos_map_row->local_priority != default_local_priority) {
-            display_headers(&cos_map_header_displayed,
-                    &code_point_header_displayed, code_point);
-            vty_out(vty, "        local_priority %" PRId64 "%s",
-                    cos_map_row->local_priority, VTY_NEWLINE);
+            differs_from_default = true;
         }
 
-        /* Show color. */
+        /* Compare color. */
         const char *default_color =
                 smap_get(&cos_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY);
         if (strncmp(cos_map_row->color, default_color,
                 QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-            display_headers(&cos_map_header_displayed,
-                    &code_point_header_displayed, code_point);
-            vty_out(vty, "        color %s%s", cos_map_row->color,
-                    VTY_NEWLINE);
+            differs_from_default = true;
         }
 
-        /* Show description. */
+        /* Compare description. */
         const char *default_description =
                 smap_get(&cos_map_row->hw_defaults,
                         QOS_DEFAULT_DESCRIPTION_KEY);
         if (strncmp(cos_map_row->description, default_description,
                 QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-            char description[QOS_CLI_STRING_BUFFER_SIZE];
-            if (strncmp(cos_map_row->description, "",
-                    QOS_CLI_STRING_BUFFER_SIZE) == 0) {
-                strncpy(description, QOS_CLI_EMPTY_DISPLAY_STRING,
-                        sizeof(description));
-            } else {
-                strncpy(description, cos_map_row->description,
-                        sizeof(description));
+            differs_from_default = true;
+        }
+
+        /* Show the command if it differs from the default. */
+        if (differs_from_default) {
+            vty_out(vty, "qos cos-map %" PRId64 " local-priority %" PRId64 " ",
+                    code_point, cos_map_row->local_priority);
+
+            if (cos_map_row->color != NULL) {
+                vty_out(vty, "color %s ", cos_map_row->color);
             }
 
-            display_headers(&cos_map_header_displayed,
-                    &code_point_header_displayed, code_point);
-            vty_out(vty, "        name %s%s", description,
-                    VTY_NEWLINE);
+            if (cos_map_row->description != NULL &&
+                    strncmp(cos_map_row->description, "",
+                            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+                vty_out(vty, "name %s ", cos_map_row->description);
+            }
+
+            vty_out(vty, "%s", VTY_NEWLINE);
         }
     }
 

@@ -127,7 +127,7 @@ DEFUN(qos_dscp_map_cos_remark_disabled,
         "Configure QoS DSCP Map local-priority\n"
         "The QoS DSCP Map local-priority\n"
         "Configure QoS DSCP Map color\n"
-        "Set color to green\n"
+        "Set color to green (Default)\n"
         "Set color to yellow\n"
         "Set color to red\n"
         "Configure QoS DSCP Map name\n"
@@ -203,7 +203,7 @@ DEFUN(qos_dscp_map,
         "Configure the the 802.1Q priority.\n"
         "The 802.1Q priority that will be assigned to the packet\n"
         "Configure QoS DSCP Map color\n"
-        "Set color to green\n"
+        "Set color to green (Default)\n"
         "Set color to yellow\n"
         "Set color to red\n"
         "Configure QoS DSCP Map name\n"
@@ -326,7 +326,7 @@ DEFUN(qos_dscp_map_no,
         "Configure the the 802.1Q priority.\n"
         "The 802.1Q priority that will be assigned to the packet\n"
         "Configure QoS DSCP Map color\n"
-        "Set color to green\n"
+        "Set color to green (Default)\n"
         "Set color to yellow\n"
         "Set color to red\n"
         "Configure QoS DSCP Map name\n"
@@ -460,107 +460,80 @@ DEFUN(qos_dscp_map_show,
 }
 
 /**
- * Displays headers for the given code_point.
- */
-static void
-display_headers(bool *dscp_map_header_displayed,
-        bool *code_point_header_displayed, int64_t code_point)
-{
-    if (!*dscp_map_header_displayed) {
-        vty_out (vty, "qos dscp-map%s", VTY_NEWLINE);
-        *dscp_map_header_displayed = true;
-    }
-
-    if (!*code_point_header_displayed) {
-        vty_out (vty, "    code_point %" PRId64 "%s", code_point, VTY_NEWLINE);
-        *code_point_header_displayed = true;
-    }
-}
-
-/**
- * Contains the callback function for qos_dscp_map_show_running_config.
+ * Contains the callback for qos_dscp_map_show_running_config.
  */
 static vtysh_ret_val
 qos_dscp_map_show_running_config_callback(
         void *p_private)
 {
-    bool dscp_map_header_displayed = false;
+    /* Create an ordered array of rows. */
+    struct ovsrec_qos_dscp_map_entry *dscp_map_rows[QOS_DSCP_MAP_ENTRY_COUNT];
     const struct ovsrec_qos_dscp_map_entry *dscp_map_row;
     OVSREC_QOS_DSCP_MAP_ENTRY_FOR_EACH(dscp_map_row, idl) {
-        int64_t code_point = dscp_map_row->code_point;
-        bool code_point_header_displayed = false;
+        dscp_map_rows[dscp_map_row->code_point] =
+                (struct ovsrec_qos_dscp_map_entry *) dscp_map_row;
+    }
 
-        /* Show local_priority. */
+    /* Check the ordered rows. */
+    int i;
+    for (i = 0; i < QOS_DSCP_MAP_ENTRY_COUNT; i++) {
+        const struct ovsrec_qos_dscp_map_entry *dscp_map_row =
+                dscp_map_rows[i];
+        int64_t code_point = dscp_map_row->code_point;
+        bool differs_from_default = false;
+
+        /* Compare local_priority. */
         int64_t default_local_priority = atoi(smap_get(
                 &dscp_map_row->hw_defaults, QOS_DEFAULT_LOCAL_PRIORITY_KEY));
         if (dscp_map_row->local_priority != default_local_priority) {
-            display_headers(&dscp_map_header_displayed,
-                    &code_point_header_displayed, code_point);
-            vty_out(vty, "        local_priority %" PRId64 "%s",
-                    dscp_map_row->local_priority, VTY_NEWLINE);
+            differs_from_default = true;
         }
 
 #ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
         /* cos is disabled for dill. */
 #else
-        /* Show priority_code_point. */
-        char current_priority_code_point[QOS_CLI_STRING_BUFFER_SIZE];
-        if (dscp_map_row->priority_code_point == NULL) {
-            strncpy(current_priority_code_point,
-                    QOS_CLI_EMPTY_DISPLAY_STRING,
-                    sizeof(current_priority_code_point));
-        } else {
-            snprintf(current_priority_code_point,
-                    sizeof(current_priority_code_point), "%" PRId64,
-                    *dscp_map_row->priority_code_point);
-        }
-        char default_priority_code_point[QOS_CLI_STRING_BUFFER_SIZE];
-        int64_t default_priority_code_point_int =
-                atoi(smap_get(&dscp_map_row->hw_defaults,
-                        QOS_DEFAULT_PRIORITY_CODE_POINT_KEY));
-        snprintf(default_priority_code_point,
-                sizeof(default_priority_code_point), "%d",
-                    default_priority_code_point_int);
-        if (strncmp(current_priority_code_point,
-                default_priority_code_point,
-                sizeof(current_priority_code_point)) != 0) {
-            display_headers(&dscp_map_header_displayed,
-                    &code_point_header_displayed, code_point);
-            vty_out(vty, "        cos %s%s",
-                    current_priority_code_point, VTY_NEWLINE);
-        }
+        /* Implement priority_code_point. */
 #endif
 
-        /* Show color. */
+        /* Compare color. */
         const char *default_color =
                 smap_get(&dscp_map_row->hw_defaults, QOS_DEFAULT_COLOR_KEY);
         if (strncmp(dscp_map_row->color, default_color,
                 QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-            display_headers(&dscp_map_header_displayed,
-                    &code_point_header_displayed, code_point);
-            vty_out(vty, "        color %s%s", dscp_map_row->color,
-                    VTY_NEWLINE);
+            differs_from_default = true;
         }
 
-        /* Show description. */
+        /* Compare description. */
         const char *default_description =
-                smap_get(&dscp_map_row->hw_defaults, QOS_DEFAULT_DESCRIPTION_KEY);
+                smap_get(&dscp_map_row->hw_defaults,
+                        QOS_DEFAULT_DESCRIPTION_KEY);
         if (strncmp(dscp_map_row->description, default_description,
                 QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-            char description[QOS_CLI_STRING_BUFFER_SIZE];
-            if (strncmp(dscp_map_row->description, "",
-                    QOS_CLI_STRING_BUFFER_SIZE) == 0) {
-                strncpy(description, QOS_CLI_EMPTY_DISPLAY_STRING,
-                        sizeof(description));
-            } else {
-                strncpy(description, dscp_map_row->description,
-                        sizeof(description));
+            differs_from_default = true;
+        }
+
+        /* Show the command if it differs from the default. */
+        if (differs_from_default) {
+            vty_out(vty, "qos dscp-map %" PRId64 " local-priority %" PRId64 " ",
+                    code_point, dscp_map_row->local_priority);
+
+#ifdef QOS_CAPABILITY_DSCP_MAP_COS_REMARK_DISABLED
+        /* cos is disabled for dill. */
+#else
+        /* Implement priority_code_point. */
+#endif
+
+            if (dscp_map_row->color != NULL) {
+                vty_out(vty, "color %s ", dscp_map_row->color);
             }
 
-            display_headers(&dscp_map_header_displayed,
-                    &code_point_header_displayed, code_point);
-            vty_out(vty, "        name %s%s", description,
-                    VTY_NEWLINE);
+            if (dscp_map_row->description != NULL &&
+                    strncmp(dscp_map_row->description, "",
+                            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+                vty_out(vty, "name %s ", dscp_map_row->description);
+            }
+
+            vty_out(vty, "%s", VTY_NEWLINE);
         }
     }
 
