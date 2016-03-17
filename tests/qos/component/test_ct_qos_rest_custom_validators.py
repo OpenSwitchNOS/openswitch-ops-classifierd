@@ -97,7 +97,7 @@ queue_post_url = "/rest/v1/system/qoss/p1/queues"
 queue_url = queue_post_url + "/1"
 queue_data = {
     "configuration": {
-        "algorithm": "wrr",
+        "algorithm": "dwrr",
         "weight": 1
     }
 }
@@ -176,14 +176,14 @@ class Test_qos_rest_custom_validators:
 
         self.s1.cmdCLI('no qos schedule-profile p1')
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
-        self.s1.cmdCLI('wrr queue 7 weight 70')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 7 weight 70')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
 
     def teardown(self):
@@ -258,10 +258,10 @@ class Test_qos_rest_custom_validators:
         self.s1.cmdCLI('strict queue 5')
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
 
         data = [{"op": "add", "path": "/qos",
@@ -343,10 +343,10 @@ class Test_qos_rest_custom_validators:
         self.s1.cmdCLI('strict queue 5')
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
 
         data = deepcopy(port_data)
@@ -1019,7 +1019,7 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'A hardware default profile cannot' in response_data
 
-    def test_queue_post_validate_profile_entry_with_wrr_has_w_less_than_max_w(
+    def test_queue_post_validate_profile_entry_with_dwrr_has_w_less_than_max_w(
             self):
         data = deepcopy(queue_data)
         data["configuration"]["queue_number"] = "1"
@@ -1069,7 +1069,7 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'A hardware default profile cannot' in response_data
 
-    def test_queue_patch_validate_profile_entry_with_wrr_has_w_less_than_max_w(
+    def test_queue_patch_validate_profile_entry_with_dwrr_has_w_less_than_max_w(
             self):
         # Once custom validators support PATCH (taiga 661), enable this test.
         return
@@ -1115,7 +1115,7 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'A hardware default profile cannot' in response_data
 
-    def test_queue_put_validate_profile_entry_with_wrr_has_w_less_than_max_w(
+    def test_queue_put_validate_profile_entry_with_dwrr_has_w_less_than_max_w(
             self):
         data = deepcopy(queue_data)
         data["configuration"]["weight"] = 1024
@@ -1256,10 +1256,10 @@ class Test_qos_rest_custom_validators:
         self.s1.cmdCLI('strict queue 5')
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
 
         data = [{"op": "add", "path": "/qos",
@@ -1428,10 +1428,10 @@ class Test_qos_rest_custom_validators:
         self.s1.cmdCLI('strict queue 5')
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
 
         data = deepcopy(system_data)

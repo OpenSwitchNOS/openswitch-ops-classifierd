@@ -115,7 +115,7 @@ struct queue_profile_settings {
 
 enum schedule_algorithm {
     ALGORITHM_STRICT,
-    ALGORITHM_WRR,
+    ALGORITHM_DWRR,
     ALGORITHM_MAX
 };
 
@@ -123,7 +123,7 @@ enum schedule_algorithm {
 struct schedule_profile_entry {
     unsigned queue;            /* queue number */
     enum schedule_algorithm algorithm; /* must have some scheduling algorithm */
-    int weight;                /* weight, if queue type is WRR */
+    int weight;                /* weight, if queue type is DWRR */
     struct smap *other_config; /* pass-through from Queue row */
 };
 

@@ -63,14 +63,14 @@ class Test_qos_cli():
 
         self.s1.cmdCLI('no qos schedule-profile p1')
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
-        self.s1.cmdCLI('wrr queue 7 weight 70')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 7 weight 70')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
 
     def setUp_qosApplyPort(self):
@@ -88,14 +88,14 @@ class Test_qos_cli():
 
         self.s1.cmdCLI('no qos schedule-profile p1')
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
-        self.s1.cmdCLI('wrr queue 7 weight 70')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 7 weight 70')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
 
         self.s1.cmdCLI('end')
@@ -260,7 +260,7 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommandWithMissingScheduleProfileQueue(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('no wrr queue 7')
+        self.s1.cmdCLI('no dwrr queue 7')
         self.s1.cmdCLI('exit')
         out = self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         assert 'cannot contain different queues' in out
@@ -326,14 +326,14 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommandWithAllWrr(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
-        self.s1.cmdCLI('wrr queue 7 weight 70')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 7 weight 70')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = self.s1.cmdCLI('do show qos schedule-profile')
@@ -342,14 +342,14 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommandWithAllWrrWithMaxStrict(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         out = self.s1.cmdCLI('do show qos schedule-profile')
@@ -362,10 +362,10 @@ class Test_qos_cli():
         self.s1.cmdCLI('strict queue 5')
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         out = self.s1.cmdCLI('apply qos queue-profile p1 schedule-profile p1')
         assert 'must have the same algorithm assigned to each queue' in out
@@ -373,10 +373,10 @@ class Test_qos_cli():
     def test_qosApplyGlobalCommandWithLowerStrictHigherWrr(self):
         self.setUp_qosApplyGlobal()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
-        self.s1.cmdCLI('wrr queue 7 weight 70')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 7 weight 70')
         self.s1.cmdCLI('strict queue 0')
         self.s1.cmdCLI('strict queue 1')
         self.s1.cmdCLI('strict queue 2')
@@ -418,7 +418,7 @@ class Test_qos_cli():
     def test_qosApplyPortCommandWithMissingScheduleProfileQueue(self):
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('no wrr queue 7')
+        self.s1.cmdCLI('no dwrr queue 7')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('interface 1')
         out = self.s1.cmdCLI('apply qos schedule-profile p1')
@@ -476,14 +476,14 @@ class Test_qos_cli():
     def test_qosApplyPortCommandWithAllWrr(self):
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
-        self.s1.cmdCLI('wrr queue 7 weight 70')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 7 weight 70')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('apply qos schedule-profile p1')
@@ -493,14 +493,14 @@ class Test_qos_cli():
     def test_qosApplyPortCommandWithAllWrrWithMaxStrict(self):
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('apply qos schedule-profile p1')
@@ -514,10 +514,10 @@ class Test_qos_cli():
         self.s1.cmdCLI('strict queue 5')
         self.s1.cmdCLI('strict queue 6')
         self.s1.cmdCLI('strict queue 7')
-        self.s1.cmdCLI('wrr queue 0 weight 1')
-        self.s1.cmdCLI('wrr queue 1 weight 10')
-        self.s1.cmdCLI('wrr queue 2 weight 20')
-        self.s1.cmdCLI('wrr queue 3 weight 30')
+        self.s1.cmdCLI('dwrr queue 0 weight 1')
+        self.s1.cmdCLI('dwrr queue 1 weight 10')
+        self.s1.cmdCLI('dwrr queue 2 weight 20')
+        self.s1.cmdCLI('dwrr queue 3 weight 30')
         self.s1.cmdCLI('exit')
         self.s1.cmdCLI('interface 1')
         out = self.s1.cmdCLI('apply qos schedule-profile p1')
@@ -526,10 +526,10 @@ class Test_qos_cli():
     def test_qosApplyPortCommandWithLowerStrictHigherWrr(self):
         self.setUp_qosApplyPort()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 4 weight 40')
-        self.s1.cmdCLI('wrr queue 5 weight 50')
-        self.s1.cmdCLI('wrr queue 6 weight 60')
-        self.s1.cmdCLI('wrr queue 7 weight 70')
+        self.s1.cmdCLI('dwrr queue 4 weight 40')
+        self.s1.cmdCLI('dwrr queue 5 weight 50')
+        self.s1.cmdCLI('dwrr queue 6 weight 60')
+        self.s1.cmdCLI('dwrr queue 7 weight 70')
         self.s1.cmdCLI('strict queue 0')
         self.s1.cmdCLI('strict queue 1')
         self.s1.cmdCLI('strict queue 2')
@@ -1282,7 +1282,7 @@ class Test_qos_cli():
     def test_qosScheduleProfileWrrCommand(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 1 weight 2')
+        self.s1.cmdCLI('dwrr queue 1 weight 2')
         out = self.s1.cmdCLI('do show qos schedule-profile p1')
         assert '1' in out
         assert 'weight' in out
@@ -1291,73 +1291,73 @@ class Test_qos_cli():
     def test_qosScheduleProfileWrrCommandWithIllegalQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('wrr queue -1 weight 2')
+        out = self.s1.cmdCLI('dwrr queue -1 weight 2')
         assert 'Unknown command' in out
-        out = self.s1.cmdCLI('wrr queue 8 weight 2')
+        out = self.s1.cmdCLI('dwrr queue 8 weight 2')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrCommandWithNullQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('wrr queue weight 2')
+        out = self.s1.cmdCLI('dwrr queue weight 2')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrCommandWithIllegalWeight(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('wrr queue 1 weight 0')
+        out = self.s1.cmdCLI('dwrr queue 1 weight 0')
         assert 'Unknown command' in out
-        out = self.s1.cmdCLI('wrr queue 1 weight 128')
+        out = self.s1.cmdCLI('dwrr queue 1 weight 128')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrCommandWithNullWeight(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('wrr queue 1 weight')
+        out = self.s1.cmdCLI('dwrr queue 1 weight')
         assert 'incomplete' in out
 
     def test_qosScheduleProfileWrrNoCommand(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        self.s1.cmdCLI('wrr queue 1 weight 2')
+        self.s1.cmdCLI('dwrr queue 1 weight 2')
         out = self.s1.cmdCLI('do show qos schedule-profile p1')
-        assert '1         wrr' in out
-        self.s1.cmdCLI('no wrr queue 1')
+        assert '1         dwrr' in out
+        self.s1.cmdCLI('no dwrr queue 1')
         out = self.s1.cmdCLI('do show qos schedule-profile p1')
-        assert '1         wrr' not in out
+        assert '1         dwrr' not in out
 
     def test_qosScheduleProfileWrrNoCommandWithIllegalQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('no wrr queue -1 weight 2')
+        out = self.s1.cmdCLI('no dwrr queue -1 weight 2')
         assert 'Unknown command' in out
-        out = self.s1.cmdCLI('no wrr queue 8 weight 2')
+        out = self.s1.cmdCLI('no dwrr queue 8 weight 2')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrNoCommandWithNullQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('no wrr queue weight 2')
+        out = self.s1.cmdCLI('no dwrr queue weight 2')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrNoCommandWithIllegalWeight(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('no wrr queue 1 weight 0')
+        out = self.s1.cmdCLI('no dwrr queue 1 weight 0')
         assert 'Unknown command' in out
-        out = self.s1.cmdCLI('no wrr queue 1 weight 128')
+        out = self.s1.cmdCLI('no dwrr queue 1 weight 128')
         assert 'Unknown command' in out
 
     def test_qosScheduleProfileWrrNoCommandWithNullWeight(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('no wrr queue 1 weight')
+        out = self.s1.cmdCLI('no dwrr queue 1 weight')
         assert 'incomplete' in out
 
     def test_qosScheduleProfileWrrNoCommandWithMissingQueue(self):
         self.setUp_qosScheduleProfile()
         self.s1.cmdCLI('qos schedule-profile p1')
-        out = self.s1.cmdCLI('no wrr queue 2')
+        out = self.s1.cmdCLI('no dwrr queue 2')
         assert 'does not have queue' in out
 
     def test_qosTrustGlobalCommand(self):

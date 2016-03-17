@@ -134,9 +134,9 @@ one queue.%s", VTY_NEWLINE);
     /**
      * The spec is:
      * There are two allowed forms for schedule profiles: 1. All queues use
-     * the same scheduling algorithm (e.g. wrr) 2. The highest queue number
+     * the same scheduling algorithm (e.g. dwrr) 2. The highest queue number
      * uses Strict Priority and all remaining (lower) queues use the same
-     * algorithm (e.g. wrr)
+     * algorithm (e.g. dwrr)
      *
      * Or, to phrase another way, all queues always use the same scheduling
      * algorithm, but the max queue number can either be the same as all of
@@ -871,11 +871,11 @@ DEFUN(qos_schedule_profile_strict_no,
 }
 
 /**
- * Executes the qos_schedule_profile_wrr_command for the given profile_name,
+ * Executes the qos_schedule_profile_dwrr_command for the given profile_name,
  * queue_num, and weight.
  */
 static bool
-qos_schedule_profile_wrr_command(struct ovsdb_idl_txn *txn,
+qos_schedule_profile_dwrr_command(struct ovsdb_idl_txn *txn,
         const char *profile_name,
         int64_t queue_num, int64_t weight)
 {
@@ -898,18 +898,18 @@ qos_schedule_profile_wrr_command(struct ovsdb_idl_txn *txn,
     }
 
     /* Update the queue row. */
-    ovsrec_queue_set_algorithm(queue_row, OVSREC_QUEUE_ALGORITHM_WRR);
+    ovsrec_queue_set_algorithm(queue_row, OVSREC_QUEUE_ALGORITHM_DWRR);
     ovsrec_queue_set_weight(queue_row, &weight, 1);
 
     return true;
 }
 
 /**
- * Executes and commits the qos_schedule_profile_wrr_command for
+ * Executes and commits the qos_schedule_profile_dwrr_command for
  * the given profile_name, queue_num, and weight.
  */
 static int
-qos_schedule_profile_wrr_command_commit(
+qos_schedule_profile_dwrr_command_commit(
         const char *profile_name,
         int64_t queue_num, int64_t weight)
 {
@@ -939,7 +939,7 @@ qos_schedule_profile_wrr_command_commit(
         return CMD_OVSDB_FAILURE;
     }
 
-    bool success = qos_schedule_profile_wrr_command(txn, profile_name,
+    bool success = qos_schedule_profile_dwrr_command(txn, profile_name,
             queue_num, weight);
     if (!success) {
         cli_do_config_abort(txn);
@@ -957,20 +957,20 @@ qos_schedule_profile_wrr_command_commit(
 }
 
 /**
- * Executes and commits the qos_schedule_profile_wrr_command for
+ * Executes and commits the qos_schedule_profile_dwrr_command for
  * the given profile_name, queue_num, and weight.
  */
-DEFUN(qos_schedule_profile_wrr,
-        qos_schedule_profile_wrr_cmd,
-       "wrr queue <0-7> weight <1-127>",
-       "Configure a queue in a Schedule Profile to use wrr scheduling\n"
+DEFUN(qos_schedule_profile_dwrr,
+        qos_schedule_profile_dwrr_cmd,
+       "dwrr queue <0-7> weight <1-127>",
+       "Configure a queue in a Schedule Profile to use dwrr scheduling\n"
        "The number of the queue\n"
        "The number of the queue\n"
        "The weight to configure\n"
        "The weight to configure\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: wrr queue", sizeof(aubuf));
+    strncpy(aubuf, "op=CLI: dwrr queue", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -1004,7 +1004,7 @@ DEFUN(qos_schedule_profile_wrr,
     }
     int64_t weight_int = atoi(weight);
 
-    int result = qos_schedule_profile_wrr_command_commit(
+    int result = qos_schedule_profile_dwrr_command_commit(
             profile_name, queue_num_int, weight_int);
 
     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
@@ -1014,11 +1014,11 @@ DEFUN(qos_schedule_profile_wrr,
 }
 
 /**
- * Executes the qos_schedule_profile_wrr_no_command for
+ * Executes the qos_schedule_profile_dwrr_no_command for
  * the given profile_name and queue_num.
  */
 static bool
-qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
+qos_schedule_profile_dwrr_no_command(struct ovsdb_idl_txn *txn,
         const char *profile_name,
         int64_t queue_num)
 {
@@ -1041,10 +1041,10 @@ qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
         return false;
     }
 
-    /* If the algorithm is wrr, then clear it. */
+    /* If the algorithm is dwrr, then clear it. */
     if (queue_row->algorithm != NULL &&
             strncmp(queue_row->algorithm,
-                    OVSREC_QUEUE_ALGORITHM_WRR,
+                    OVSREC_QUEUE_ALGORITHM_DWRR,
                     QOS_CLI_STRING_BUFFER_SIZE) == 0) {
         ovsrec_queue_set_algorithm(queue_row, NULL);
         ovsrec_queue_set_weight(queue_row, NULL, 0);
@@ -1059,11 +1059,11 @@ qos_schedule_profile_wrr_no_command(struct ovsdb_idl_txn *txn,
 }
 
 /**
- * Executes and commits the qos_schedule_profile_wrr_no_command for
+ * Executes and commits the qos_schedule_profile_dwrr_no_command for
  * the given profile_name and queue_num.
  */
 static int
-qos_schedule_profile_wrr_no_command_commit(
+qos_schedule_profile_dwrr_no_command_commit(
         const char *profile_name,
         int64_t queue_num)
 {
@@ -1093,7 +1093,7 @@ qos_schedule_profile_wrr_no_command_commit(
         return CMD_OVSDB_FAILURE;
     }
 
-    bool success = qos_schedule_profile_wrr_no_command(txn, profile_name,
+    bool success = qos_schedule_profile_dwrr_no_command(txn, profile_name,
             queue_num);
     if (!success) {
         cli_do_config_abort(txn);
@@ -1111,21 +1111,21 @@ qos_schedule_profile_wrr_no_command_commit(
 }
 
 /**
- * Executes and commits the qos_schedule_profile_wrr_no_command for
+ * Executes and commits the qos_schedule_profile_dwrr_no_command for
  * the given profile_name and queue_num.
  */
-DEFUN(qos_schedule_profile_wrr_no,
-        qos_schedule_profile_wrr_no_cmd,
-       "no wrr queue <0-7> {weight <1-127>}",
+DEFUN(qos_schedule_profile_dwrr_no,
+        qos_schedule_profile_dwrr_no_cmd,
+       "no dwrr queue <0-7> {weight <1-127>}",
        NO_STR
-       "Clears the algorithm for a queue, if the algorithm is 'wrr'\n"
+       "Clears the algorithm for a queue, if the algorithm is 'dwrr'\n"
        "The number of the queue\n"
        "The number of the queue\n"
        "The weight to configure\n"
        "The weight to configure\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no wrr queue", sizeof(aubuf));
+    strncpy(aubuf, "op=CLI: no dwrr queue", sizeof(aubuf));
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
@@ -1149,7 +1149,7 @@ DEFUN(qos_schedule_profile_wrr_no,
     }
     int64_t queue_num_int = atoi(queue_num);
 
-    int result = qos_schedule_profile_wrr_no_command_commit(profile_name,
+    int result = qos_schedule_profile_dwrr_no_command_commit(profile_name,
             queue_num_int);
 
     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
@@ -1419,9 +1419,9 @@ qos_schedule_profile_vty_init(void)
             &qos_schedule_profile_strict_no_cmd);
 
     install_element(QOS_SCHEDULE_PROFILE_NODE,
-            &qos_schedule_profile_wrr_cmd);
+            &qos_schedule_profile_dwrr_cmd);
     install_element(QOS_SCHEDULE_PROFILE_NODE,
-            &qos_schedule_profile_wrr_no_cmd);
+            &qos_schedule_profile_dwrr_no_cmd);
 }
 
 /**
