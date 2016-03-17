@@ -185,10 +185,11 @@ qos_get_schedule_profile_settings(const struct ovsrec_qos *ovsrec_qos,
             /* set each profile entry to the same 'strict' entry. */
             sp_entry = calloc(1, sizeof(struct schedule_profile_entry));
             sp_entry->queue = (unsigned)ovsrec_qos->key_queues[q_index];
+            settings->entries[q_index] = sp_entry;
+
             sp_entry->algorithm = ALGORITHM_STRICT;
             sp_entry->weight = 0;
             sp_entry->other_config = NULL;
-            settings->entries[q_index] = sp_entry;
         }
     }
     else {
@@ -200,6 +201,7 @@ qos_get_schedule_profile_settings(const struct ovsrec_qos *ovsrec_qos,
 
             /* each queue gets a separate entry in settings parameter */
             sp_entry = calloc(1, sizeof(struct schedule_profile_entry));
+            sp_entry->queue = (unsigned)ovsrec_qos->key_queues[q_index];
             settings->entries[q_index] = sp_entry;
 
             /* point at a ovsrec_queue in the qos table */
