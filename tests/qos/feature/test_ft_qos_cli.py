@@ -323,7 +323,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('qos dscp 1')
         out = self.s1.cmdCLI('do show running-config')
-        assert 'override' in out
+        assert 'qos dscp 1' in out
 
     def test_qosDscpPortShowRunningConfigInterface(self):
         self.setUp_qosDscpPort()
@@ -331,7 +331,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('qos dscp 1')
         out = self.s1.cmdCLI('do show running-config interface 1')
-        assert 'override' in out
+        assert 'qos dscp 1' in out
 
     def test_qosDscpPortShowInterface(self):
         self.setUp_qosDscpPort()

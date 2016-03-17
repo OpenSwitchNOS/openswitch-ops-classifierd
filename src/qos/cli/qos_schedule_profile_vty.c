@@ -1387,6 +1387,9 @@ qos_schedule_profile_show_running_config(void)
             /* End with a new line. */
             vty_out(vty, "%s", VTY_NEWLINE);
         }
+
+        /* Exit the profile context. */
+        vty_out(vty, "    exit%s", VTY_NEWLINE);
     }
 }
 

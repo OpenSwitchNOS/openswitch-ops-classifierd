@@ -1508,6 +1508,9 @@ qos_queue_profile_show_running_config(void)
                         VTY_NEWLINE);
             }
         }
+
+        /* Exit the profile context. */
+        vty_out(vty, "    exit%s", VTY_NEWLINE);
     }
 }
 
