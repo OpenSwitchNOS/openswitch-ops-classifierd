@@ -18,6 +18,8 @@
 #ifndef _QOS_TRUST_PORT_VTY_H_
 #define _QOS_TRUST_PORT_VTY_H_
 
+#include "vswitch-idl.h"
+
 /**
  * Initializes vty functions for port qos trust.
  */
@@ -27,5 +29,10 @@ void qos_trust_port_vty_init(void);
  * Initializes ovsdb functions for port qos trust.
  */
 void qos_trust_port_ovsdb_init(void);
+
+/**
+ * Returns the port qos trust value for the given port row.
+ */
+const char *qos_trust_port_get_value(const struct ovsrec_port *port_row);
 
 #endif /* _QOS_TRUST_PORT_VTY_H_ */

@@ -125,50 +125,25 @@ DEFUN(qos_cos_map,
         "Configure QoS COS Map name\n"
         "The QoS COS Map name\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: qos cos-map", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos cos-map";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *code_point = argv[0];
-    if (code_point != NULL) {
-        char *cfg = audit_encode_nv_string("code_point", code_point, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "code_point", code_point);
     int64_t code_point_int = atoi(code_point);
 
     const char *local_priority = argv[1];
-    if (local_priority != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "local_priority", local_priority, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "local_priority", local_priority);
     int64_t local_priority_int = atoi(local_priority);
 
     const char *color = argv[2];
-    if (color != NULL) {
-        char *cfg = audit_encode_nv_string("color", color, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "color", color);
 
     const char *description = argv[3];
-    if (description != NULL) {
-        char *cfg = audit_encode_nv_string("description", description, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "description", description);
 
     int result = qos_cos_map_command(
             code_point_int, local_priority_int, color, description);
@@ -228,20 +203,14 @@ DEFUN(qos_cos_map_no,
         "Configure QoS COS Map name\n"
         "The QoS COS Map name\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no qos cos-map", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos cos-map";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *code_point = argv[0];
-    if (code_point != NULL) {
-        char *cfg = audit_encode_nv_string("code_point", code_point, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "code_point", code_point);
     int64_t code_point_int = atoi(code_point);
 
     int result = qos_cos_map_no_command(code_point_int);

@@ -19,6 +19,7 @@
 #define _QOS_UTILS_VTY_H_
 
 #include <stdbool.h>
+#include <stdlib.h>
 
 #define QOS_INVALID_STRING_ERROR_MESSAGE \
 "This field can have a length up to 64 characters.\n\
@@ -39,5 +40,11 @@ struct ovsrec_port *port_row_for_name(const char *port_name);
  * Returns true if the given port_name is a member of a lag.
  */
 bool is_member_of_lag(const char *port_name);
+
+/**
+ * Encodes the given arg_name and arg_value into the given aubuf and ausize.
+ */
+void qos_audit_encode(char *aubuf, size_t ausize, const char *arg_name,
+        const char *arg_value);
 
 #endif /* _QOS_UTILS_VTY_H_ */

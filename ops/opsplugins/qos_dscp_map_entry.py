@@ -36,6 +36,10 @@ class QosDscpMapEntryValidator(BaseValidator):
         self.validate_dscp_map_description_contains_valid_chars(
             qos_dscp_map_entry_row)
 
+        # Cos (priority_code_point) is not supported for dill.
+        self.validate_priority_code_point_is_empty(
+            qos_dscp_map_entry_row)
+
     #
     # Validates that the given deletion of a given row is allowed.
     #
@@ -53,3 +57,15 @@ class QosDscpMapEntryValidator(BaseValidator):
 
         description = qos_dscp_map_entry_row.description[0]
         qos_utils.validate_string_contains_valid_chars(description)
+
+    #
+    # Validates that the priority_code_point field is empty, since it is
+    # not supported for dill.
+    #
+    def validate_priority_code_point_is_empty(
+            self, qos_dscp_map_entry_row):
+        # Cos (priority_code_point) is not supported for dill.
+        if qos_dscp_map_entry_row.priority_code_point is not None:
+            details = "The priority_code_point field " + \
+                "is not currently supported."
+            raise ValidationError(error.VERIFICATION_FAILED, details)

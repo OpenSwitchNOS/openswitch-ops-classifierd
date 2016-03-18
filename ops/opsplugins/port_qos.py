@@ -41,9 +41,9 @@ class PortQosValidator(BaseValidator):
             system_row = i
 
         self.validate_port_override_has_port_trust_mode_none(
-            port_row, qos_utils.QOS_COS_OVERRIDE_KEY, "COS")
+            port_row, system_row, qos_utils.QOS_COS_OVERRIDE_KEY, "COS")
         self.validate_port_override_has_port_trust_mode_none(
-            port_row, qos_utils.QOS_DSCP_OVERRIDE_KEY, "DSCP")
+            port_row, system_row, qos_utils.QOS_DSCP_OVERRIDE_KEY, "DSCP")
         self.validate_apply_port_queue_profile_is_null(port_row)
         self.validate_apply_port_s_p_has_all_same_algorithm_on_all_queues(
             port_row)
@@ -57,11 +57,33 @@ class PortQosValidator(BaseValidator):
         pass
 
     #
+    # Returns the port qos trust value for the given port row.
+    #
+    def qos_trust_port_get_value(self, port_row, system_row):
+        qos_trust_name = qos_utils.QOS_TRUST_NONE_STRING
+
+        if system_row is not None:
+            qos_config = utils.get_column_data_from_row(system_row,
+                                                        "qos_config")
+            system_value = qos_config.get(qos_utils.QOS_TRUST_KEY, None)
+            if system_value is not None:
+                qos_trust_name = system_value
+
+        if port_row is not None:
+            qos_config = utils.get_column_data_from_row(port_row,
+                                                        "qos_config")
+            port_value = qos_config.get(qos_utils.QOS_TRUST_KEY, None)
+            if port_value is not None:
+                qos_trust_name = port_value
+
+        return qos_trust_name
+
+    #
     # Validates that port overrides are only allowed when the port trust
     # mode is 'none'.
     #
     def validate_port_override_has_port_trust_mode_none(
-            self, port_row, qos_config_key, display_string):
+            self, port_row, system_row, qos_config_key, display_string):
         qos_config = utils.get_column_data_from_row(port_row, "qos_config")
 
         qos_override = qos_config.get(qos_config_key, None)
@@ -74,11 +96,11 @@ class PortQosValidator(BaseValidator):
                 " override is not currently supported."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
-        qos_trust_value = qos_config.get(qos_utils.QOS_TRUST_KEY, None)
+        qos_trust_value = self.qos_trust_port_get_value(port_row, system_row)
         if qos_trust_value is None or \
                 qos_trust_value != qos_utils.QOS_TRUST_NONE_STRING:
             details = "QoS " + display_string + \
-                " override is only allowed if the port trust mode is 'none'."
+                " override is only allowed if the trust mode is 'none'."
             raise ValidationError(error.VERIFICATION_FAILED, details)
 
     #

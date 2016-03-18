@@ -360,20 +360,14 @@ DEFUN(qos_queue_profile,
        "Set the QoS Queue Profile configuration\n"
        "The name of the Queue Profile\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: qos queue-profile", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos queue-profile";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     int result = qos_queue_profile_command_commit(profile_name);
 
@@ -527,20 +521,14 @@ DEFUN(qos_queue_profile_no,
         "Deletes a Queue Profile, if it is not currently applied\n"
         "The name of the Queue Profile to delete\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no qos queue-profile", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos queue-profile";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     int result = qos_queue_profile_no_command_commit(profile_name);
 
@@ -656,39 +644,21 @@ DEFUN(qos_queue_profile_name,
        "The number of the queue\n"
        "The name of the queue\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: name queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: name queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    if (queue_num != NULL) {
-        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *queue_name = argv[1];
-    if (queue_name != NULL) {
-        char *cfg = audit_encode_nv_string("queue_name", queue_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_name", queue_name);
 
     int result = qos_queue_profile_name_command_commit(
             profile_name, queue_num_int, queue_name);
@@ -845,29 +815,17 @@ DEFUN(qos_queue_profile_name_no,
         "The number of the queue\n"
         "The name of the queue\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no name queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no name queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    if (queue_num != NULL) {
-        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     int result = qos_queue_profile_name_no_command_commit(
@@ -1013,40 +971,21 @@ DEFUN(qos_queue_profile_map,
        "The local-priority to configure\n"
        "The local-priority to configure\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: map queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: map queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    if (queue_num != NULL) {
-        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *local_priority = argv[1];
-    if (local_priority != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "local_priority", local_priority, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "local_priority", local_priority);
     const char * local_priorities = local_priority;
 
     int result = qos_queue_profile_map_command_commit(
@@ -1210,40 +1149,21 @@ DEFUN(qos_queue_profile_map_no,
        "The local-priority to delete\n"
        "The local-priority to delete\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no map queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no map queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    if (queue_num != NULL) {
-        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *local_priority = argv[1];
-    if (local_priority != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "local_priority", local_priority, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "local_priority", local_priority);
     const char * local_priorities = local_priority;
 
     int result = qos_queue_profile_map_no_command_commit(

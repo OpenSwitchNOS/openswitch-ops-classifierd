@@ -79,8 +79,7 @@ qos_dscp_map_entry_data = {
         "code_point": 1,
         "color": "green",
         "description": "d1",
-        "local_priority": 2,
-        "priority_code_point": 3
+        "local_priority": 2
     }
 }
 
@@ -303,7 +302,7 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.OK
         assert response_data is ''
 
-    def test_port_qos_put_validate_port_cos_has_port_trust_mode_none(self):
+    def test_port_qos_put_validate_port_cos_has_trust_mode_none(self):
         data = deepcopy(port_data)
         data["configuration"]["qos_config"]["cos_override"] = "1"
 
@@ -314,9 +313,60 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'QoS COS override is not currently supported.' in response_data
 
-    def test_port_qos_put_validate_port_dscp_has_port_trust_mode_none(self):
+    def test_port_qos_put_port_dscp_with_sys_trust_none_port_trust_dscp(self):
+        self.s1.cmdCLI('qos trust none')
+
         data = deepcopy(port_data)
-        data["configuration"]["qos_config"]["qos_trust"] = "dscp"
+        data["configuration"]["qos_config"] = {
+            "qos_trust": "dscp",
+            "dscp_override": "1"
+        }
+
+        response_status, response_data = execute_request(
+            port_url, "PUT",
+            json.dumps(data), self.switch_ip)
+
+        assert response_status == httplib.BAD_REQUEST
+        assert 'QoS DSCP override is only allowed if' in response_data
+
+    def test_port_qos_put_port_dscp_with_sys_trust_none_port_trust_null(self):
+        self.s1.cmdCLI('qos trust none')
+
+        data = deepcopy(port_data)
+        data["configuration"]["qos_config"] = {
+            "dscp_override": "1"
+        }
+
+        response_status, response_data = execute_request(
+            port_url, "PUT",
+            json.dumps(data), self.switch_ip)
+
+        assert response_status == httplib.OK
+        assert response_data is ''
+
+    def test_port_qos_put_port_dscp_with_sys_trust_dscp_port_trust_none(self):
+        self.s1.cmdCLI('qos trust dscp')
+
+        data = deepcopy(port_data)
+        data["configuration"]["qos_config"] = {
+            "qos_trust": "none",
+            "dscp_override": "1"
+        }
+
+        response_status, response_data = execute_request(
+            port_url, "PUT",
+            json.dumps(data), self.switch_ip)
+
+        assert response_status == httplib.OK
+        assert response_data is ''
+
+    def test_port_qos_put_port_dscp_with_sys_trust_dscp_port_trust_null(self):
+        self.s1.cmdCLI('qos trust dscp')
+
+        data = deepcopy(port_data)
+        data["configuration"]["qos_config"] = {
+            "dscp_override": "1"
+        }
 
         response_status, response_data = execute_request(
             port_url, "PUT",
@@ -805,6 +855,19 @@ class Test_qos_rest_custom_validators:
         assert response_status == httplib.BAD_REQUEST
         assert 'The allowed characters are' in response_data
 
+    def test_qos_dscp_map_entry_patch_validate_pcp_is_empty(self):
+        # Once custom validators support PATCH (taiga 661), enable this test.
+        return
+        data = [{"op": "add", "path": "/priority_code_point",
+                 "value": "1"}]
+
+        response_status, response_data = execute_request(
+            qos_dscp_map_entry_url, "PATCH",
+            json.dumps(data), self.switch_ip)
+
+        assert response_status == httplib.BAD_REQUEST
+        assert 'not supported.' in response_data
+
     def test_qos_dscp_map_entry_put(self):
         data = deepcopy(qos_dscp_map_entry_data)
 
@@ -826,6 +889,17 @@ class Test_qos_rest_custom_validators:
 
         assert response_status == httplib.BAD_REQUEST
         assert 'The allowed characters are' in response_data
+
+    def test_qos_dscp_map_entry_put_validate_pcp_is_empty(self):
+        data = deepcopy(qos_dscp_map_entry_data)
+        data["configuration"]["priority_code_point"] = "1"
+
+        response_status, response_data = execute_request(
+            qos_dscp_map_entry_url, "PUT",
+            json.dumps(data), self.switch_ip)
+
+        assert response_status == httplib.BAD_REQUEST
+        assert 'not supported.' in response_data
 
     def test_qos_dscp_map_entry_delete(self):
         response_status, response_data = execute_request(

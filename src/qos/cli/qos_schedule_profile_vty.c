@@ -368,20 +368,14 @@ DEFUN(qos_schedule_profile,
        "Set the QoS Schedule Profile configuration\n"
        "The name of the Schedule Profile\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: qos schedule-profile", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos schedule-profile";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     int result = qos_schedule_profile_command_commit(profile_name);
 
@@ -531,20 +525,14 @@ DEFUN(qos_schedule_profile_no,
         "Deletes a Schedule Profile, if it is not currently applied\n"
         "The name of the Schedule Profile to delete\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no qos schedule-profile", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos schedule-profile";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     int result = qos_schedule_profile_no_command_commit(profile_name);
 
@@ -650,29 +638,17 @@ DEFUN(qos_schedule_profile_strict,
        "The number of the queue\n"
        "The number of the queue\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: strict queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: strict queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    if (queue_num != NULL) {
-        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     int result = qos_schedule_profile_strict_command_commit(
@@ -836,29 +812,17 @@ DEFUN(qos_schedule_profile_strict_no,
         "The number of the queue\n"
         "The number of the queue\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no strict queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no strict queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
      const char *profile_name = (char*) vty->index;
-     if (profile_name != NULL) {
-         char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-         if (cfg != NULL) {
-             strncat(aubuf, cfg, sizeof(aubuf));
-             free(cfg);
-         }
-     }
+     qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
      const char *queue_num = argv[0];
-     if (queue_num != NULL) {
-         char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-         if (cfg != NULL) {
-             strncat(aubuf, cfg, sizeof(aubuf));
-             free(cfg);
-         }
-     }
+     qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
      int64_t queue_num_int = atoi(queue_num);
 
      int result = qos_schedule_profile_strict_no_command_commit(
@@ -969,39 +933,21 @@ DEFUN(qos_schedule_profile_dwrr,
        "The weight to configure\n"
        "The weight to configure\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: dwrr queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: dwrr queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    if (queue_num != NULL) {
-        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *weight = argv[1];
-    if (weight != NULL) {
-        char *cfg = audit_encode_nv_string("weight", weight, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "weight", weight);
     int64_t weight_int = atoi(weight);
 
     int result = qos_schedule_profile_dwrr_command_commit(
@@ -1124,29 +1070,17 @@ DEFUN(qos_schedule_profile_dwrr_no,
        "The weight to configure\n"
        "The weight to configure\n")
 {
-    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no dwrr queue", sizeof(aubuf));
+    char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no dwrr queue";
+    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    if (profile_name != NULL) {
-        char *cfg = audit_encode_nv_string("profile_name", profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    if (queue_num != NULL) {
-        char *cfg = audit_encode_nv_string("queue_num", queue_num, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     int result = qos_schedule_profile_dwrr_no_command_commit(profile_name,
