@@ -111,7 +111,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('end')
         self.s1.cmdCLI('configure terminal')
 
-        self.s1.cmdCLI('no qos cos')
+        self.s1.cmdCLI('no qos trust')
 
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('no lag 10')
@@ -135,7 +135,7 @@ class Test_qos_cli():
         self.s1.cmdCLI('end')
         self.s1.cmdCLI('configure terminal')
 
-        self.s1.cmdCLI('no qos dscp')
+        self.s1.cmdCLI('no qos trust')
 
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('no lag 10')
@@ -651,20 +651,45 @@ class Test_qos_cli():
         out = self.s1.cmdCLI('do show running-config interface 1')
         assert 'override 1' in out
 
-    def test_qosCosPortCommandWithTrustEmpty(self):
+    def test_qosCosPortCommandWithSystemTrustNoneAndPortTrustCos(self):
         # This command is not supported in dill.
         return
-        self.setup_qosCosPort()
+        self.setUp_qosCosPort()
+        self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('qos trust cos')
         out = self.s1.cmdCLI('qos cos 1')
         assert 'only allowed' in out
 
-    def test_qosCosPortCommandWithTrustCos(self):
+    def test_qosCosPortCommandWithSystemTrustNoneAndPortTrustMissing(self):
         # This command is not supported in dill.
         return
-        self.setup_qosCosPort()
+        self.setUp_qosCosPort()
+        self.s1.cmdCLI('qos trust none')
+        self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('no qos trust')
+        out = self.s1.cmdCLI('qos cos 1')
+        out = self.s1.cmdCLI('do show interface 1')
+        assert 'override 1' in out
+
+    def test_qosCosPortCommandWithSystemTrustCosAndPortTrustNone(self):
+        # This command is not supported in dill.
+        return
+        self.setUp_qosCosPort()
+        self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust cos')
+        out = self.s1.cmdCLI('qos cos 1')
+        out = self.s1.cmdCLI('do show interface 1')
+        assert 'override 1' in out
+
+    def test_qosCosPortCommandWithSystemTrustCosAndPortTrustMissing(self):
+        # This command is not supported in dill.
+        return
+        self.setUp_qosCosPort()
+        self.s1.cmdCLI('qos trust none')
+        self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('no qos trust')
         out = self.s1.cmdCLI('qos cos 1')
         assert 'only allowed' in out
 
@@ -835,16 +860,37 @@ class Test_qos_cli():
         out = self.s1.cmdCLI('do show interface 1')
         assert 'override 1' in out
 
-    def test_qosDscpPortCommandWithTrustEmpty(self):
+    def test_qosDscpPortCommandWithSystemTrustNoneAndPortTrustDscp(self):
         self.setUp_qosDscpPort()
+        self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('qos trust dscp')
         out = self.s1.cmdCLI('qos dscp 1')
         assert 'only allowed' in out
 
-    def test_qosDscpPortCommandWithTrustDscp(self):
+    def test_qosDscpPortCommandWithSystemTrustNoneAndPortTrustMissing(self):
         self.setUp_qosDscpPort()
+        self.s1.cmdCLI('qos trust none')
+        self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('no qos trust')
+        out = self.s1.cmdCLI('qos dscp 1')
+        out = self.s1.cmdCLI('do show interface 1')
+        assert 'override 1' in out
+
+    def test_qosDscpPortCommandWithSystemTrustDscpAndPortTrustNone(self):
+        self.setUp_qosDscpPort()
+        self.s1.cmdCLI('qos trust none')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust dscp')
+        out = self.s1.cmdCLI('qos dscp 1')
+        out = self.s1.cmdCLI('do show interface 1')
+        assert 'override 1' in out
+
+    def test_qosDscpPortCommandWithSystemTrustDscpAndPortTrustMissing(self):
+        self.setUp_qosDscpPort()
+        self.s1.cmdCLI('qos trust none')
+        self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('no qos trust')
         out = self.s1.cmdCLI('qos dscp 1')
         assert 'only allowed' in out
 

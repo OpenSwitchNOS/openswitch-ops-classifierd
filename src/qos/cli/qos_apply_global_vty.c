@@ -230,30 +230,18 @@ DEFUN(qos_apply_global,
         "The schedule-profile to apply\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: apply qos", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: apply qos", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *queue_profile_name = argv[0];
-    if (queue_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "queue_profile_name", queue_profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_profile_name", queue_profile_name);
 
     const char *schedule_profile_name = argv[1];
-    if (schedule_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "schedule_profile_name", schedule_profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize,
+            "schedule_profile_name", schedule_profile_name);
 
     int result = qos_apply_global_command(
             queue_profile_name, schedule_profile_name);
@@ -280,30 +268,18 @@ DEFUN(qos_apply_global_strict,
  queues configured to use the strict algorithm\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: appy qos", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: appy qos", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *queue_profile_name = argv[0];
-    if (queue_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "queue_profile_name", queue_profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "queue_profile_name", queue_profile_name);
 
     const char *schedule_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
-    if (schedule_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "schedule_profile_name", schedule_profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize,
+            "schedule_profile_name", schedule_profile_name);
 
     int result = qos_apply_global_command(
             queue_profile_name, schedule_profile_name);

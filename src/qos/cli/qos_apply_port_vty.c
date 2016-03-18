@@ -160,29 +160,18 @@ DEFUN(qos_apply_port,
         "The schedule-profile to apply\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: apply qos", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: apply qos", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    if (port_name != NULL) {
-        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "port_name", port_name);
 
     const char *schedule_profile_name = argv[0];
-    if (schedule_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "schedule_profile_name", schedule_profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize,
+            "schedule_profile_name", schedule_profile_name);
 
     int result = qos_apply_port_command(port_name, schedule_profile_name);
 
@@ -207,29 +196,18 @@ DEFUN
  configured to use the strict algorithm\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: apply qos", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: apply qos", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    if (port_name != NULL) {
-        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "port_name", port_name);
 
     const char *schedule_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
-    if (schedule_profile_name != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "schedule_profile_name", schedule_profile_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize,
+            "schedule_profile_name", schedule_profile_name);
 
     int result = qos_apply_port_command(port_name, schedule_profile_name);
 
@@ -300,19 +278,14 @@ DEFUN(qos_apply_port_no,
         "The name of the schedule profile\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no apply qos", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: no apply qos", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    if (port_name != NULL) {
-        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "port_name", port_name);
 
     int result = qos_apply_port_no_command(port_name);
 

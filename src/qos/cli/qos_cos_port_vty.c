@@ -25,6 +25,7 @@
 #include "openswitch-idl.h"
 #include "openvswitch/vlog.h"
 #include "ovsdb-idl.h"
+#include "qos_trust_port_vty.h"
 #include "qos_utils.h"
 #include "qos_utils_vty.h"
 #include "smap.h"
@@ -77,12 +78,11 @@ qos_cos_port_command(const char *port_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    const char *qos_trust_name = smap_get(&port_row->qos_config,
-            QOS_TRUST_KEY);
+    const char *qos_trust_name = qos_trust_port_get_value(port_row);
     if (qos_trust_name == NULL || strncmp(qos_trust_name,
             QOS_TRUST_NONE_STRING, QOS_CLI_STRING_BUFFER_SIZE) != 0) {
         vty_out(vty, "QoS COS override is only allowed\
- if the port trust mode is 'none'.%s",
+ if the trust mode is 'none'.%s",
                 VTY_NEWLINE);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
@@ -115,29 +115,17 @@ DEFUN(qos_cos_port,
         "The index into the COS Map\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: qos cos", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: qos cos", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    if (port_name != NULL) {
-        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "port_name", port_name);
 
     const char *cos_map_index = argv[0];
-    if (cos_map_index != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "cos_map_index", cos_map_index, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "cos_map_index", cos_map_index);
 
     int result = qos_cos_port_command(port_name, cos_map_index);
 
@@ -208,19 +196,14 @@ DEFUN(qos_cos_port_no,
         "The index into the COS Map\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no qos cos", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: no qos cos", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    if (port_name != NULL) {
-        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "port_name", port_name);
 
     int result = qos_cos_port_no_command(port_name);
 

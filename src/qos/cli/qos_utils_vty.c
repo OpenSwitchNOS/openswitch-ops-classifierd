@@ -111,3 +111,19 @@ is_member_of_lag(const char *port_name)
 
     return false;
 }
+
+/**
+ * Encodes the given arg_name and arg_value into the given aubuf and ausize.
+ */
+void
+qos_audit_encode(char *aubuf, size_t ausize, const char *arg_name,
+        const char *arg_value)
+{
+    if (arg_value != NULL) {
+        char *cfg = audit_encode_nv_string(arg_name, arg_value, 0);
+        if (cfg != NULL) {
+            strncat(aubuf, cfg, ausize);
+            free(cfg);
+        }
+    }
+}

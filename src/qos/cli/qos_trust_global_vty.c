@@ -94,20 +94,14 @@ all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: qos trust", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: qos trust", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *qos_trust_name = argv[0];
-    if (qos_trust_name != NULL) {
-        char *cfg = audit_encode_nv_string(
-                "qos_trust_name", qos_trust_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "qos_trust_name", qos_trust_name);
 
     int result = qos_trust_global_command(qos_trust_name);
 
@@ -143,7 +137,8 @@ remark all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no qos trust", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: no qos trust", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();

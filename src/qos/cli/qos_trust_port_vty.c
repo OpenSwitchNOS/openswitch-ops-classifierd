@@ -38,6 +38,30 @@
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_trust_port_cli);
 extern struct ovsdb_idl *idl;
 
+const char *
+qos_trust_port_get_value(const struct ovsrec_port *port_row)
+{
+    const char *qos_trust_name = QOS_TRUST_NONE_STRING;
+
+    const struct ovsrec_system *system_row = ovsrec_system_first(idl);
+    if (system_row != NULL) {
+        const char *system_value = smap_get(
+                &system_row->qos_config, QOS_TRUST_KEY);
+        if (system_value != NULL) {
+            qos_trust_name = system_value;
+        }
+    }
+
+    if (port_row != NULL) {
+        const char *port_value = smap_get(&port_row->qos_config, QOS_TRUST_KEY);
+        if (port_value != NULL) {
+            qos_trust_name = port_value;
+        }
+    }
+
+    return qos_trust_name;
+}
+
 /**
  * Executes the trust_port_command for the given port_name and
  * qos_trust_name.
@@ -109,29 +133,17 @@ remark all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: qos trust", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: qos trust", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    if (port_name != NULL) {
-        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "port_name", port_name);
 
     const char *qos_trust_name = argv[0];
-    if (qos_trust_name != NULL) {
-        char *cfg = audit_encode_nv_string("qos_trust_name",
-                qos_trust_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "qos_trust_name", qos_trust_name);
 
     int result = qos_trust_port_command(port_name, qos_trust_name);
 
@@ -205,19 +217,14 @@ remark all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE];
-    strncpy(aubuf, "op=CLI: no qos trust", sizeof(aubuf));
+    size_t ausize = sizeof(aubuf);
+    strncpy(aubuf, "op=CLI: no qos trust", ausize);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    if (port_name != NULL) {
-        char *cfg = audit_encode_nv_string("port_name", port_name, 0);
-        if (cfg != NULL) {
-            strncat(aubuf, cfg, sizeof(aubuf));
-            free(cfg);
-        }
-    }
+    qos_audit_encode(aubuf, ausize, "port_name", port_name);
 
     int result = qos_trust_port_no_command(port_name);
 
@@ -241,14 +248,7 @@ qos_trust_port_show(const struct ovsrec_port *port_row)
         return;
     }
 
-    const struct ovsrec_system *system_row = ovsrec_system_first(idl);
-    const char *qos_trust_name = smap_get(
-            &system_row->qos_config, QOS_TRUST_KEY);
-
-    const char *map_value = smap_get(&port_row->qos_config, QOS_TRUST_KEY);
-    if (map_value != NULL) {
-        qos_trust_name = map_value;
-    }
+    const char *qos_trust_name = qos_trust_port_get_value(port_row);
 
     vty_out(vty, " qos trust %s%s", qos_trust_name, VTY_NEWLINE);
 }
