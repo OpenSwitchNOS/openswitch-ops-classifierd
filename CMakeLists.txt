@@ -33,7 +33,7 @@ include_directories (${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/${INCL_DIR}
 )
 
 # Sources to build ops-classifierd
-set (SOURCES ${SRC_DIR}/ops-classifierd.c)
+set (SOURCES ${SRC_DIR}/ops-classifierd.c ${SRC_DIR}/classifierd_ovsdb_if.c ${SRC_DIR}/classifierd_utils.c)
 
 # Rules to build ops-classifierd
 add_executable (${CLASSIFIERD} ${SOURCES})

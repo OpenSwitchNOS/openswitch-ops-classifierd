@@ -46,7 +46,7 @@ VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
 
 struct db_ace {
     uint32_t sequence_number;
-    const char *json;
+    struct ovsrec_acl_entry *acl_entry;
 };
 
 static int
@@ -67,7 +67,7 @@ sort_swap_aces(size_t a, size_t b, void *ptrs_)
     ptrs[a] = ptrs[b];
     ptrs[b] = tmp;
 }
-
+#if 0
 static bool
 populate_entry_from_json_string(struct ops_cls_list_entry *entry,
                                 const char *json_str)
@@ -170,6 +170,105 @@ populate_entry_from_json_string(struct ops_cls_list_entry *entry,
     json_destroy(jsonace);
     return valid;
 }
+#endif
+
+static bool
+populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
+                                const struct ovsrec_acl_entry *acl_entry)
+{
+    bool valid = true;
+
+    /* TODO: support more than ipv4 */
+    if (!acl_parse_ipv4_address
+        (acl_entry->src_ip,
+         OPS_CLS_SRC_IPADDR_VALID,
+         &entry->entry_fields.entry_flags,
+         &entry->entry_fields.src_ip_address.v4,
+         &entry->entry_fields.src_ip_address_mask.v4,
+         &entry->entry_fields.src_addr_family)) {
+        VLOG_ERR("invalid source ip addr %s", acl_entry->src_ip);
+        valid = false;
+    }
+	if (!acl_parse_ipv4_address
+		(acl_entry->dst_ip,
+		 OPS_CLS_DEST_IPADDR_VALID,
+		 &entry->entry_fields.entry_flags,
+		 &entry->entry_fields.dst_ip_address.v4,
+		 &entry->entry_fields.dst_ip_address_mask.v4,
+		 &entry->entry_fields.dst_addr_family)) {
+		VLOG_ERR("invalid destination ip addr %s", acl_entry->dst_ip);
+		valid = false;
+	}
+
+	if (acl_entry->n_protocol == 0)
+	{
+		VLOG_INFO("populate_entry_from_acl_entry: Protocol not specified");
+	}
+    else
+    {
+	/* SB: @todo verify if business logic has validated protocol value */
+	entry->entry_fields.protocol = acl_entry->protocol[0];
+	entry->entry_fields.entry_flags |= OPS_CLS_PROTOCOL_VALID;
+    }
+
+	if (!acl_parse_actions(acl_entry->action,
+						   &entry->entry_actions)) {
+		VLOG_ERR("invalid action %s", acl_entry->action);
+		valid = false;
+	}
+
+	if(acl_entry->n_src_l4_port_min
+			&& acl_entry->src_l4_port_min)
+	{
+		entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_EQ;
+		entry->entry_fields.entry_flags |= OPS_CLS_L4_SRC_PORT_VALID;
+		entry->entry_fields.L4_src_port_min = acl_entry->src_l4_port_min[0];
+	}
+
+	if(acl_entry->n_src_l4_port_max
+			&& acl_entry->src_l4_port_max)
+	{
+		/* assumes port min was specified, so changes operator to range */
+		entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_RANGE;
+		entry->entry_fields.entry_flags |= OPS_CLS_L4_SRC_PORT_VALID;
+		entry->entry_fields.L4_src_port_max = acl_entry->src_l4_port_max[0];
+	}
+
+	if(acl_entry->n_src_l4_port_range_reverse
+			&& acl_entry->src_l4_port_range_reverse)
+	{
+		/* it assumes that CLI has validated port min and max are the same */
+		entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_NEQ;
+	}
+
+
+	if(acl_entry->n_dst_l4_port_min
+			&& acl_entry->dst_l4_port_min)
+	{
+		entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_EQ;
+		entry->entry_fields.entry_flags |= OPS_CLS_L4_DEST_PORT_VALID;
+		entry->entry_fields.L4_dst_port_min = acl_entry->dst_l4_port_min[0];
+	}
+
+	if(acl_entry->n_dst_l4_port_max
+			&& acl_entry->dst_l4_port_max)
+	{
+		/* assumes port min was specified, so changes operator to range */
+		entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_RANGE;
+		entry->entry_fields.entry_flags |= OPS_CLS_L4_DEST_PORT_VALID;
+		entry->entry_fields.L4_dst_port_max = acl_entry->dst_l4_port_max[0];
+	}
+
+	if(acl_entry->n_dst_l4_port_range_reverse
+			&& acl_entry->dst_l4_port_range_reverse)
+	{
+		/* it assumes that CLI has validated port min and max are the same */
+		entry->entry_fields.L4_dst_port_op = OPS_CLS_L4_PORT_OP_NEQ;
+	}
+
+
+    return valid;
+}
 
 static struct ops_cls_list*
 ops_cls_list_new_from_acl(struct acl *acl)
@@ -183,22 +282,21 @@ ops_cls_list_new_from_acl(struct acl *acl)
     list->list_type = acl->type;
 
     /* make a sorted copy of the ace strings from OVSDB */
-    size_t n_aces = smap_count(&acl_row->want);
+    size_t n_aces = acl_row->n_cfg_aces;
     size_t n_sorted_aces = 0;
     struct db_ace *sorted_aces = NULL;
     if (n_aces > 0) {
         sorted_aces = xmalloc(n_aces * sizeof sorted_aces[0]);
-        struct smap_node *node;
-        SMAP_FOR_EACH (node, &acl_row->want) {
+
+        while (n_sorted_aces < n_aces) {
             /* TODO: Deal with comment ACE's
              *
              if (node->value.is_comment) {
                 continue;
              }
             */
-            sorted_aces[n_sorted_aces].sequence_number =
-                strtoul(node->key, NULL, 0);
-            sorted_aces[n_sorted_aces].json = node->value;
+            sorted_aces[n_sorted_aces].sequence_number = acl_row->key_cfg_aces[n_sorted_aces];
+            sorted_aces[n_sorted_aces].acl_entry = acl_row->value_cfg_aces[n_sorted_aces];
             ++n_sorted_aces;
         }
         if (n_sorted_aces > 0) {
@@ -214,7 +312,7 @@ ops_cls_list_new_from_acl(struct acl *acl)
         const struct db_ace *dbace = &sorted_aces[i];
         struct ops_cls_list_entry *entry = &list->entries[i];
 
-        if (!populate_entry_from_json_string(entry, dbace->json)) {
+        if (!populate_entry_from_acl_entry(entry, dbace->acl_entry)) {
             /* VLOG_ERR already emitted */
             valid = false;
         }
@@ -274,7 +372,7 @@ acl_new(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
 {
     struct acl *acl = xzalloc(sizeof *acl);
     acl->uuid = ovsdb_row->header_.uuid;
-    acl->name = xstrdup(ovsdb_row->list_name); /* we can outlive ovsdb row */
+    acl->name = xstrdup(ovsdb_row->name); /* we can outlive ovsdb row */
     acl->type = acl_type_from_string(ovsdb_row->list_type);
 
     acl->ovsdb_row = ovsdb_row;
@@ -352,7 +450,7 @@ acl_update_internal(struct acl* acl)
 static struct acl*
 acl_cfg_create(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
 {
-    VLOG_DBG("ACL %s created", ovsdb_row->list_name);
+    VLOG_DBG("ACL %s created", ovsdb_row->name);
 
     struct acl *acl = acl_new(ovsdb_row, seqno);
 

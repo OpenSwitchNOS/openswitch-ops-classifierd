@@ -116,7 +116,7 @@ p2acl_update_cfg_internal(struct p2acl *p2acl, struct port *bridgec_port,
      *       Short circuit if want_version == want_status_version.
      */
     const struct ovsrec_acl *ovsdb_acl =
-        p2acl_colgrp_get_want(p2acl->colgrp, p2acl->parent->ovsdb_row);
+        p2acl_colgrp_get_cfg(p2acl->colgrp, p2acl->parent->ovsdb_row);
     if (!ovsdb_acl) {
         acl = NULL;
         if (p2acl->hw_acl) {
@@ -312,8 +312,8 @@ p2acl_unapply_for_acl_cfg_delete(struct p2acl* p2acl)
     p2acl_unapply_internal(p2acl, bridgec_port);
 */
     /* TODO: We must update OVSDB
-     *       _cur must go to NULL
-     *       _want_status must change too
+     *       _applied must go to NULL
+     *       _cfg_status must change too
      *         failed w/ reason = ACL deleted while applied
      */
 }
