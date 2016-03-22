@@ -49,18 +49,16 @@ qos_trust_global_command(const char *qos_trust_name)
         return CMD_OVSDB_FAILURE;
     }
 
+    const struct ovsrec_system *system_row = ovsrec_system_first(idl);
+    if (system_row == NULL) {
+        vty_out(vty, "System config does not exist.%s", VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
     struct ovsdb_idl_txn *txn = cli_do_config_start();
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return CMD_OVSDB_FAILURE;
-    }
-
-    const struct ovsrec_system *system_row = ovsrec_system_first(idl);
-    if (system_row == NULL) {
-        vty_out(vty, "System config does not exist.%s", VTY_NEWLINE);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -94,18 +92,13 @@ all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos trust";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *qos_trust_name = argv[0];
-    qos_audit_encode(aubuf, ausize, "qos_trust_name", qos_trust_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "qos_trust_name", qos_trust_name);
 
     int result = qos_trust_global_command(qos_trust_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -136,14 +129,10 @@ remark all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos trust";
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     int result = qos_trust_global_no_command();
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }

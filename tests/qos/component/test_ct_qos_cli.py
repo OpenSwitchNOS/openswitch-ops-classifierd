@@ -676,9 +676,9 @@ class Test_qos_cli():
         # This command is not supported in dill.
         return
         self.setUp_qosCosPort()
-        self.s1.cmdCLI('qos trust none')
-        self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust cos')
+        self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('qos trust none')
         out = self.s1.cmdCLI('qos cos 1')
         out = self.s1.cmdCLI('do show interface 1')
         assert 'override 1' in out
@@ -687,7 +687,7 @@ class Test_qos_cli():
         # This command is not supported in dill.
         return
         self.setUp_qosCosPort()
-        self.s1.cmdCLI('qos trust none')
+        self.s1.cmdCLI('qos trust cos')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('no qos trust')
         out = self.s1.cmdCLI('qos cos 1')
@@ -879,16 +879,16 @@ class Test_qos_cli():
 
     def test_qosDscpPortCommandWithSystemTrustDscpAndPortTrustNone(self):
         self.setUp_qosDscpPort()
-        self.s1.cmdCLI('qos trust none')
-        self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('qos trust dscp')
+        self.s1.cmdCLI('interface 1')
+        self.s1.cmdCLI('qos trust none')
         out = self.s1.cmdCLI('qos dscp 1')
         out = self.s1.cmdCLI('do show interface 1')
         assert 'override 1' in out
 
     def test_qosDscpPortCommandWithSystemTrustDscpAndPortTrustMissing(self):
         self.setUp_qosDscpPort()
-        self.s1.cmdCLI('qos trust none')
+        self.s1.cmdCLI('qos trust dscp')
         self.s1.cmdCLI('interface 1')
         self.s1.cmdCLI('no qos trust')
         out = self.s1.cmdCLI('qos dscp 1')

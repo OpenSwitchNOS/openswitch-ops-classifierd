@@ -78,18 +78,9 @@ qos_trust_port_command(const char *port_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return CMD_OVSDB_FAILURE;
-    }
-
     if (is_member_of_lag(port_name)) {
         vty_out(vty, "QoS Trust cannot be configured on a member of a LAG.%s",
                 VTY_NEWLINE);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -97,7 +88,13 @@ qos_trust_port_command(const char *port_name,
     if (port_row == NULL) {
         vty_out(vty, "Port %s does not exist.%s",
                 port_name, VTY_NEWLINE);
-        cli_do_config_abort(txn);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    struct ovsdb_idl_txn *txn = cli_do_config_start();
+    if (txn == NULL) {
+        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -131,21 +128,16 @@ remark all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos trust";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "port_name", port_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "port_name", port_name);
 
     const char *qos_trust_name = argv[0];
-    qos_audit_encode(aubuf, ausize, "qos_trust_name", qos_trust_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "qos_trust_name", qos_trust_name);
 
     int result = qos_trust_port_command(port_name, qos_trust_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -161,25 +153,22 @@ qos_trust_port_no_command(const char *port_name)
         return CMD_OVSDB_FAILURE;
     }
 
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return CMD_OVSDB_FAILURE;
-    }
-
     if (is_member_of_lag(port_name)) {
         vty_out(vty, "QoS Trust cannot be configured on a member of a LAG.%s",
                 VTY_NEWLINE);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
     struct ovsrec_port *port_row = port_row_for_name(port_name);
     if (port_row == NULL) {
         vty_out(vty, "Port %s does not exist.%s", port_name, VTY_NEWLINE);
-        cli_do_config_abort(txn);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    struct ovsdb_idl_txn *txn = cli_do_config_start();
+    if (txn == NULL) {
+        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -214,18 +203,13 @@ remark all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos trust";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "port_name", port_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "port_name", port_name);
 
     int result = qos_trust_port_no_command(port_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }

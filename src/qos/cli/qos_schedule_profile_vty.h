@@ -27,13 +27,13 @@
 /**
  * Creates the 'strict' profile, if it does not already exist.
  */
-void qos_schedule_profile_create_strict_profile(
-        struct ovsdb_idl_txn *txn);
+int qos_schedule_profile_create_strict_profile_commit(void);
 
 /**
- * Shows the global schedule profile running config.
+ * Shows the running config for schedule_profile. Returns true if the applied
+ * profile differs from the default profile.
  */
-void qos_schedule_profile_show_running_config(void);
+bool qos_schedule_profile_show_running_config(void);
 
 /**
  * Returns true if the schedule profile contains the queue_num.
@@ -52,11 +52,6 @@ bool qos_schedule_profile_is_complete(struct ovsrec_qos *profile_row,
  */
 struct ovsrec_qos *qos_get_schedule_profile_row(
         const char *profile_name);
-
-/**
- * Shows the running config for qos schedule profile.
- */
-void qos_schedule_profile_show_running_config(void);
 
 /**
  * Initializes vty functions for qos schedule profile.

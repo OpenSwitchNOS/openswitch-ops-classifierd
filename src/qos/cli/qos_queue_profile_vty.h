@@ -24,9 +24,10 @@
 #include "vswitch-idl.h"
 
 /**
- * Shows the global queue profile running config.
+ * Shows the running config for queue_profile. Returns true if the applied
+ * profile differs from the default profile.
  */
-void qos_queue_profile_show_running_config(void);
+bool qos_queue_profile_show_running_config(void);
 
 /**
  * Returns true if the queue profile has the queue_num.
@@ -45,11 +46,6 @@ bool qos_queue_profile_is_complete(struct ovsrec_q_profile *profile_row,
  */
 struct ovsrec_q_profile *qos_get_queue_profile_row(
         const char *profile_name);
-
-/**
- * Shows the running config for qos queue profile.
- */
-void qos_queue_profile_show_running_config(void);
 
 /**
  * Initializes vty functions for qos queue profile.

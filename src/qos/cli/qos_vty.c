@@ -84,4 +84,6 @@ cli_post_init(void)
     qos_cos_map_show_running_config();
     qos_dscp_map_show_running_config();
     qos_trust_global_show_running_config();
+
+    qos_audit_init();
 }

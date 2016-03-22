@@ -76,21 +76,19 @@ qos_dscp_map_command(int64_t code_point, int64_t local_priority,
         }
     }
 
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return CMD_OVSDB_FAILURE;
-    }
-
     /* Retrieve the row. */
     struct ovsrec_qos_dscp_map_entry *dscp_map_row =
             qos_dscp_map_row_for_code_point(code_point);
     if (dscp_map_row == NULL) {
         vty_out(vty, "DSCP Map code point %" PRId64 " does not exist.%s",
                 code_point, VTY_NEWLINE);
-        cli_do_config_abort(txn);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    struct ovsdb_idl_txn *txn = cli_do_config_start();
+    if (txn == NULL) {
+        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -134,30 +132,25 @@ DEFUN(qos_dscp_map_cos_remark_disabled,
         "The QoS DSCP Map name\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos dscp-map";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *code_point = argv[0];
-    qos_audit_encode(aubuf, ausize, "code_point", code_point);
+    qos_audit_encode(aubuf, sizeof(aubuf), "code_point", code_point);
     int64_t code_point_int = atoi(code_point);
 
     const char *local_priority = argv[1];
-    qos_audit_encode(aubuf, ausize, "local_priority", local_priority);
+    qos_audit_encode(aubuf, sizeof(aubuf), "local_priority", local_priority);
     int64_t local_priority_int = atoi(local_priority);
 
     const char *color = argv[2];
-    qos_audit_encode(aubuf, ausize, "color", color);
+    qos_audit_encode(aubuf, sizeof(aubuf), "color", color);
 
     const char *description = argv[3];
-    qos_audit_encode(aubuf, ausize, "description", description);
+    qos_audit_encode(aubuf, sizeof(aubuf), "description", description);
 
     int result = qos_dscp_map_command(code_point_int,
             local_priority_int, NULL, color, description);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -185,17 +178,13 @@ DEFUN(qos_dscp_map,
         "The QoS DSCP Map name\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos dscp-map";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *code_point = argv[0];
-    qos_audit_encode(aubuf, ausize, "code_point", code_point);
+    qos_audit_encode(aubuf, sizeof(aubuf), "code_point", code_point);
     int64_t code_point_int = atoi(code_point);
 
     const char *local_priority = argv[1];
-    qos_audit_encode(aubuf, ausize, "local_priority", local_priority);
+    qos_audit_encode(aubuf, sizeof(aubuf), "local_priority", local_priority);
     int64_t local_priority_int = atoi(local_priority);
 
     const char *priority_code_point_string = argv[2];
@@ -205,20 +194,19 @@ DEFUN(qos_dscp_map,
         priority_code_point = &priority_code_point_value;
         priority_code_point_value = atoi(priority_code_point_string);
     }
-    qos_audit_encode(aubuf, ausize,
+    qos_audit_encode(aubuf, sizeof(aubuf),
             "priority_code_point_string", priority_code_point_string);
 
     const char *color = argv[3];
-    qos_audit_encode(aubuf, ausize, "color", color);
+    qos_audit_encode(aubuf, sizeof(aubuf), "color", color);
 
     const char *description = argv[4];
-    qos_audit_encode(aubuf, ausize, "description", description);
+    qos_audit_encode(aubuf, sizeof(aubuf), "description", description);
 
     int result = qos_dscp_map_command(code_point_int, local_priority_int,
             priority_code_point, color, description);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -286,19 +274,14 @@ DEFUN(qos_dscp_map_no,
         "The QoS DSCP Map name\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos dscp-map";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *code_point = argv[0];
-    qos_audit_encode(aubuf, ausize, "code_point", code_point);
+    qos_audit_encode(aubuf, sizeof(aubuf), "code_point", code_point);
     int64_t code_point_int = atoi(code_point);
 
     int result = qos_dscp_map_no_command(code_point_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }

@@ -42,9 +42,19 @@ struct ovsrec_port *port_row_for_name(const char *port_name);
 bool is_member_of_lag(const char *port_name);
 
 /**
+ * Initializes the audit log.
+ */
+void qos_audit_init(void);
+
+/**
  * Encodes the given arg_name and arg_value into the given aubuf and ausize.
  */
 void qos_audit_encode(char *aubuf, size_t ausize, const char *arg_name,
         const char *arg_value);
+
+/**
+ * Logs the given aubuf and command_result to the audit log.
+ */
+void qos_audit_log(const char *aubuf, int command_result);
 
 #endif /* _QOS_UTILS_VTY_H_ */

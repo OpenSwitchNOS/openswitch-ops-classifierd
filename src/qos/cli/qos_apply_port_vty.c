@@ -63,19 +63,10 @@ qos_apply_port_command(const char *port_name,
         return CMD_OVSDB_FAILURE;
     }
 
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return CMD_OVSDB_FAILURE;
-    }
-
     if (is_member_of_lag(port_name)) {
         vty_out(vty, "QoS Schedule Profile cannot be\
  configured on a member of a LAG.%s",
                 VTY_NEWLINE);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -83,7 +74,6 @@ qos_apply_port_command(const char *port_name,
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
     if (system_row == NULL) {
         vty_out(vty, "System config does not exist.%s", VTY_NEWLINE);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -93,7 +83,10 @@ qos_apply_port_command(const char *port_name,
     /* If the profile is strict, make sure the 'strict' profile exists. */
     if (strncmp(schedule_profile_name, OVSREC_QUEUE_ALGORITHM_STRICT,
             QOS_CLI_STRING_BUFFER_SIZE) == 0) {
-        qos_schedule_profile_create_strict_profile(txn);
+        int result = qos_schedule_profile_create_strict_profile_commit();
+        if (result != CMD_SUCCESS) {
+            return result;
+        }
     }
 
     /* Retrieve the schedule profile. */
@@ -102,7 +95,6 @@ qos_apply_port_command(const char *port_name,
     if (schedule_profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 schedule_profile_name, VTY_NEWLINE);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -112,7 +104,6 @@ qos_apply_port_command(const char *port_name,
             QOS_CLI_STRING_BUFFER_SIZE) != 0) {
         /* Check that the profile is complete. */
         if (!qos_schedule_profile_is_complete(schedule_profile_row, true)) {
-            cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
 
@@ -121,7 +112,6 @@ qos_apply_port_command(const char *port_name,
                 schedule_profile_row)) {
             vty_out(vty, "The queue profile and schedule profile\
  cannot contain different queues.%s", VTY_NEWLINE);
-            cli_do_config_abort(txn);
             return CMD_OVSDB_FAILURE;
         }
     }
@@ -130,7 +120,13 @@ qos_apply_port_command(const char *port_name,
     struct ovsrec_port *port_row = port_row_for_name(port_name);
     if (port_row == NULL) {
         vty_out(vty, "Port %s does not exist.%s", port_name, VTY_NEWLINE);
-        cli_do_config_abort(txn);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    struct ovsdb_idl_txn *txn = cli_do_config_start();
+    if (txn == NULL) {
+        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -160,22 +156,17 @@ DEFUN(qos_apply_port,
         "The schedule-profile to apply\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: apply qos";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "port_name", port_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "port_name", port_name);
 
     const char *schedule_profile_name = argv[0];
-    qos_audit_encode(aubuf, ausize,
+    qos_audit_encode(aubuf, sizeof(aubuf),
             "schedule_profile_name", schedule_profile_name);
 
     int result = qos_apply_port_command(port_name, schedule_profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -195,22 +186,17 @@ DEFUN
  configured to use the strict algorithm\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: apply qos";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "port_name", port_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "port_name", port_name);
 
     const char *schedule_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
-    qos_audit_encode(aubuf, ausize,
+    qos_audit_encode(aubuf, sizeof(aubuf),
             "schedule_profile_name", schedule_profile_name);
 
     int result = qos_apply_port_command(port_name, schedule_profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -226,19 +212,10 @@ qos_apply_port_no_command(const char *port_name)
         return CMD_OVSDB_FAILURE;
     }
 
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return CMD_OVSDB_FAILURE;
-    }
-
     if (is_member_of_lag(port_name)) {
         vty_out(vty, "QoS Schedule Profile cannot\
  be configured on a member of a LAG.%s",
                 VTY_NEWLINE);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -246,7 +223,13 @@ qos_apply_port_no_command(const char *port_name)
     struct ovsrec_port *port_row = port_row_for_name(port_name);
     if (port_row == NULL) {
         vty_out(vty, "Port %s does not exist.%s", port_name, VTY_NEWLINE);
-        cli_do_config_abort(txn);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    struct ovsdb_idl_txn *txn = cli_do_config_start();
+    if (txn == NULL) {
+        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -276,18 +259,13 @@ DEFUN(qos_apply_port_no,
         "The name of the schedule profile\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no apply qos";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *port_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "port_name", port_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "port_name", port_name);
 
     int result = qos_apply_port_no_command(port_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }

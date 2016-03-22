@@ -326,7 +326,6 @@ qos_queue_profile_command_commit(const char *profile_name)
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -361,18 +360,13 @@ DEFUN(qos_queue_profile,
        "The name of the Queue Profile\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos queue-profile";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     int result = qos_queue_profile_command_commit(profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -489,7 +483,6 @@ qos_queue_profile_no_command_commit(const char *profile_name)
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -522,18 +515,13 @@ DEFUN(qos_queue_profile_no,
         "The name of the Queue Profile to delete\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos queue-profile";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     int result = qos_queue_profile_no_command_commit(profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -611,7 +599,6 @@ qos_queue_profile_name_command_commit(const char *profile_name,
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -645,26 +632,21 @@ DEFUN(qos_queue_profile_name,
        "The name of the queue\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: name queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *queue_name = argv[1];
-    qos_audit_encode(aubuf, ausize, "queue_name", queue_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_name", queue_name);
 
     int result = qos_queue_profile_name_command_commit(
             profile_name, queue_num_int, queue_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -781,7 +763,6 @@ qos_queue_profile_name_no_command_commit(const char *profile_name,
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -816,23 +797,18 @@ DEFUN(qos_queue_profile_name_no,
         "The name of the queue\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no name queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     int result = qos_queue_profile_name_no_command_commit(
             profile_name, queue_num_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -937,7 +913,6 @@ qos_queue_profile_map_command_commit(const char *profile_name,
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -972,27 +947,22 @@ DEFUN(qos_queue_profile_map,
        "The local-priority to configure\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: map queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *local_priority = argv[1];
-    qos_audit_encode(aubuf, ausize, "local_priority", local_priority);
+    qos_audit_encode(aubuf, sizeof(aubuf), "local_priority", local_priority);
     const char * local_priorities = local_priority;
 
     int result = qos_queue_profile_map_command_commit(
             profile_name, queue_num_int, local_priorities);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -1114,7 +1084,6 @@ qos_queue_profile_map_no_command_commit(const char *profile_name,
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -1150,27 +1119,22 @@ DEFUN(qos_queue_profile_map_no,
        "The local-priority to delete\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no map queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *local_priority = argv[1];
-    qos_audit_encode(aubuf, ausize, "local_priority", local_priority);
+    qos_audit_encode(aubuf, sizeof(aubuf), "local_priority", local_priority);
     const char * local_priorities = local_priority;
 
     int result = qos_queue_profile_map_no_command_commit(
             profile_name, queue_num_int, local_priorities);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -1327,9 +1291,10 @@ DEFUN(qos_queue_profile_show_all,
 }
 
 /**
- * Shows the running config for queue_profile.
+ * Shows the running config for queue_profile. Returns true if the applied
+ * profile differs from the default profile.
  */
-void
+bool
 qos_queue_profile_show_running_config(void)
 {
     struct ovsrec_q_profile *default_profile_row = qos_get_queue_profile_row(
@@ -1337,7 +1302,7 @@ qos_queue_profile_show_running_config(void)
     if (default_profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 QOS_FACTORY_DEFAULT_NAME, VTY_NEWLINE);
-        return;
+        return false;
     }
 
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
@@ -1428,10 +1393,9 @@ qos_queue_profile_show_running_config(void)
                         VTY_NEWLINE);
             }
         }
-
-        /* Exit the profile context. */
-        vty_out(vty, "    exit%s", VTY_NEWLINE);
     }
+
+    return differs_from_default;
 }
 
 /**

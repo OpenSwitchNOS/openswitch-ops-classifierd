@@ -335,7 +335,6 @@ qos_schedule_profile_command_commit(const char *profile_name)
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -369,18 +368,13 @@ DEFUN(qos_schedule_profile,
        "The name of the Schedule Profile\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos schedule-profile";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     int result = qos_schedule_profile_command_commit(profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -494,7 +488,6 @@ qos_schedule_profile_no_command_commit(const char *profile_name)
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -526,18 +519,13 @@ DEFUN(qos_schedule_profile_no,
         "The name of the Schedule Profile to delete\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos schedule-profile";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = argv[0];
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     int result = qos_schedule_profile_no_command_commit(profile_name);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -607,7 +595,6 @@ qos_schedule_profile_strict_command_commit(
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -639,23 +626,18 @@ DEFUN(qos_schedule_profile_strict,
        "The number of the queue\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: strict queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     int result = qos_schedule_profile_strict_command_commit(
             profile_name, queue_num_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -780,7 +762,6 @@ qos_schedule_profile_strict_no_command_commit(
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -813,25 +794,20 @@ DEFUN(qos_schedule_profile_strict_no,
         "The number of the queue\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no strict queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
-     const char *profile_name = (char*) vty->index;
-     qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    const char *profile_name = (char*) vty->index;
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
-     const char *queue_num = argv[0];
-     qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
-     int64_t queue_num_int = atoi(queue_num);
+    const char *queue_num = argv[0];
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
+    int64_t queue_num_int = atoi(queue_num);
 
-     int result = qos_schedule_profile_strict_no_command_commit(
-             profile_name, queue_num_int);
+    int result = qos_schedule_profile_strict_no_command_commit(
+            profile_name, queue_num_int);
 
-     audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-             aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
-     return result;
+    return result;
 }
 
 /**
@@ -899,7 +875,6 @@ qos_schedule_profile_dwrr_command_commit(
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -934,27 +909,22 @@ DEFUN(qos_schedule_profile_dwrr,
        "The weight to configure\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: dwrr queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     const char *weight = argv[1];
-    qos_audit_encode(aubuf, ausize, "weight", weight);
+    qos_audit_encode(aubuf, sizeof(aubuf), "weight", weight);
     int64_t weight_int = atoi(weight);
 
     int result = qos_schedule_profile_dwrr_command_commit(
             profile_name, queue_num_int, weight_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -1035,7 +1005,6 @@ qos_schedule_profile_dwrr_no_command_commit(
     if (txn == NULL) {
         vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
         VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
 
@@ -1071,23 +1040,18 @@ DEFUN(qos_schedule_profile_dwrr_no,
        "The weight to configure\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no dwrr queue";
-    size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *profile_name = (char*) vty->index;
-    qos_audit_encode(aubuf, ausize, "profile_name", profile_name);
+    qos_audit_encode(aubuf, sizeof(aubuf), "profile_name", profile_name);
 
     const char *queue_num = argv[0];
-    qos_audit_encode(aubuf, ausize, "queue_num", queue_num);
+    qos_audit_encode(aubuf, sizeof(aubuf), "queue_num", queue_num);
     int64_t queue_num_int = atoi(queue_num);
 
     int result = qos_schedule_profile_dwrr_no_command_commit(profile_name,
             queue_num_int);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }
@@ -1226,9 +1190,10 @@ DEFUN(qos_schedule_profile_show_all,
 }
 
 /**
- * Shows the running config for schedule_profile.
+ * Shows the running config for schedule_profile. Returns true if the applied
+ * profile differs from the default profile.
  */
-void
+bool
 qos_schedule_profile_show_running_config(void)
 {
     struct ovsrec_qos *default_profile_row = qos_get_schedule_profile_row(
@@ -1236,7 +1201,7 @@ qos_schedule_profile_show_running_config(void)
     if (default_profile_row == NULL) {
         vty_out(vty, "Profile %s does not exist.%s",
                 QOS_FACTORY_DEFAULT_NAME, VTY_NEWLINE);
-        return;
+        return false;
     }
 
     const struct ovsrec_system *system_row = ovsrec_system_first(idl);
@@ -1291,6 +1256,13 @@ qos_schedule_profile_show_running_config(void)
         }
     }
 
+    /* If it's the strict profile, then there's no command to create the
+     * strict profile, so just return. */
+    if (strncmp(applied_profile_row->name, OVSREC_QUEUE_ALGORITHM_STRICT,
+            QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+        return differs_from_default;
+    }
+
     /* Show the command if it differs from the default. */
     if (differs_from_default) {
         /* Show profile name. */
@@ -1321,22 +1293,44 @@ qos_schedule_profile_show_running_config(void)
             /* End with a new line. */
             vty_out(vty, "%s", VTY_NEWLINE);
         }
-
-        /* Exit the profile context. */
-        vty_out(vty, "    exit%s", VTY_NEWLINE);
     }
+
+    return differs_from_default;
 }
 
 /**
  * Creates the 'strict' schedule profile.
  */
-void
-qos_schedule_profile_create_strict_profile(
-        struct ovsdb_idl_txn *txn)
+int
+qos_schedule_profile_create_strict_profile_commit(void)
 {
     const char *strict_profile_name = OVSREC_QUEUE_ALGORITHM_STRICT;
 
+    /* Retrieve the row. */
+    struct ovsrec_qos *profile_row =
+            qos_get_schedule_profile_row(strict_profile_name);
+    if (profile_row != NULL) {
+        /* If the profile already exists, then there is no work to do. */
+        return CMD_SUCCESS;
+    }
+
+    struct ovsdb_idl_txn *txn = cli_do_config_start();
+    if (txn == NULL) {
+        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
+        return CMD_OVSDB_FAILURE;
+    }
+
     qos_schedule_profile_command(txn, strict_profile_name);
+
+    enum ovsdb_idl_txn_status status = cli_do_config_finish(txn);
+    if (status != TXN_SUCCESS && status != TXN_UNCHANGED) {
+        vty_out(vty, "Unable to commit transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_COMMIT_ERROR);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    return CMD_SUCCESS;
 }
 
 /**

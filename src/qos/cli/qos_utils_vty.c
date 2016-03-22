@@ -37,6 +37,8 @@
 VLOG_DEFINE_THIS_MODULE(vtysh_qos_utils_cli);
 extern struct ovsdb_idl *idl;
 
+int audit_fd;
+
 /**
  * Returns true if the given character is valid.
  */
@@ -113,6 +115,13 @@ is_member_of_lag(const char *port_name)
 }
 
 /**
+ * Initializes the audit log.
+ */
+void qos_audit_init(void) {
+    audit_fd = audit_open();
+}
+
+/**
  * Encodes the given arg_name and arg_value into the given aubuf and ausize.
  */
 void
@@ -127,4 +136,17 @@ qos_audit_encode(char *aubuf, size_t ausize, const char *arg_name,
             free(cfg);
         }
     }
+}
+
+/**
+ * Logs the given aubuf and command_result to the audit log.
+ */
+void
+qos_audit_log(const char *aubuf, int command_result)
+{
+    char hostname[HOST_NAME_MAX];
+    gethostname(hostname, HOST_NAME_MAX);
+
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, command_result);
 }
