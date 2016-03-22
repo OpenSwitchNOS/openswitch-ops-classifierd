@@ -14,12 +14,13 @@
  *    under the License.
  *
  ***************************************************************************/
-
 #include <config.h>
+
+#include "qos_utils.h"
+
 #include "qos_map.h"
 #include "qos_profile.h"
 #include "qos_trust.h"
-#include "qos_utils.h"
 
 #include "openswitch-idl.h"
 #include "ovsdb-idl.h"
@@ -44,17 +45,6 @@ struct port {
     struct ovs_list ifaces;    /* List of "struct iface"s. */
     int bond_hw_handle;        /* Hardware bond identifier. */
 };
-
-/**
- * Do whatever initialization needed by QOS feature at the ofproto layer.
- */
-void
-qos_ofproto_init(void)
-{
-    qos_ofproto_map_init();
-    qos_ofproto_profile_init();
-    qos_ofproto_trust_init();
-}
 
 /**
  * Configure QOS maps & profiles for a particular bridge.

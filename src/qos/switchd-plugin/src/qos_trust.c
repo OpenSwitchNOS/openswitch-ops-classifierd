@@ -16,8 +16,13 @@
  ***************************************************************************/
 
 #include <config.h>
+
 #include "qos_trust.h"
+
 #include "qos_utils.h"
+#include "qos_ofproto.h"
+
+#include "qos-asic-provider.h"
 #include "openvswitch/vlog.h"
 
 
@@ -83,9 +88,4 @@ qos_trust_send_change(struct ofproto *ofproto,
                                  &port_cfg->qos_config,
                                  &port_cfg->other_config);
     }
-}
-
-void
-qos_ofproto_trust_init(void)
-{
 }

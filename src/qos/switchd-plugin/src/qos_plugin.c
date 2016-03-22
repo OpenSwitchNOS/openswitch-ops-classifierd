@@ -32,6 +32,8 @@
 
 VLOG_DEFINE_THIS_MODULE(qos_plugin);
 
+static bool plugin_init_done = false;
+
 //************ Define plugin functions into a reconfigure block ***************//
 //
 // If a function of the plugin is considered as part of a global reconfigure
@@ -71,10 +73,17 @@ int run(void)
 {
     VLOG_DBG("[%s] is running...", QOS_PLUGIN_NAME);
 
-    /**
-     * Initialize the QOS API -- it will find its ASIC provider APIs.
-     */
-    qos_ofproto_init();
+    if (! plugin_init_done) {
+        /**
+         * Initialize the QOS API -- it will find its ASIC provider APIs.
+         *
+         * Must run after ASIC provider plugin initializes, therefore must
+         * be called in the "run loop", as there is no "after all plugins
+         * are initialized" callback.
+         */
+        qos_ofproto_init();
+        plugin_init_done = true;
+    }
 
     return 0;
 }

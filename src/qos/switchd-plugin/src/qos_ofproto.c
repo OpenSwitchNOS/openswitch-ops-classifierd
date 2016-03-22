@@ -16,23 +16,32 @@
  ***************************************************************************/
 
 #include <config.h>
+
 #include "qos_ofproto.h"
+
+#include "qos-asic-provider.h"
 #include "qos_utils.h"
+
 #include <errno.h>
 #include <string.h>
-#include "smap.h"
+
 #include "ofproto/ofproto-provider.h"
 #include "openvswitch/vlog.h"
+#include "plugin-extensions.h"
+#include "smap.h"
+
 
 VLOG_DEFINE_THIS_MODULE(qos_ofproto);
 
+
+static struct plugin_extension_interface *extension = NULL;
+static struct qos_asic_plugin_interface *plugin = NULL;
 
 /* converts enum in qos_trust SMAP into enum value */
 enum qos_trust get_qos_trust_value(const struct smap *cfg) {
     enum qos_trust rv = QOS_TRUST_MAX;
     const char *qos_trust_name = smap_get(cfg, "qos_trust");
 
-    VLOG_DBG("qos trust is %s", qos_trust_name);
     if (qos_trust_name == NULL) {
         return rv;
     }
@@ -59,11 +68,12 @@ int ofproto_set_port_qos_cfg(struct ofproto *ofproto, void *aux,
     const char *dscp_override_str;
     int rv = 0;
 
-#ifdef REWRITE_ME
-    if (ofproto->ofproto_class->set_port_qos_cfg == NULL) {
+    if (plugin == NULL) {
         return EOPNOTSUPP;
     }
-#endif
+    if (plugin->set_port_qos_cfg == NULL) {
+        return EOPNOTSUPP;
+    }
 
     VLOG_DBG("%s: aux @ %p, qos_trust %d, qos_cfg smap@ %p",
              __FUNCTION__, aux, global_qos_trust, qos_config);
@@ -98,9 +108,7 @@ int ofproto_set_port_qos_cfg(struct ofproto *ofproto, void *aux,
              settings.dscp_override_value,
              other_config);
 
-#ifdef REWRITE_ME
-    rv = ofproto->ofproto_class->set_port_qos_cfg(ofproto, aux, &settings);
-#endif
+    rv = plugin->set_port_qos_cfg(ofproto, aux, &settings);
 
     return rv;
 }
@@ -110,18 +118,17 @@ int ofproto_set_cos_map(struct ofproto *ofproto, void *aux,
                         const struct cos_map_settings *settings) {
     int rv = 0;
 
-#ifdef REWRITE_ME
-    if (ofproto->ofproto_class->set_cos_map == NULL) {
+    if (plugin == NULL) {
         return EOPNOTSUPP;
     }
-#endif
+    if (plugin->set_cos_map == NULL) {
+        return EOPNOTSUPP;
+    }
 
     VLOG_DBG("%s: aux @ %p, settings@ %p (%d entry(s))",
              __FUNCTION__, aux, settings, settings->n_entries);
 
-#ifdef REWRITE_ME
-    rv = ofproto->ofproto_class->set_cos_map(ofproto, aux, settings);
-#endif
+    rv = plugin->set_cos_map(ofproto, aux, settings);
 
     return rv;
 }
@@ -131,42 +138,58 @@ int ofproto_set_dscp_map(struct ofproto *ofproto, void *aux,
                          const struct dscp_map_settings *settings) {
     int rv = 0;
 
-#ifdef REWRITE_ME
-    if (ofproto->ofproto_class->set_dscp_map == NULL) {
+    if (plugin == NULL) {
         return EOPNOTSUPP;
     }
-#endif
+    if (plugin->set_dscp_map == NULL) {
+        return EOPNOTSUPP;
+    }
 
     VLOG_DBG("%s: aux @ %p, settings@ %p (%d entry(s)",
              __FUNCTION__, aux, settings, settings->n_entries);
 
-#ifdef REWRITE_ME
-    rv = ofproto->ofproto_class->set_dscp_map(ofproto, aux, settings);
-#endif
+    rv = plugin->set_dscp_map(ofproto, aux, settings);
 
     return rv;
 }
 
 int ofproto_apply_qos_profile(struct ofproto *ofproto,
-                              const void *aux,
+                              void *aux,
                               const struct schedule_profile_settings *s_settings,
                               const struct queue_profile_settings *q_settings) {
     int rv = 0;
 
     VLOG_DBG("%s aux=%p settings=%p,%p", __FUNCTION__, aux,
              s_settings, q_settings);
-#ifdef REWRITE_ME
-    if (ofproto->ofproto_class->apply_qos_profile == NULL) {
+
+    if (plugin == NULL) {
         return EOPNOTSUPP;
     }
-#endif
+    if (plugin->apply_qos_profile == NULL) {
+        return EOPNOTSUPP;
+    }
 
-#ifdef REWRITE_ME
-    rv = ofproto->ofproto_class->apply_qos_profile(ofproto,
-                                                       aux,
-                                                       s_settings,
-                                                       q_settings);
-#endif
+    rv = plugin->apply_qos_profile(ofproto,
+                                   aux,
+                                   s_settings,
+                                   q_settings);
 
     return rv;
+}
+
+/**
+ * Do whatever initialization needed by QOS feature at the ofproto layer.
+ */
+void
+qos_ofproto_init(void)
+{
+    int rv;
+
+    rv = find_plugin_extension(QOS_ASIC_PLUGIN_INTERFACE_NAME,
+                               QOS_ASIC_PLUGIN_INTERFACE_MAJOR,
+                               QOS_ASIC_PLUGIN_INTERFACE_MINOR,
+                               &extension);
+    if (rv == 0) {
+        plugin = (struct qos_asic_plugin_interface *)extension->plugin_interface;
+    }
 }

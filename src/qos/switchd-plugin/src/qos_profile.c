@@ -17,10 +17,14 @@
 
 #include <config.h>
 #include "qos_profile.h"
+
+#include "qos_ofproto.h"
 #include "qos_utils.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include "smap.h"
+#include "qos-asic-provider.h"
 #include "openvswitch/vlog.h"
 
 
@@ -90,8 +94,8 @@ qos_get_queue_profile_settings(const struct ovsrec_q_profile *ovsrec_q_profile)
                 if (ovsrec_q_profile_entry->local_priorities[lp_index]) {
                     lp_entry->local_priority = (unsigned)
                         ovsrec_q_profile_entry->local_priorities[lp_index];
-                    VLOG_INFO("%s ... %d lp=%d", __FUNCTION__,
-                              lp_index, lp_entry->local_priority);
+                    VLOG_DBG("%s ... %d lp=%d", __FUNCTION__,
+                             lp_index, lp_entry->local_priority);
                 }
             }
         }
@@ -244,7 +248,7 @@ qos_free_schedule_profile_settings(struct schedule_profile_settings *settings)
 /* Apply a single set up of queue- and schedule- profiles. */
 int
 qos_apply_profile(struct ofproto *ofproto,
-                  const void *aux, /* struct port *port */
+                  void *aux, /* struct port *port */
                   const struct ovsrec_qos *ovsrec_qos,
                   const struct ovsrec_q_profile *ovsrec_q_profile)
 {
@@ -406,7 +410,7 @@ qos_configure_global_profiles(struct ofproto *ofproto,
 void
 qos_configure_port_profiles(struct ofproto *ofproto,
                             const struct ovsrec_port *port_cfg,
-                            const void *aux, /* struct port *port */
+                            void *aux, /* struct port *port */
                             struct ovsdb_idl *idl, unsigned int idl_seqno)
 {
     const struct ovsrec_system *ovs_row = NULL;

@@ -18,11 +18,9 @@
 #ifndef _QOS_MAP_H_
 #define _QOS_MAP_H_
 
-#include "qos_ofproto.h"
 #include "vswitch-idl.h"
 #include "ofproto/ofproto-provider.h"
 
-void qos_ofproto_map_init(void);
 void qos_configure_cos_map(struct ofproto *, struct ovsdb_idl *, unsigned int);
 void qos_configure_dscp_map(struct ofproto *, struct ovsdb_idl *, unsigned int);
 
