@@ -2910,7 +2910,7 @@ show_run_access_list_callback(void *p_private)
 }
 
 /**
- * Callback routine for port access-list (ACL) show running-config handler
+ * Callback routine for access-list show running-config subcontext handler
  *
  * @param  p_private Void pointer for holding address of vtysh_ovsdb_cbmsg_ptr
  *                   structure object
@@ -2918,69 +2918,38 @@ show_run_access_list_callback(void *p_private)
  * @return           e_vtysh_ok on success
  */
 static vtysh_ret_val
-show_run_port_access_list_callback(void *p_private)
+show_run_access_list_subcontext_callback(void *p_private)
 {
     vtysh_ovsdb_cbmsg_ptr p_msg = (vtysh_ovsdb_cbmsg *) p_private;
-    const struct ovsrec_interface *interface_row = (struct ovsrec_interface *) p_msg->feature_row;
-    const struct ovsrec_port *port_row;
+    const struct ovsrec_vlan *vlan_row = NULL;
+    const struct ovsrec_interface *interface_row = NULL;
+    const struct ovsrec_port *port_row = NULL;
 
-    /* Used for dumping information populated for callback data */
-    // vtysh_ovsdb_cli_print(p_msg,
-    //      "called for interface contextid=%d, clientid=%d feature_row=%p skip_subcontext_list=%d disp_header_cfg=%d",
-    //      p_msg->contextid,
-    //      p_msg->clientid,
-    //      p_msg->feature_row,
-    //      p_msg->skip_subcontext_list,
-    //      p_msg->disp_header_cfg);
-
-    /* Should not occur as long as feature_row is populated */
-    if (!interface_row) {
-        vtysh_ovsdb_cli_print(p_msg, "    !access-list error: NULL interface row");
-        return e_vtysh_ok;
+    /* Determine context type and subtype we were called for */
+    if (p_msg->contextid == e_vtysh_vlan_context &&
+        p_msg->clientid == e_vtysh_vlan_context_access_list) {
+        vlan_row = (struct ovsrec_vlan *) p_msg->feature_row;
+    } else if (p_msg->contextid == e_vtysh_interface_context &&
+               p_msg->clientid == e_vtysh_interface_context_access_list) {
+        interface_row = (struct ovsrec_interface *) p_msg->feature_row;
+    } else {
+        VLOG_ERR("%s called with unhandled contextid=%d clientid=%d",
+                 __func__, p_msg->contextid, p_msg->clientid);
+        return e_vtysh_error;
     }
 
-    /* Print ACL, if any (LAGs won't have interface name == port name) */
-    port_row = get_port_by_name(interface_row->name);
-    if (port_row && port_row->aclv4_in_want) {
-        vtysh_ovsdb_cli_print(p_msg, "    apply access-list ip %s in",
-                              port_row->aclv4_in_want->list_name);
-    }
-    return e_vtysh_ok;
-}
-
-/**
- * Callback routine for vlan access-list (ACL) show running-config handler
- *
- * @param  p_private Void pointer for holding address of vtysh_ovsdb_cbmsg_ptr
- *                   structure object
- *
- * @return           e_vtysh_ok on success
- */
-static vtysh_ret_val
-show_run_vlan_access_list_callback(void *p_private)
-{
-    vtysh_ovsdb_cbmsg_ptr p_msg = (vtysh_ovsdb_cbmsg *) p_private;
-    const struct ovsrec_vlan *vlan_row = (struct ovsrec_vlan *) p_msg->feature_row;
-
-    /* Used for dumping information populated for callback data */
-    // vtysh_ovsdb_cli_print(p_msg,
-    //      "called for interface contextid=%d, clientid=%d feature_row=%p skip_subcontext_list=%d disp_header_cfg=%d",
-    //      p_msg->contextid,
-    //      p_msg->clientid,
-    //      p_msg->feature_row,
-    //      p_msg->skip_subcontext_list,
-    //      p_msg->disp_header_cfg);
-
-    /* Should not occur as long as feature_row is populated */
-    if (!vlan_row) {
-        vtysh_ovsdb_cli_print(p_msg, "    !access-list error: NULL vlan row");
-        return e_vtysh_ok;
-    }
-
-    /* Print ACL, if any */
-    if (vlan_row->aclv4_in_want) {
+    /* Print VLAN ACL, if any */
+    if (vlan_row && vlan_row->aclv4_in_want) {
         vtysh_ovsdb_cli_print(p_msg, "    apply access-list ip %s in",
                               vlan_row->aclv4_in_want->list_name);
+    }
+    /* Print port ACL, if any (LAGs won't have interface name == port name) */
+    if (interface_row) {
+        port_row = get_port_by_name(interface_row->name);
+        if (port_row && port_row->aclv4_in_want) {
+            vtysh_ovsdb_cli_print(p_msg, "    apply access-list ip %s in",
+                                  port_row->aclv4_in_want->list_name);
+        }
     }
     return e_vtysh_ok;
 }
@@ -3026,7 +2995,7 @@ cli_post_init (void)
     retval = install_show_run_config_subcontext(
                     e_vtysh_interface_context,
                     e_vtysh_interface_context_access_list,
-                    &show_run_port_access_list_callback,
+                    &show_run_access_list_subcontext_callback,
                     NULL, NULL);
     if (e_vtysh_ok != retval) {
         vtysh_ovsdb_config_logmsg(VTYSH_OVSDB_CONFIG_ERR,
@@ -3039,7 +3008,7 @@ cli_post_init (void)
     retval = install_show_run_config_subcontext(
                     e_vtysh_vlan_context,
                     e_vtysh_vlan_context_access_list,
-                    &show_run_vlan_access_list_callback,
+                    &show_run_access_list_subcontext_callback,
                     NULL, NULL);
     if (e_vtysh_ok != retval) {
         vtysh_ovsdb_config_logmsg(VTYSH_OVSDB_CONFIG_ERR,
