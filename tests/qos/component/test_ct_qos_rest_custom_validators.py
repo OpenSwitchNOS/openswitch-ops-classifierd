@@ -132,7 +132,7 @@ class Test_qos_rest_custom_validators:
         Test_qos_rest_custom_validators.test = QosRestCustomValidatorsTest()
 
         # Allow restd time to start.
-        time.sleep(2)
+        time.sleep(4)
 
     def teardown_class(cls):
         Test_qos_rest_custom_validators.test.net.stop()
@@ -892,14 +892,14 @@ class Test_qos_rest_custom_validators:
 
     def test_qos_dscp_map_entry_put_validate_pcp_is_empty(self):
         data = deepcopy(qos_dscp_map_entry_data)
-        data["configuration"]["priority_code_point"] = "1"
+        data["configuration"]["priority_code_point"] = 1
 
         response_status, response_data = execute_request(
             qos_dscp_map_entry_url, "PUT",
             json.dumps(data), self.switch_ip)
 
         assert response_status == httplib.BAD_REQUEST
-        assert 'not supported.' in response_data
+        assert 'not currently supported' in response_data
 
     def test_qos_dscp_map_entry_delete(self):
         response_status, response_data = execute_request(

@@ -128,3 +128,17 @@ qos_audit_encode(char *aubuf, size_t ausize, const char *arg_name,
         }
     }
 }
+
+/**
+ * Logs the given aubuf and command_result to the audit log.
+ */
+void
+qos_audit_log(const char *aubuf, int command_result)
+{
+    char hostname[HOST_NAME_MAX+1];
+    gethostname(hostname, HOST_NAME_MAX);
+
+    int audit_fd = audit_open();
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
+            aubuf, hostname, NULL, NULL, command_result);
+}

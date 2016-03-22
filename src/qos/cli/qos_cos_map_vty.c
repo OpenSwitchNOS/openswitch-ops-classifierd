@@ -70,20 +70,19 @@ qos_cos_map_command(int64_t code_point, int64_t local_priority,
         }
     }
 
-    struct ovsdb_idl_txn *txn = cli_do_config_start();
-    if (txn == NULL) {
-        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
-        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
-        cli_do_config_abort(txn);
-        return CMD_OVSDB_FAILURE;
-    }
-
     /* Retrieve the row. */
     struct ovsrec_qos_cos_map_entry *cos_map_row =
             qos_cos_map_row_for_code_point(code_point);
     if (cos_map_row == NULL) {
         vty_out(vty, "COS Map code point %" PRId64 " does not exist.%s",
                 code_point, VTY_NEWLINE);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    struct ovsdb_idl_txn *txn = cli_do_config_start();
+    if (txn == NULL) {
+        vty_out(vty, "Unable to start transaction.%s", VTY_NEWLINE);
+        VLOG_ERR(OVSDB_TXN_CREATE_ERROR);
         cli_do_config_abort(txn);
         return CMD_OVSDB_FAILURE;
     }
@@ -127,9 +126,6 @@ DEFUN(qos_cos_map,
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: qos cos-map";
     size_t ausize = sizeof(aubuf);
-    char hostname[HOST_NAME_MAX+1];
-    gethostname(hostname, HOST_NAME_MAX);
-    int audit_fd = audit_open();
 
     const char *code_point = argv[0];
     qos_audit_encode(aubuf, ausize, "code_point", code_point);
@@ -148,8 +144,7 @@ DEFUN(qos_cos_map,
     int result = qos_cos_map_command(
             code_point_int, local_priority_int, color, description);
 
-    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG,
-            aubuf, hostname, NULL, NULL, result);
+    qos_audit_log(aubuf, result);
 
     return result;
 }

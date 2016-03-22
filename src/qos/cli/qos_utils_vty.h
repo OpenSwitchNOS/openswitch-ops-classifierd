@@ -47,4 +47,9 @@ bool is_member_of_lag(const char *port_name);
 void qos_audit_encode(char *aubuf, size_t ausize, const char *arg_name,
         const char *arg_value);
 
+/**
+ * Logs the given aubuf and command_result to the audit log.
+ */
+void qos_audit_log(const char *aubuf, int command_result);
+
 #endif /* _QOS_UTILS_VTY_H_ */

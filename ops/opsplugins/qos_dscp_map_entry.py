@@ -65,7 +65,7 @@ class QosDscpMapEntryValidator(BaseValidator):
     def validate_priority_code_point_is_empty(
             self, qos_dscp_map_entry_row):
         # Cos (priority_code_point) is not supported for dill.
-        if qos_dscp_map_entry_row.priority_code_point is not None:
+        if qos_dscp_map_entry_row.priority_code_point != []:
             details = "The priority_code_point field " + \
                 "is not currently supported."
             raise ValidationError(error.VERIFICATION_FAILED, details)
