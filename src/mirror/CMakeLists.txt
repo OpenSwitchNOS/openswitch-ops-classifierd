@@ -17,8 +17,8 @@ cmake_minimum_required (VERSION 2.8)
 PROJECT(mirror)
 
 MESSAGE("got to mirror")
-set(QOS_INCL_DIR "${PROJECT_SOURCE_DIR}/include")
+set(MIRROR_INCL_DIR "${PROJECT_SOURCE_DIR}/include")
 MESSAGE("PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
-MESSAGE("QOS_INCL_DIR=${QOS_INCL_DIR}")
+MESSAGE("MIRROR_INCL_DIR=${MIRROR_INCL_DIR}")
 
 add_subdirectory(cli)
