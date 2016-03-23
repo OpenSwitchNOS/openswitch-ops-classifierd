@@ -136,7 +136,6 @@ remark all of them to 0 (Default)\n"
         "Trust DSCP and remark the 802.1p priority to match\n")
 {
     char aubuf[QOS_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: no qos trust";
-    size_t ausize = sizeof(aubuf);
     char hostname[HOST_NAME_MAX+1];
     gethostname(hostname, HOST_NAME_MAX);
     int audit_fd = audit_open();
