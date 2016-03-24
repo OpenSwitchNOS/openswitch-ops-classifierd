@@ -131,10 +131,9 @@ class Test_qos_rest_custom_validators:
     def setup_class(cls):
         Test_qos_rest_custom_validators.test = QosRestCustomValidatorsTest()
 
-        # TODO: once these tests have been migrated to opstestfw, this sleep
-        # may no longer be necessary.
-        # Allow restd time to start.
-        time.sleep(4)
+        s1 = Test_qos_rest_custom_validators.test.net.switches[0]
+        switch_ip = get_switch_ip(s1)
+        rest_sanity_check(switch_ip)
 
     def teardown_class(cls):
         Test_qos_rest_custom_validators.test.net.stop()
