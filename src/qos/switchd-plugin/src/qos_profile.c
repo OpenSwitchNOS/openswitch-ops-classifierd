@@ -57,8 +57,8 @@ qos_get_queue_profile_settings(const struct ovsrec_q_profile *ovsrec_q_profile)
     settings->n_entries = (int)ovsrec_q_profile->n_q_profile_entries;
     settings->entries = malloc(settings->n_entries * sizeof(void *));
 
-    VLOG_INFO("%s %s %d", __FUNCTION__,
-              ovsrec_q_profile->name, settings->n_entries);
+    VLOG_DBG("%s %s %d", __FUNCTION__,
+             ovsrec_q_profile->name, settings->n_entries);
 
     /* collect all queues in the profiles whether or not they changed */
     for (q_index = 0; q_index < settings->n_entries; q_index++) {
@@ -178,8 +178,8 @@ qos_get_schedule_profile_settings(const struct ovsrec_qos *ovsrec_qos,
     /* start constructing the variable-length settings for the API call */
     settings = calloc(1, sizeof *settings);
 
-    VLOG_INFO("%s %s %d", __FUNCTION__,
-              ovsrec_qos->name, settings->n_entries);
+    VLOG_DBG("%s %s %d", __FUNCTION__,
+             ovsrec_qos->name, settings->n_entries);
     if (!strcmp(ovsrec_qos->name, OVSREC_QUEUE_ALGORITHM_STRICT)) {
         settings->n_entries = n_queues;
         settings->entries = malloc(settings->n_entries * sizeof(void *));
