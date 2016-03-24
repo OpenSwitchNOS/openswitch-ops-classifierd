@@ -1339,6 +1339,9 @@ qos_schedule_profile_create_strict_profile_commit(void)
 void
 qos_schedule_profile_vty_init(void)
 {
+    install_element(QOS_SCHEDULE_PROFILE_NODE, &vtysh_exit_interface_cmd);
+    install_element(QOS_SCHEDULE_PROFILE_NODE, &vtysh_end_all_cmd);
+
     install_element(CONFIG_NODE, &qos_schedule_profile_cmd);
     install_element(CONFIG_NODE, &qos_schedule_profile_no_cmd);
     install_element(ENABLE_NODE, &qos_schedule_profile_show_cmd);
@@ -1356,11 +1359,22 @@ qos_schedule_profile_vty_init(void)
 }
 
 /**
+ * Contains the display prompt for the profile node.
+ */
+static struct cmd_node qos_schedule_profile_node = {
+    QOS_SCHEDULE_PROFILE_NODE,
+    "%s(config-schedule)# ",
+};
+
+/**
  * Initializes qos_schedule_profile_ovsdb.
  */
 void
 qos_schedule_profile_ovsdb_init(void)
 {
+    install_node(&qos_schedule_profile_node, NULL);
+    vtysh_install_default(QOS_SCHEDULE_PROFILE_NODE);
+
     ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_qos);
 

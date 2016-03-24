@@ -1404,6 +1404,9 @@ qos_queue_profile_show_running_config(void)
 void
 qos_queue_profile_vty_init(void)
 {
+    install_element(QOS_QUEUE_PROFILE_NODE, &vtysh_exit_interface_cmd);
+    install_element(QOS_QUEUE_PROFILE_NODE, &vtysh_end_all_cmd);
+
     install_element(CONFIG_NODE, &qos_queue_profile_cmd);
     install_element(CONFIG_NODE, &qos_queue_profile_no_cmd);
     install_element(ENABLE_NODE, &qos_queue_profile_show_cmd);
@@ -1417,11 +1420,22 @@ qos_queue_profile_vty_init(void)
 }
 
 /**
+ * Contains the display prompt for the profile node.
+ */
+static struct cmd_node qos_queue_profile_node = {
+    QOS_QUEUE_PROFILE_NODE,
+    "%s(config-queue)# ",
+};
+
+/**
  * Initializes qos_queue_profile_ovsdb.
  */
 void
 qos_queue_profile_ovsdb_init(void)
 {
+    install_node(&qos_queue_profile_node, NULL);
+    vtysh_install_default(QOS_QUEUE_PROFILE_NODE);
+
     ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_q_profile);
 
