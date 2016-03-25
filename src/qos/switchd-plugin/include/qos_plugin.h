@@ -18,24 +18,30 @@
 #define __QOS_PLUGIN_H__
 
 
+#include "qos-asic-provider.h"
 #include "ofproto/ofproto-provider.h"
 #include "reconfigure-blocks.h"
 
-#define QOS_PLUGIN_NAME    "qos" //Do not change this name
-#define QOS_PLUGIN_MAJOR    0
-#define QOS_PLUGIN_MINOR    1
+#define QOS_PLUGIN_NAME    "QOS" //Do not change this name
 
 
-void qos_ofproto_init(void);
-
-
-/**
- * Configure QOS maps & profiles for a bridge
- * @param params
- */
+/* bridge_reconfigure callback functions (registered by qos_plugin:init) */
 void qos_configure(struct ofproto *ofproto, struct ovsdb_idl *idl, unsigned int idl_seqno);
-
 void qos_callback_init(struct blk_params *params);
 void qos_callback_reconfigure(struct blk_params *params);
+
+/* Configuration of QOS tables. */
+enum qos_trust get_qos_trust_value(const struct smap *);
+int ofproto_set_port_qos_cfg(struct ofproto *, void *,
+                             const enum qos_trust,
+                             const struct smap *,
+                             const struct smap *);
+int ofproto_set_cos_map(struct ofproto *, void *,
+                        const struct cos_map_settings *);
+int ofproto_set_dscp_map(struct ofproto *, void *,
+                         const struct dscp_map_settings *);
+int ofproto_apply_qos_profile(struct ofproto *, void *,
+                              const struct schedule_profile_settings *,
+                              const struct queue_profile_settings *);
 
 #endif //__QOS_PLUGIN_H__

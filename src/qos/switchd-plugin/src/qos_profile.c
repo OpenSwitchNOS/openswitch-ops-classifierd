@@ -13,6 +13,7 @@
  *    License for the specific language governing permissions and limitations
  *    under the License.
  *
+ * Handle QoS queue- and schedule-profile callbacks from bridge_reconfigure
  ***************************************************************************/
 
 #include <config.h>
@@ -23,7 +24,7 @@
 
 #include "openvswitch/vlog.h"
 #include "qos-asic-provider.h"
-#include "qos_ofproto.h"
+#include "qos_plugin.h"
 #include "qos_utils.h"
 #include "smap.h"
 
@@ -561,9 +562,4 @@ qos_configure_port_profiles(struct ofproto *ofproto,
             smap_destroy(&smap);
         }
     }
-}
-
-void
-qos_ofproto_profile_init(void)
-{
 }

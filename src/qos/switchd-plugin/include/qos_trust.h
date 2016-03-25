@@ -22,8 +22,6 @@
 #include "ofproto/ofproto-provider.h"
 
 
-void qos_ofproto_trust_init(void);
-
 void qos_configure_trust(struct ovsdb_idl *idl, unsigned int idl_seqno);
 void qos_trust_send_change(struct ofproto *ofproto,
                            void *aux, /* struct port * */

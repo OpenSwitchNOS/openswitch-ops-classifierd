@@ -13,6 +13,7 @@
  *    License for the specific language governing permissions and limitations
  *    under the License.
  *
+ * Handle QoS COS- and DSCP-map callbacks from bridge_reconfigure
  ***************************************************************************/
 
 #include <config.h>
@@ -23,7 +24,7 @@
 #include <string.h>
 
 #include "openvswitch/vlog.h"
-#include "qos_ofproto.h"
+#include "qos_plugin.h"
 #include "qos-asic-provider.h"
 
 

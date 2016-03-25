@@ -22,8 +22,6 @@
 #include "ofproto/ofproto-provider.h"
 
 
-void qos_ofproto_profile_init(void);
-
 int qos_apply_profile(struct ofproto *ofproto,
                       void *aux, /* struct port *port */
                       const struct ovsrec_qos *ovsrec_qos,

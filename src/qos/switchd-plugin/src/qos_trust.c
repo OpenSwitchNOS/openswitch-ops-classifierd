@@ -13,6 +13,7 @@
  *    License for the specific language governing permissions and limitations
  *    under the License.
  *
+ * Handle QoS trust callbacks from bridge_reconfigure
  ***************************************************************************/
 
 #include <config.h>
@@ -21,7 +22,7 @@
 
 #include "openvswitch/vlog.h"
 #include "qos-asic-provider.h"
-#include "qos_ofproto.h"
+#include "qos_plugin.h"
 #include "qos_utils.h"
 
 
@@ -32,7 +33,15 @@ static enum qos_trust global_qos_trust = QOS_TRUST_NONE;
 static bool global_trust_changed = false;
 
 
-/* Configure global QOS trust setting. */
+/**
+ * Configure global QOS trust setting.
+ *   Keeps track of global QOS trust value.
+ *
+ *   Called from bridge reconfigure at the start of its processing.
+ *
+ * @param idl       - pointer to IDL
+ * @param idl_seqno - current transaction sequence number
+ */
 void
 qos_configure_trust(struct ovsdb_idl *idl, unsigned int idl_seqno)
 {
@@ -43,14 +52,14 @@ qos_configure_trust(struct ovsdb_idl *idl, unsigned int idl_seqno)
     /* Clear global trust changed indicator. */
     global_trust_changed = false;
 
-    // nothing to do if System row is unchanged.
+    /* nothing to do if System row is unchanged. */
     ovs_row = ovsrec_system_first(idl);
     if (OVSREC_IDL_IS_ROW_MODIFIED(ovs_row, idl_seqno) &&
         OVSREC_IDL_IS_COLUMN_MODIFIED(ovsrec_system_col_qos_config, idl_seqno))
     {
         qos_trust = get_qos_trust_value(&ovs_row->qos_config);
 
-        // only change saved QoS trust if default is valid
+        /* only change saved QoS trust if default is valid */
         if (qos_trust != QOS_TRUST_MAX) {
             if (qos_trust != global_qos_trust)
             {
@@ -64,6 +73,17 @@ qos_configure_trust(struct ovsdb_idl *idl, unsigned int idl_seqno)
     return;
 }
 
+/**
+ * programs qos trust for a port
+ *      called from bridge reconfigure after all ports in a bridge or VRF
+ *      have been configured.
+ *
+ * @param ofproto   - pointer to bridge or VRF descriptor
+ * @param aux       - opaque pointer passed through to provider layer,
+ *                    is a bridge_reconfigure "struct port" pointer
+ * @param port_cfg  - Port row in IDL
+ * @param idl_seqno - current transaction sequence number
+ */
 void
 qos_trust_send_change(struct ofproto *ofproto,
                       void *aux,
