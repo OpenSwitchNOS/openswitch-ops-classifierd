@@ -35,11 +35,11 @@ int init (int phase_id)
     register_reconfigure_callback(&acl_reconfigure_init, BLK_INIT_RECONFIGURE,
                                   NO_PRIORITY);
     VLOG_INFO("[%s] - Registering in BLK_BR_DELETE_PORTS", ACL_PLUGIN_NAME);
-    //register_reconfigure_callback(&acl_callback_port_delete,
-      //                             BLK_BR_DELETE_PORTS, NO_PRIORITY);
+    register_reconfigure_callback(&acl_callback_port_delete,
+                                  BLK_BR_DELETE_PORTS, NO_PRIORITY);
     VLOG_INFO("[%s] - Registering in BLK_VRF_DELETE_PORTS", ACL_PLUGIN_NAME);
-    //register_reconfigure_callback(&acl_callback_port_delete,
-      //                             BLK_VRF_DELETE_PORTS, NO_PRIORITY);
+    register_reconfigure_callback(&acl_callback_port_delete,
+                                  BLK_VRF_DELETE_PORTS, NO_PRIORITY);
     VLOG_INFO("[%s] - Registering in BLK_BR_RECONFIGURE_PORTS",
               ACL_PLUGIN_NAME);
     register_reconfigure_callback(&acl_callback_port_reconfigure,
