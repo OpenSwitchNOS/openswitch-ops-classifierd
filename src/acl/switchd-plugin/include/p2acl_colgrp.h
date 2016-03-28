@@ -32,13 +32,13 @@
  * accomplished solely via row pointers and column pointers.
  * Access is only provided via direct access to individualy
  * named structure members and setter functions (e.g
- * ovsrec_port_set_aclv4_in_cur(). This means that
- * a function coded to work with the aclv4_in_cur field cannot
- * also be used to access the aclv4_out_cur field.
+ * ovsrec_port_set_aclv4_in_applied(). This means that
+ * a function coded to work with the aclv4_in_applied field cannot
+ * also be used to access the aclv4_out_applied field.
  *
  * This structure, and it's associated getters/setters solve that
- * problem. Functions coded to work with p2acl_colgp_get_cur()
- * and p2acl_colgrp_set_cur() will be able to work with the _cur
+ * problem. Functions coded to work with p2acl_colgp_get_applied()
+ * and p2acl_colgrp_set_applied() will be able to work with the _applied
  * field of any p2acl "quartet".
  ************************************************************/
 struct p2acl_colgrp {
@@ -46,25 +46,25 @@ struct p2acl_colgrp {
     enum ops_cls_direction direction;
 
     /* column pointer */
-    struct ovsdb_idl_column *column_cur;
-    struct ovsdb_idl_column *column_want;
-    struct ovsdb_idl_column *column_want_version;
-    struct ovsdb_idl_column *column_want_status;
+    struct ovsdb_idl_column *column_applied;
+    struct ovsdb_idl_column *column_cfg;
+    struct ovsdb_idl_column *column_cfg_version;
+    struct ovsdb_idl_column *column_cfg_status;
 
     /* Offset to the fields inside IDL-generated 'struct ovsrec_port' */
-    off_t offset_cur;
-    off_t offset_want;
-    off_t offset_want_version;
-    off_t offset_want_status;
+    off_t offset_applied;
+    off_t offset_cfg;
+    off_t offset_cfg_version;
+    off_t offset_cfg_status;
 
     /* pointers to IDL-generated setter functions */
-    void (*set_cur)(const struct ovsrec_port *,
+    void (*set_applied)(const struct ovsrec_port *,
                     const struct ovsrec_acl *cur);
-    void (*set_want)(const struct ovsrec_port *,
+    void (*set_cfg)(const struct ovsrec_port *,
                      const struct ovsrec_acl *want);
-    void (*set_want_version)(const struct ovsrec_port *,
+    void (*set_cfg_version)(const struct ovsrec_port *,
                              int64_t want_version);
-    void (*set_want_status)(const struct ovsrec_port *,
+    void (*set_cfg_status)(const struct ovsrec_port *,
                             const struct smap *want_status);
 };
 
@@ -75,26 +75,26 @@ extern struct p2acl_colgrp p2acl_colgrps[NUM_P2ACL_COLGRPS];
 void p2acl_colgroup_init(void);
 
 /***** Getters *****/
-const struct ovsrec_acl* p2acl_colgrp_get_cur(
+const struct ovsrec_acl* p2acl_colgrp_get_applied(
     const struct p2acl_colgrp *colgrp, const struct ovsrec_port *port);
-const struct ovsrec_acl* p2acl_colgrp_get_want(
+const struct ovsrec_acl* p2acl_colgrp_get_cfg(
     const struct p2acl_colgrp *colgrp, const struct ovsrec_port *port);
-int64_t p2acl_colgrp_get_want_version(
+int64_t p2acl_colgrp_get_cfg_version(
     const struct p2acl_colgrp *colgrp, const struct ovsrec_port *port);
-const struct smap* p2acl_colgrp_get_want_status(
+const struct smap* p2acl_colgrp_get_cfg_status(
     const struct p2acl_colgrp *colgrp, const struct ovsrec_port *port);
 
 /***** Setters *****/
-void p2acl_colgrp_set_cur(const struct p2acl_colgrp *colgrp,
+void p2acl_colgrp_set_applied(const struct p2acl_colgrp *colgrp,
                           const struct ovsrec_port *port,
                           const struct ovsrec_acl *cur);
-void p2acl_colgrp_set_want(const struct p2acl_colgrp *colgrp,
+void p2acl_colgrp_set_cfg(const struct p2acl_colgrp *colgrp,
                            const struct ovsrec_port *port,
                            const struct ovsrec_acl *want);
-void p2acl_colgrp_set_want_version(const struct p2acl_colgrp *colgrp,
+void p2acl_colgrp_set_cfg_version(const struct p2acl_colgrp *colgrp,
                                    const struct ovsrec_port *port,
                                    int64_t want_version);
-void p2acl_colgrp_set_want_status(const struct p2acl_colgrp *colgrp,
+void p2acl_colgrp_set_cfg_status(const struct p2acl_colgrp *colgrp,
                                   const struct ovsrec_port *port,
                                   const struct smap *want_status);
 

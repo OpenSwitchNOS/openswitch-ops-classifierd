@@ -20,6 +20,7 @@
 #include "json.h"
 #include "vswitch-idl.h"
 #include "openvswitch/vlog.h"
+#include "ofproto/ofproto-provider.h"
 #include "ofproto-ops-classifier.h"
 #include "acl_parse.h"
 #include "acl_ofproto.h"
@@ -44,9 +45,19 @@ VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
 #define ACE_KEY_DESTINATION_PORT_MAX      "dst_l4_port_max"
 #endif
 
+#define ACL_CFG_STATUS_STR     "status_string"
+#define ACL_CFG_STATUS_VERSION "version"
+#define ACL_CFG_STATUS_STATE   "state"
+#define ACL_CFG_STATUS_CODE    "code"
+#define ACL_CFG_STATUS_MSG     "message"
+#define ACL_CFG_STATE_APPLIED  "applied"
+#define ACL_CFG_STATE_REJECTED "rejected"
+#define ACL_CFG_STATE_IN_PROGRESS "in_progress"
+#define ACL_CFG_STATE_CANCELLED   "cancelled"
+
 struct db_ace {
     uint32_t sequence_number;
-    const char *json;
+    struct ovsrec_acl_entry *acl_entry;
 };
 
 static int
@@ -67,7 +78,7 @@ sort_swap_aces(size_t a, size_t b, void *ptrs_)
     ptrs[a] = ptrs[b];
     ptrs[b] = tmp;
 }
-
+#if 0
 static bool
 populate_entry_from_json_string(struct ops_cls_list_entry *entry,
                                 const char *json_str)
@@ -170,6 +181,105 @@ populate_entry_from_json_string(struct ops_cls_list_entry *entry,
     json_destroy(jsonace);
     return valid;
 }
+#endif
+
+static bool
+populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
+                                const struct ovsrec_acl_entry *acl_entry)
+{
+    bool valid = true;
+
+    /* TODO: support more than ipv4 */
+    if (!acl_parse_ipv4_address
+        (acl_entry->src_ip,
+         OPS_CLS_SRC_IPADDR_VALID,
+         &entry->entry_fields.entry_flags,
+         &entry->entry_fields.src_ip_address.v4,
+         &entry->entry_fields.src_ip_address_mask.v4,
+         &entry->entry_fields.src_addr_family)) {
+        VLOG_ERR("invalid source ip addr %s", acl_entry->src_ip);
+        valid = false;
+    }
+    if (!acl_parse_ipv4_address
+        (acl_entry->dst_ip,
+         OPS_CLS_DEST_IPADDR_VALID,
+         &entry->entry_fields.entry_flags,
+         &entry->entry_fields.dst_ip_address.v4,
+         &entry->entry_fields.dst_ip_address_mask.v4,
+         &entry->entry_fields.dst_addr_family)) {
+        VLOG_ERR("invalid destination ip addr %s", acl_entry->dst_ip);
+        valid = false;
+    }
+
+    if (acl_entry->n_protocol == 0)
+    {
+        VLOG_INFO("populate_entry_from_acl_entry: Protocol not specified");
+    }
+    else
+    {
+    /* SB: @todo verify if business logic has validated protocol value */
+    entry->entry_fields.protocol = acl_entry->protocol[0];
+    entry->entry_fields.entry_flags |= OPS_CLS_PROTOCOL_VALID;
+    }
+
+    if (!acl_parse_actions(acl_entry->action,
+                           &entry->entry_actions)) {
+        VLOG_ERR("invalid action %s", acl_entry->action);
+        valid = false;
+    }
+
+    if(acl_entry->n_src_l4_port_min
+            && acl_entry->src_l4_port_min)
+    {
+        entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_EQ;
+        entry->entry_fields.entry_flags |= OPS_CLS_L4_SRC_PORT_VALID;
+        entry->entry_fields.L4_src_port_min = acl_entry->src_l4_port_min[0];
+    }
+
+    if(acl_entry->n_src_l4_port_max
+            && acl_entry->src_l4_port_max)
+    {
+        /* assumes port min was specified, so changes operator to range */
+        entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_RANGE;
+        entry->entry_fields.entry_flags |= OPS_CLS_L4_SRC_PORT_VALID;
+        entry->entry_fields.L4_src_port_max = acl_entry->src_l4_port_max[0];
+    }
+
+    if(acl_entry->n_src_l4_port_range_reverse
+            && acl_entry->src_l4_port_range_reverse)
+    {
+        /* it assumes that CLI has validated port min and max are the same */
+        entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_NEQ;
+    }
+
+
+    if(acl_entry->n_dst_l4_port_min
+            && acl_entry->dst_l4_port_min)
+    {
+        entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_EQ;
+        entry->entry_fields.entry_flags |= OPS_CLS_L4_DEST_PORT_VALID;
+        entry->entry_fields.L4_dst_port_min = acl_entry->dst_l4_port_min[0];
+    }
+
+    if(acl_entry->n_dst_l4_port_max
+            && acl_entry->dst_l4_port_max)
+    {
+        /* assumes port min was specified, so changes operator to range */
+        entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_RANGE;
+        entry->entry_fields.entry_flags |= OPS_CLS_L4_DEST_PORT_VALID;
+        entry->entry_fields.L4_dst_port_max = acl_entry->dst_l4_port_max[0];
+    }
+
+    if(acl_entry->n_dst_l4_port_range_reverse
+            && acl_entry->dst_l4_port_range_reverse)
+    {
+        /* it assumes that CLI has validated port min and max are the same */
+        entry->entry_fields.L4_dst_port_op = OPS_CLS_L4_PORT_OP_NEQ;
+    }
+
+
+    return valid;
+}
 
 static struct ops_cls_list*
 ops_cls_list_new_from_acl(struct acl *acl)
@@ -183,22 +293,21 @@ ops_cls_list_new_from_acl(struct acl *acl)
     list->list_type = acl->type;
 
     /* make a sorted copy of the ace strings from OVSDB */
-    size_t n_aces = smap_count(&acl_row->want);
+    size_t n_aces = acl_row->n_cfg_aces;
     size_t n_sorted_aces = 0;
     struct db_ace *sorted_aces = NULL;
     if (n_aces > 0) {
         sorted_aces = xmalloc(n_aces * sizeof sorted_aces[0]);
-        struct smap_node *node;
-        SMAP_FOR_EACH (node, &acl_row->want) {
+
+        while (n_sorted_aces < n_aces) {
             /* TODO: Deal with comment ACE's
              *
              if (node->value.is_comment) {
                 continue;
              }
             */
-            sorted_aces[n_sorted_aces].sequence_number =
-                strtoul(node->key, NULL, 0);
-            sorted_aces[n_sorted_aces].json = node->value;
+            sorted_aces[n_sorted_aces].sequence_number = acl_row->key_cfg_aces[n_sorted_aces];
+            sorted_aces[n_sorted_aces].acl_entry = acl_row->value_cfg_aces[n_sorted_aces];
             ++n_sorted_aces;
         }
         if (n_sorted_aces > 0) {
@@ -214,7 +323,7 @@ ops_cls_list_new_from_acl(struct acl *acl)
         const struct db_ace *dbace = &sorted_aces[i];
         struct ops_cls_list_entry *entry = &list->entries[i];
 
-        if (!populate_entry_from_json_string(entry, dbace->json)) {
+        if (!populate_entry_from_acl_entry(entry, dbace->acl_entry)) {
             /* VLOG_ERR already emitted */
             valid = false;
         }
@@ -274,7 +383,7 @@ acl_new(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
 {
     struct acl *acl = xzalloc(sizeof *acl);
     acl->uuid = ovsdb_row->header_.uuid;
-    acl->name = xstrdup(ovsdb_row->list_name); /* we can outlive ovsdb row */
+    acl->name = xstrdup(ovsdb_row->name); /* we can outlive ovsdb row */
     acl->type = acl_type_from_string(ovsdb_row->list_type);
 
     acl->ovsdb_row = ovsdb_row;
@@ -312,14 +421,57 @@ acl_delete(struct acl* acl)
 }
 
 static void
+acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
+                   char *details)
+{
+    struct smap cfg_status;
+    char version[25], code_str[10];
+
+    smap_clone(&cfg_status, &row->cfg_status);
+
+    /* Remove any values that exist */
+    smap_remove(&cfg_status, ACL_CFG_STATUS_STR);
+    smap_remove(&cfg_status, ACL_CFG_STATUS_VERSION);
+    smap_remove(&cfg_status, ACL_CFG_STATUS_STATE);
+    smap_remove(&cfg_status, ACL_CFG_STATUS_CODE);
+    smap_remove(&cfg_status, ACL_CFG_STATUS_MSG);
+
+    /* Add values to the smap */
+    smap_add(&cfg_status, ACL_CFG_STATUS_STR, state);
+    sprintf(version, "%" PRId64"", row->cfg_version);
+    smap_add(&cfg_status, ACL_CFG_STATUS_VERSION,
+             version);
+    smap_add(&cfg_status, ACL_CFG_STATUS_STATE, state);
+    sprintf(code_str, "%u", code);
+    smap_add(&cfg_status, ACL_CFG_STATUS_CODE, code_str);
+    smap_add(&cfg_status, ACL_CFG_STATUS_MSG, details);
+
+    /* Write cfg_status column */
+    ovsrec_acl_set_cfg_status(row, &cfg_status);
+
+    /* TODO: Make this code work/
+    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_STR, state);
+    sprintf(version, "%" PRId64"", row->cfg_version);
+    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_VERSION, version);
+    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_STATE, state);
+    sprintf(code_str, "%u", code);
+    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_CODE, code_str);
+    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_MSG, details); */
+}
+
+static void
 acl_update_internal(struct acl* acl)
 {
     /* Always translate/validate user input, so we can fail early
      * on unsupported values */
+
+    char details[256];
     struct ops_cls_list *list = ops_cls_list_new_from_acl(acl);
     if (!list) {
-        VLOG_DBG("ACL %s -- unable to translate from ovsdb", acl->name);
-        /* TODO: report failure to OVSDB */
+        sprintf(details, "ACL %s -- unable to translate from ovsdb",
+                acl->name);
+        VLOG_DBG(details);
+        acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_REJECTED, 4, details);
         return;
     } else {
         /* delete old PI cache of API obj, and remember new one */
@@ -336,12 +488,29 @@ acl_update_internal(struct acl* acl)
         int rc = call_ofproto_ops_cls_list_update(acl, &status);
 
         if (rc == 0) {
-            VLOG_DBG("ACL %s -- PD list_update succeeded", acl->name);
+            sprintf(details, "ACL %s -- PD list_update succeeded", acl->name);
+            VLOG_DBG(details);
+            ovsrec_acl_set_cur_aces(acl->ovsdb_row,
+                                    acl->ovsdb_row->key_cfg_aces,
+                                    acl->ovsdb_row->value_cfg_aces,
+                                    acl->ovsdb_row->n_cfg_aces);
+            acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_APPLIED,
+                               0, details);
         } else {
-            VLOG_DBG("ACL %s -- PD list_update failed", acl->name);
+            sprintf(details, "ACL %s -- PD list_update failed for"
+                    " acl entry = %u and port = %u", acl->name,
+                     status.entry_id, status.port->ofp_port);
+            VLOG_DBG(details);
+            acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_REJECTED,
+                               status.status_code, details);
         }
     } else {
-        VLOG_DBG("ACL %s -- Not applied. No PD call necessary", acl->name);
+        sprintf(details, "ACL %s -- Not applied. No PD call necessary",
+                acl->name);
+        VLOG_DBG(details);
+        ovsrec_acl_set_cur_aces(acl->ovsdb_row, acl->ovsdb_row->key_cfg_aces,
+            acl->ovsdb_row->value_cfg_aces, acl->ovsdb_row->n_cfg_aces);
+        acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_APPLIED, 0, details);
     }
 }
 
@@ -352,7 +521,7 @@ acl_update_internal(struct acl* acl)
 static struct acl*
 acl_cfg_create(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
 {
-    VLOG_DBG("ACL %s created", ovsdb_row->list_name);
+    VLOG_DBG("ACL %s created", ovsdb_row->name);
 
     struct acl *acl = acl_new(ovsdb_row, seqno);
 

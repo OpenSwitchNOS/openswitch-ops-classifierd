@@ -22,7 +22,5 @@ MESSAGE("PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
 MESSAGE("INCL_DIR=${INCL_DIR}")
 
 add_subdirectory(cli)
-#### RE-ENABLE BEFORE COMMIT OR DON'T COMMIT THIS FILE!!! ####
-#add_subdirectory(switchd-plugin)
-#### END #####
+add_subdirectory(switchd-plugin)
 add_subdirectory(util)

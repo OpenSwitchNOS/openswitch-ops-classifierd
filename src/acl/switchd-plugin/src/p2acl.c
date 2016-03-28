@@ -25,6 +25,15 @@
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_p2acl);
 
+#define P2ACL_CFG_STATUS_VERSION "version"
+#define P2ACL_CFG_STATUS_STATE   "state"
+#define P2ACL_CFG_STATUS_CODE    "code"
+#define P2ACL_CFG_STATUS_MSG     "message"
+#define P2ACL_CFG_STATE_APPLIED  "applied"
+#define P2ACL_CFG_STATE_REJECTED "rejected"
+#define P2ACL_CFG_STATE_IN_PROGRESS "in_progress"
+#define P2ACL_CFG_STATE_CANCELLED   "cancelled"
+
 /*************************************************************
  * struct ops_cls_interface_info helper routines
  *************************************************************/
@@ -95,6 +104,35 @@ p2acl_destruct(struct p2acl *p2acl)
        inside acl_port structs */
 }
 
+static void
+p2acl_set_cfg_status(struct p2acl *p2acl, const struct ovsrec_port *row,
+                     char *state, unsigned int code, char *details)
+{
+    struct smap cfg_status;
+    char version[25], code_str[10];
+
+    smap_clone(&cfg_status, &row->aclv4_in_cfg_status);
+
+    /* Remove any values that exist */
+    smap_remove(&cfg_status, P2ACL_CFG_STATUS_VERSION);
+    smap_remove(&cfg_status, P2ACL_CFG_STATUS_STATE);
+    smap_remove(&cfg_status, P2ACL_CFG_STATUS_CODE);
+    smap_remove(&cfg_status, P2ACL_CFG_STATUS_MSG);
+
+    /* Add values to the smap */
+    sprintf(version, "%" PRId64"", row->aclv4_in_cfg_version);
+    smap_add(&cfg_status, P2ACL_CFG_STATUS_VERSION,
+             version);
+    smap_add(&cfg_status, P2ACL_CFG_STATUS_STATE, state);
+    sprintf(code_str, "%u", code);
+    smap_add(&cfg_status, P2ACL_CFG_STATUS_CODE, code_str);
+    smap_add(&cfg_status, P2ACL_CFG_STATUS_MSG, details);
+
+    /* Write cfg_status column */
+    p2acl_colgrp_set_cfg_status(p2acl->colgrp, row, &cfg_status);
+}
+
+
 /************************************************************
  * p2acl_cfg_create(), p2acl_cfg_update(), p2acl_cfg_delete() are the PI
  * p2acl CRUD routines.
@@ -110,13 +148,14 @@ p2acl_update_cfg_internal(struct p2acl *p2acl, struct port *bridgec_port,
                                      p2acl->parent, bridgec_port);
     int rc;
     const char *method_called = NULL;
+    char details[256];
 
     struct acl* acl;
     /* TODO: Start looking at want_version too.
      *       Short circuit if want_version == want_status_version.
      */
     const struct ovsrec_acl *ovsdb_acl =
-        p2acl_colgrp_get_want(p2acl->colgrp, p2acl->parent->ovsdb_row);
+        p2acl_colgrp_get_cfg(p2acl->colgrp, p2acl->parent->ovsdb_row);
     if (!ovsdb_acl) {
         acl = NULL;
         if (p2acl->hw_acl) {
@@ -175,28 +214,37 @@ p2acl_update_cfg_internal(struct p2acl *p2acl, struct port *bridgec_port,
     }
 
     if (method_called == NULL) {
-        VLOG_DBG("P2ACL %s:%s:%s no PD call needed",
+        sprintf(details, "P2ACL %s:%s:%s no PD call needed",
                  p2acl->parent->name,
                  ops_cls_type_strings[p2acl->colgrp->type],
                  ops_cls_direction_strings[p2acl->colgrp->direction]);
-        /* TODO: report NoOp success to OVSDB */
+        VLOG_DBG(details);
+        p2acl_set_cfg_status(p2acl, bridgec_port->cfg, P2ACL_CFG_STATE_APPLIED, 0, details);
     } else if (rc == 0) {
         /* success */
-        VLOG_DBG("P2ACL %s:%s:%s -- PD %s succeeded",
+        sprintf(details, "P2ACL %s:%s:%s -- PD %s succeeded",
                  p2acl->parent->name,
                  ops_cls_type_strings[p2acl->colgrp->type],
                  ops_cls_direction_strings[p2acl->colgrp->direction],
                  method_called);
+        VLOG_DBG(details);
         /* TODO: report success to OVSDB */
         p2acl_set_hw_acl(p2acl, acl);
+        p2acl_colgrp_set_applied(p2acl->colgrp, bridgec_port->cfg,
+                                 acl->ovsdb_row);
+        p2acl_set_cfg_status(p2acl, bridgec_port->cfg, P2ACL_CFG_STATE_APPLIED,
+                             status.status_code, details);
     } else {
         /* failure */
-        VLOG_DBG("P2ACL %s:%s:%s -- PD %s failed",
+        sprintf(details, "P2ACL %s:%s:%s -- PD %s failed",
                  p2acl->parent->name,
                  ops_cls_type_strings[p2acl->colgrp->type],
                  ops_cls_direction_strings[p2acl->colgrp->direction],
                  method_called);
-        /* TODO: report failure to OVSDB */
+        VLOG_DBG(details);
+        p2acl_set_cfg_status(p2acl, bridgec_port->cfg,
+                             P2ACL_CFG_STATE_REJECTED,
+                             status.status_code, details);
     }
 }
 
@@ -312,8 +360,8 @@ p2acl_unapply_for_acl_cfg_delete(struct p2acl* p2acl)
     p2acl_unapply_internal(p2acl, bridgec_port);
 */
     /* TODO: We must update OVSDB
-     *       _cur must go to NULL
-     *       _want_status must change too
+     *       _applied must go to NULL
+     *       _cfg_status must change too
      *         failed w/ reason = ACL deleted while applied
      */
 }
