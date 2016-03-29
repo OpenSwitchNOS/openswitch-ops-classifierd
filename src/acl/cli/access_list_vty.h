@@ -33,6 +33,7 @@
 #ifndef _ACCESS_LIST_VTY_H
 #define _ACCESS_LIST_VTY_H
 
+/** @todo remote these once update for new schema */
 /* ACL Entry (ACE) key indices */
 #ifndef ACE_KEY_
 #define ACE_KEY_
@@ -56,23 +57,6 @@
 #define ACE_KEY_N_                       13 /**< For sizing arrays, loops */
 #define ACE_KEY_MIN_                      0 /**< For checking bounds */
 #define ACE_KEY_MAX_         ACE_KEY_N_ - 1 /**< For checking bounds */
-
-/** ACL Entry (ACE) key string constants (indexed by ACE_KEY_*) */
-static const char *ace_key_names[ACE_KEY_N_] = {
-    "action",
-    "protocol",
-    "src_ip",
-    "src_l4_op",
-    "src_l4_port",
-    "src_l4_port_max",
-    "dst_ip",
-    "dst_l4_op",
-    "dst_l4_port",
-    "dst_l4_port_max",
-    "log",
-    "count",
-    "comment"
-};
 #endif
 
 /** Standard CLI entry point for first stage of initalization */

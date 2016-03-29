@@ -35,6 +35,7 @@
 #include <openvswitch/vlog.h>
 #include <smap.h>
 #include <json.h>
+#include <dynamic-string.h>
 
 #include <vswitch-idl.h>
 #include <ovsdb-idl.h>
@@ -138,9 +139,12 @@ extern struct ovsdb_idl *idl;
 #define ACE_ADDITIONAL_OPTIONS_CMDSTR "{ log | count }"
 #define ACE_ADDITIONAL_OPTIONS_HELPSTR "Log packets matching this entry\n" \
                                        "Count packets matching this entry\n"
-#define ACE_COMMENT_CMDSTR "(comment) .TEXT"
-#define ACE_COMMENT_HELPSTR "Text comment entry\n" \
-                            "Comment text\n"
+#define ACE_COMMENT_CMDSTR "(comment) "
+#define ACE_COMMENT_HELPSTR "Set a text comment for a new or existing ACE\n"
+#define ACE_COMMENT_TEXT_CMDSTR ".TEXT"
+#define ACE_COMMENT_TEXT_HELPSTR "Comment text\n"
+#define ACE_ETC_CMDSTR "...."
+#define ACE_ETC_HELPSTR "(ignored)\n"
 
 /* = Static/Helper functions = */
 
@@ -159,7 +163,7 @@ get_acl_by_type_name(const char *acl_type, const char *acl_name)
 
     OVSREC_ACL_FOR_EACH(acl, idl) {
         if ((!strcmp(acl->list_type, acl_type)) &&
-            (!strcmp(acl->list_name, acl_name))) {
+            (!strcmp(acl->name, acl_name))) {
             return (struct ovsrec_acl *) acl;
         }
     }
@@ -168,24 +172,113 @@ get_acl_by_type_name(const char *acl_type, const char *acl_name)
 }
 
 /**
- * Returns the current highest sequence number in an ACL
+ * Look up an ACE by key (sequence number) in configured ACEs
  *
- * @param  acl_row  ACL OVSDB row pointer
+ * @param  acl_row         ACL row pointer
+ * @param  sequence_number ACE sequence number
  *
- * @return          Pointer to string of highest sequence number ACE
+ * @return                 Pointer to ovsrec_acl_entry structure object
+ *
+ * @todo this would be nice to have generated as part of IDL
  */
-static inline const char *
-acl_get_highest_seq(const struct ovsrec_acl *acl_row)
+static inline const struct ovsrec_acl_entry*
+ovsrec_acl_cfg_aces_getvalue(const struct ovsrec_acl *acl_row,
+                             const int64_t key)
 {
-    const struct smap_node **aces_sorted;
-    const char *seq_str = NULL;
-
-    if ((aces_sorted = smap_sort_numeric(&acl_row->want)) != NULL) {
-        seq_str = aces_sorted[smap_count(&acl_row->want) - 1]->key;
-        free(aces_sorted);
+    int i;
+    for (i = 0; i < acl_row->n_cfg_aces; i ++) {
+        if (acl_row->key_cfg_aces[i] == key) {
+            return acl_row->value_cfg_aces[i];
+        }
     }
+    return NULL;
+}
 
-    return seq_str;
+/**
+ * Look up an ACE by key (sequence number) in ACE statistics
+ *
+ * @param  port_row        Port row pointer
+ * @param  sequence_number ACE sequence number
+ *
+ * @return                 Hit count for ACE, -1 on failure
+ *
+ * @todo this would be nice to have generated as part of IDL
+ */
+static inline const int64_t
+ovsrec_port_aclv4_in_statistics_getvalue(const struct ovsrec_port *port_row,
+                                         const int64_t key)
+{
+    int i;
+    for (i = 0; i < port_row->n_aclv4_in_statistics; i ++) {
+        if (port_row->key_aclv4_in_statistics[i] == key) {
+            return port_row->value_aclv4_in_statistics[i];
+        }
+    }
+    return 0;
+}
+
+/**
+ * Look up an ACE by key (sequence number) in ACE statistics
+ *
+ * @param  vlan_row        VLAN row pointer
+ * @param  sequence_number ACE sequence number
+ *
+ * @return                 Hit count for ACE, -1 on failure
+ *
+ * @todo this would be nice to have generated as part of IDL
+ */
+static inline const int64_t
+ovsrec_vlan_aclv4_in_statistics_getvalue(const struct ovsrec_vlan *vlan_row,
+                                         const int64_t key)
+{
+    int i;
+    for (i = 0; i < vlan_row->n_aclv4_in_statistics; i ++) {
+        if (vlan_row->key_aclv4_in_statistics[i] == key) {
+            return vlan_row->value_aclv4_in_statistics[i];
+        }
+    }
+    return 0;
+}
+
+/**
+ * Set a key-value pair for an ovsrec_acl, but do so in a way that's safe for
+ * newly-added ovsrec_acl_entry UUIDs
+ *
+ * @param acl_row ACL row pointer
+ * @param key     numeric key (entry sequence number)
+ * @param value   ACL Entry row pointer
+ *
+ * @todo Work-around for https://tree.taiga.io/project/openswitch/issue/750
+ */
+static inline void
+ovsrec_acl_update_cfg_aces_setkey_safe(const struct ovsrec_acl *acl_row,
+                                       const int64_t key,
+                                       struct ovsrec_acl_entry *value)
+{
+    int new_values = 1;
+    /* It's ok if we malloc one more entry than we need in the case of update */
+    int64_t *key_list = xmalloc(sizeof(int64_t) * (acl_row->n_cfg_aces + new_values));
+    struct ovsrec_acl_entry **value_list = xmalloc(sizeof *acl_row->value_cfg_aces * (acl_row->n_cfg_aces + new_values));
+    int i;
+
+    for (i = 0; i < acl_row->n_cfg_aces; i++) {
+        if (acl_row->key_cfg_aces[i] == key) {
+            key_list[i] = key;
+            value_list[i] = value;
+            new_values = 0;
+        } else {
+            key_list[i] = acl_row->key_cfg_aces[i];
+            value_list[i] = acl_row->value_cfg_aces[i];
+        }
+    }
+    /* If not an update, append */
+    if (new_values > 0) {
+        key_list[acl_row->n_cfg_aces] = key;
+        value_list[acl_row->n_cfg_aces] = value;
+    }
+    ovsrec_acl_set_cfg_aces(acl_row, key_list, value_list, acl_row->n_cfg_aces + new_values);
+    free(key_list);
+    free(value_list);
 }
 
 /**
@@ -230,88 +323,244 @@ get_vlan_by_id_str(const char *id_str)
     return NULL;
 }
 
-/**
- * Helper function to create a json structure whose members are all printable.
- * Present items have a trailing space, missing items are empty strings ("")
- *
- * Caller must call json_destroy() when finished with returned structure
- *
- * @param  ace        json structure
- *
- * @return            pointer to json structure with "printable" members
- */
-static struct json *
-ace_clone_printable(const struct json *ace)
-{
-    const struct shash *object = json_object(ace);
-    struct json *json;
-    void *data;
-    int key_idx;
+/** @todo get protocol parsing into util directory */
+#define ACL_PROTOCOL_ICMP    1
+#define ACL_PROTOCOL_IGMP    2
+#define ACL_PROTOCOL_TCP     6
+#define ACL_PROTOCOL_UDP     17
+#define ACL_PROTOCOL_GRE     47
+#define ACL_PROTOCOL_ESP     50
+#define ACL_PROTOCOL_AH      51
+#define ACL_PROTOCOL_ICMPV6  58
+#define ACL_PROTOCOL_PIM     103
+#define ACL_PROTOCOL_SCTP    132
+#define ACL_PROTOCOL_INVALID 255
 
-    json = json_object_create();
-    for (key_idx = ACE_KEY_MIN_; key_idx < ACE_KEY_N_; key_idx++) {
-        data = shash_find_data(object, ace_key_names[key_idx]);
-        if (data) {
-            const char *data_str;
-            /* For booleans, use the key name to indicate "true" */
-            if (!strcmp(json_string(data), ACL_TRUE_STR)) {
-                data_str = ace_key_names[key_idx];
-            /* Otherwise use the json member value */
-            } else {
-                data_str = json_string(data);
-            }
-            /* Allocate buffer for data, trailing space, and NULL, thus + 2 */
-            char *value = xzalloc(strlen(data_str) + 2);
-            strcpy(value, data_str);          /* Copy original string  */
-            value[strlen(value)] = ' ';       /* Append trailing space */
-            json_object_put_string(json, ace_key_names[key_idx], value);
-            free(value);
-        } else {
-            json_object_put_string(json, ace_key_names[key_idx], "");
-        }
+static const char * const protocol_names[] = {
+       "0", "icmp", "igmp",    "3",    "4",    "5",  "tcp",    "7",
+       "8",    "9",   "10",   "11",   "12",   "13",   "14",   "15",
+      "16",  "udp",   "18",   "19",   "20",   "21",   "22",   "23",
+      "24",   "25",   "26",   "27",   "28",   "29",   "30",   "31",
+      "32",   "33",   "34",   "35",   "36",   "37",   "38",   "39",
+      "40",   "41",   "42",   "43",   "44",   "45",   "46",  "gre",
+      "48",   "49",  "esp",   "ah",   "52",   "53",   "54",   "55",
+      "56",   "57",   "58",   "59",   "60",   "61",   "62",   "63",
+      "64",   "65",   "66",   "67",   "68",   "69",   "70",   "71",
+      "72",   "73",   "74",   "75",   "76",   "77",   "78",   "79",
+      "80",   "81",   "82",   "83",   "84",   "85",   "86",   "87",
+      "88",   "89",   "90",   "91",   "92",   "93",   "94",   "95",
+      "96",   "97",   "98",   "99",  "100",  "101",  "102",  "pim",
+     "104",  "105",  "106",  "107",  "108",  "109",  "110",  "111",
+     "112",  "113",  "114",  "115",  "116",  "117",  "118",  "119",
+     "120",  "121",  "122",  "123",  "124",  "125",  "126",  "127",
+     "128",  "129",  "130",  "131", "sctp",  "133",  "134",  "135",
+     "136",  "137",  "138",  "139",  "140",  "141",  "142",  "143",
+     "144",  "145",  "146",  "147",  "148",  "149",  "150",  "151",
+     "152",  "153",  "154",  "155",  "156",  "157",  "158",  "159",
+     "160",  "161",  "162",  "163",  "164",  "165",  "166",  "167",
+     "168",  "169",  "170",  "171",  "172",  "173",  "174",  "175",
+     "176",  "177",  "178",  "179",  "180",  "181",  "182",  "183",
+     "184",  "185",  "186",  "187",  "188",  "189",  "190",  "191",
+     "192",  "193",  "194",  "195",  "196",  "197",  "198",  "199",
+     "200",  "201",  "202",  "203",  "204",  "205",  "206",  "207",
+     "208",  "209",  "210",  "211",  "212",  "213",  "214",  "215",
+     "216",  "217",  "218",  "219",  "220",  "221",  "222",  "223",
+     "224",  "225",  "226",  "227",  "228",  "229",  "230",  "231",
+     "232",  "233",  "234",  "235",  "236",  "237",  "238",  "239",
+     "240",  "241",  "242",  "243",  "244",  "245",  "246",  "247",
+     "248",  "249",  "250",  "251",  "252",  "253",  "254",  "255"
+};
+
+static uint8_t
+protocol_get_number_from_name(const char *in_proto)
+{
+    uint8_t protocol = ACL_PROTOCOL_INVALID;
+
+    if (!in_proto) {
+        VLOG_DBG("Null protocol string specified");
+        return protocol;
     }
-    return json;
+
+    if (!strcmp(in_proto, "ah")) {
+        protocol = ACL_PROTOCOL_AH;
+    } else if (!strcmp(in_proto, "esp")) {
+        protocol = ACL_PROTOCOL_ESP;
+    } else if (!strcmp(in_proto, "icmp")) {
+        protocol = ACL_PROTOCOL_ICMP;
+    } else if (!strcmp (in_proto, "icmpv6")) {
+        protocol = ACL_PROTOCOL_ICMPV6;
+    } else if (!strcmp (in_proto, "igmp")) {
+        protocol = ACL_PROTOCOL_IGMP;
+    } else if (!strcmp (in_proto, "pim")) {
+        protocol = ACL_PROTOCOL_PIM;
+    } else  if (!strcmp (in_proto, "sctp")) {
+        protocol = ACL_PROTOCOL_SCTP;
+    } else if (!strcmp (in_proto, "tcp")) {
+        protocol = ACL_PROTOCOL_TCP;
+    } else if (!strcmp (in_proto, "udp")) {
+        protocol = ACL_PROTOCOL_UDP;
+    } else {
+        VLOG_DBG("Invalid protocol specified %s", in_proto);
+        protocol = ACL_PROTOCOL_INVALID;
+    }
+
+    return protocol;
+}
+
+static bool
+protocol_is_number(const char *in_proto)
+{
+    /* Null check. May not be necessary here */
+    if (!*in_proto) {
+        return false;
+    }
+
+    /* Check if every character in the string is a digit */
+    while (*in_proto) {
+        if (!isdigit(*in_proto)) {
+            return false;
+        }
+        ++in_proto;
+    }
+
+    return true;
+}
+
+static const char *
+protocol_get_name_from_number(uint8_t proto_number)
+{
+    return protocol_names[proto_number];
 }
 
 /* = OVSDB Manipulation Functions = */
 
 /**
+ * Add IP address config information to an ACE dynamic string
+ *
+ * @param dstring      Pointer to initialized dynamic string
+ * @param address_str  Pointer to IP address string
+ *
+ * @todo conversion from A.B.C.D/W.X.Y.Z into "any", host, and prefix
+ */
+static void
+ace_entry_ip_address_config_to_ds(struct ds *dstring, char *address_str)
+{
+    ds_put_format(dstring, "%s ", address_str);
+}
+
+/**
+ * Add L4 port config information to an ACE dynamic string
+ *
+ * @param dstring  Pointer to initialized dynamic string
+ * @param min      First port number
+ * @param max      Last port number
+ * @param reverse  Whether range is reversed
+ */
+static void
+ace_entry_l4_port_config_to_ds(struct ds *dstring,
+                               int64_t min, int64_t max, bool reverse)
+{
+    if (min == max) {
+        if (reverse) {
+            ds_put_format(dstring, "%s %" PRId64 " ", "neq", min);
+        } else {
+            ds_put_format(dstring, "%s %" PRId64 " ", "eq", min);
+        }
+    } else if (min == 0 && max < 65535) {
+        ds_put_format(dstring, "%s %" PRId64 " ", "lt", max + 1);
+    } else if (min > 0 && max == 65535) {
+        ds_put_format(dstring, "%s %" PRId64 " ", "gt", min - 1);
+    } else {
+        ds_put_format(dstring, "%s %" PRId64 " %" PRId64 " ", "range", min, max);
+    }
+}
+
+/**
+ * Creates a string with an ACL Entry config as if it were entered into the CLI
+ *
+ * @param sequence_num  ACL Entry Sequence number
+ * @param ace_row       Pointer to ACL_Entry row
+ *
+ * @return              ACL Entry string, caller-freed, not newline-terminated
+ */
+static char *
+ace_entry_config_to_string(const int64_t sequence_num,
+                           const struct ovsrec_acl_entry *ace_row)
+{
+    struct ds dstring;
+    ds_init(&dstring);
+
+    ds_put_format(&dstring, "%" PRId64 " ", sequence_num);
+    ds_put_format(&dstring, "%s ", ace_row->action);
+    if (ace_row->n_protocol != 0) {
+        ds_put_format(&dstring, "%s ", protocol_get_name_from_number(ace_row->protocol[0]));
+    }
+    if (ace_row->src_ip) {
+        ace_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
+    }
+    if (ace_row->n_src_l4_port_min && ace_row->n_src_l4_port_max) {
+        ace_entry_l4_port_config_to_ds(&dstring,
+                                       ace_row->src_l4_port_min[0],
+                                       ace_row->src_l4_port_max[0],
+                                       ace_row->n_src_l4_port_range_reverse);
+    }
+    if (ace_row->dst_ip) {
+        ace_entry_ip_address_config_to_ds(&dstring, ace_row->dst_ip);
+    }
+    if (ace_row->n_dst_l4_port_min && ace_row->n_dst_l4_port_max) {
+        ace_entry_l4_port_config_to_ds(&dstring,
+                                       ace_row->dst_l4_port_min[0],
+                                       ace_row->dst_l4_port_max[0],
+                                       ace_row->n_dst_l4_port_range_reverse);
+    }
+    if (ace_row->log) {
+        ds_put_format(&dstring, "log ");
+    }
+    if (ace_row->count) {
+        ds_put_format(&dstring, "count ");
+    }
+    return ds_steal_cstr(&dstring);
+}
+
+/**
  * Print an ACL's configuration as if it were entered into the CLI
  *
  * @param acl_row Pointer to ACL row
+ *
+ * @sa show_run_access_list_callback A similar function that uses a different
+ *                                   print method
  */
 static void
 print_acl_config(const struct ovsrec_acl *acl_row)
 {
-    const struct smap_node **aces_sorted;
-    struct json *ace, *ace_printable;
-    int ace_idx, key_idx;
+    char *ace_str;
+    int i;
 
     /* Print ACL command, type, name */
     vty_out(vty,
             "%s %s %s%s",
             "access-list",
             "ip",
-            acl_row->list_name,
+            acl_row->name,
             VTY_NEWLINE);
 
-    aces_sorted = smap_sort_numeric(&acl_row->want);
-    for (ace_idx = 0; ace_idx < smap_count(&acl_row->want); ace_idx++) {
-
-        ace = json_from_string(aces_sorted[ace_idx]->value);
-        ace_printable = ace_clone_printable(ace);
-
-        /* Print each ACL entry as a single line (ala CLI input) */
-        vty_out(vty, "    %s ", aces_sorted[ace_idx]->key); /* key = sequence number */
-        for (key_idx = ACE_KEY_MIN_; key_idx < ACE_KEY_N_; key_idx++) {
-            vty_out(vty, "%s", json_object_get_string(ace_printable, ace_key_names[key_idx]));
+    /* Print each ACL entry as a single line (ala CLI input) */
+    for (i = 0; i < acl_row->n_cfg_aces; i ++) {
+        /* If entry has or is a comment, print as its own line */
+        if (acl_row->value_cfg_aces[i]->comment) {
+            vty_out(vty,
+                    "    %" PRId64 " comment %s%s",
+                    acl_row->key_cfg_aces[i],
+                    acl_row->value_cfg_aces[i]->comment,
+                    VTY_NEWLINE);
         }
-        vty_out(vty, "%s", VTY_NEWLINE);
-
-        json_destroy(ace);
-        json_destroy(ace_printable);
+        if (acl_row->value_cfg_aces[i]->action) {
+            ace_str = ace_entry_config_to_string(acl_row->key_cfg_aces[i],
+                                                 acl_row->value_cfg_aces[i]);
+            vty_out(vty, "    %s%s", ace_str, VTY_NEWLINE);
+            free(ace_str);
+        }
     }
-    free(aces_sorted);
 }
 
 /**
@@ -321,89 +570,152 @@ static void
 print_acl_tabular_header(void)
 {
     vty_out(vty,
-            "%-4s %-10s\n"
-            "   %10s %-7s %-5s\n"
-            "              %-18s %-17s\n"
-            "              %-18s %-17s\n"
-            "              %s%s",
-            "Type", "Name",
-              "Seq", "Action", "Proto",
-                "Source IP", "Port(s)",
-                "Destination IP", "Port(s)",
-                "Additional Parameters",
-            VTY_NEWLINE);
+            "%-10s %-31s %-18s\n"
+             "%10s %-31s %-18s\n"
+             "%10s %-31s %-18s\n"
+             "%10s %-31s %-18s\n"
+             "%10s %-31s %-18s\n"
+             "%10s %-31s %-18s%s",
+            "Type", "Name", "",
+            "Sequence", "Comment", "",
+            "", "Action", "L3 Protocol",
+            "", "Source IP Address", "Source L4 Port(s)",
+            "", "Destination IP Address", "Destination L4 Port(s)",
+            "", "Additional Parameters", "", VTY_NEWLINE);
+}
+
+/**
+ * Print horizontal rule line to separate tabular output
+ */
+static void
+print_acl_horizontal_rule(void)
+{
     vty_out(vty, "%s%s",
-            "-------------------------------------------------------------------------------",
-            VTY_NEWLINE);
+        "-------------------------------------------------------------------------------",
+        VTY_NEWLINE);
+}
+
+/**
+ * Print human-readable IP Address string
+ *
+ * The database stores only in dotted-slash notation, but this should be
+ * translated to other CLI-style keywords/formats to readability.
+ *
+ * @param format       Format string (e.g. "%s" for simple usage)
+ * @param address_str  Pointer to IP address string
+ *
+ * @todo conversion from A.B.C.D/W.X.Y.Z into "any", host, and prefix
+ */
+static void
+print_ace_pretty_ip_address(const char *format, char *address_str)
+{
+    if (address_str) {
+        vty_out(vty, format, address_str);
+    }
+}
+
+/**
+ * Print human-readable L4 ports string
+ *
+ * @param min      First port number
+ * @param max      Last port number
+ * @param reverse  Whether range is reversed
+ */
+static void
+print_ace_pretty_l4_ports(int64_t min, int64_t max, bool reverse)
+{
+    if (min == max) {
+        if (reverse) {
+            vty_out(vty, "%s %5" PRId64, "!=", min);
+        } else {
+            vty_out(vty, "%s %5" PRId64, " =", min);
+        }
+    } else if (min == 0 && max < 65535) {
+        vty_out(vty, "%s %5" PRId64, " <", max + 1);
+    } else if (min > 0 && max == 65535) {
+        vty_out(vty, "%s %5" PRId64, " >", min - 1);
+    } else {
+        vty_out(vty, "%s %5" PRId64 " %s %5" PRId64, "  ", min, "-", max);
+    }
 }
 
 /**
  * Print an ACL's configuration in a tabular format
+ *
+ * This function isn't pretty, but this is the only place this formatting style
+ * is used, so there's not a lot of re-use to be gained by breaking it up now.
  *
  * @param acl_row Pointer to ACL to print
  */
 static void
 print_acl_tabular(const struct ovsrec_acl *acl_row)
 {
-    const struct smap_node **aces_sorted;
-    struct json *ace, *ace_printable;
-    int ace_idx;
+    int i;
 
     /* Print ACL type and name */
     if (!strcmp(acl_row->list_type, "ipv4")) {
-        vty_out(vty, "%-4s ", "ip");
+        vty_out(vty, "%-10s ", "IPv4");
     }
-    vty_out(vty, "%-64s ", acl_row->list_name);
-    vty_out(vty, "%s", VTY_NEWLINE);
+    vty_out(vty, "%s%s", acl_row->name, VTY_NEWLINE);
 
-    aces_sorted = smap_sort_numeric(&acl_row->want);
-    for (ace_idx = 0; ace_idx < smap_count(&acl_row->want); ace_idx++) {
-
-        ace = json_from_string(aces_sorted[ace_idx]->value);
-        ace_printable = ace_clone_printable(ace);
-
+    /* Print each ACL entry as a single line (ala CLI input) */
+    for (i = 0; i < acl_row->n_cfg_aces; i ++) {
         /* Entry sequence number, action, and protocol (if any) */
-        vty_out(vty,
-                "   %10s %-7s%s %-5s%s",
-                aces_sorted[ace_idx]->key, /* key = sequence number */
-                json_object_get_string(ace_printable, ace_key_names[ACE_KEY_ACTION]),
-                json_object_get_string(ace_printable, ace_key_names[ACE_KEY_COMMENT]),
-                json_object_get_string(ace_printable, ace_key_names[ACE_KEY_IP_PROTOCOL]),
-                VTY_NEWLINE);
+        vty_out(vty, "%10" PRId64 " ", acl_row->key_cfg_aces[i]);
+        /* Comment (if any) */
+        if (acl_row->value_cfg_aces[i]->comment) {
+            vty_out(vty, "%s", acl_row->value_cfg_aces[i]->comment);
+        }
+        if (acl_row->value_cfg_aces[i]->action) {
+            /* Adjust spacing if a comment was printed as first line */
+            if (acl_row->value_cfg_aces[i]->comment) {
+                vty_out(vty, "%s", VTY_NEWLINE);
+                vty_out(vty, "%-10s ", "");
+            }
+            vty_out(vty, "%-31s ", acl_row->value_cfg_aces[i]->action);
+        } else {
+            vty_out(vty, "%-31s ", "");
+        }
+        if (acl_row->value_cfg_aces[i]->n_protocol != 0) {
+            vty_out(vty, "%s ", protocol_get_name_from_number(acl_row->value_cfg_aces[i]->protocol[0]));
+        } else {
+            vty_out(vty, "%s ", "");
+        }
+        vty_out(vty, "%s", VTY_NEWLINE);
         /* Source IP, port information */
-        if (json_object_get_string(ace, ace_key_names[ACE_KEY_SOURCE_IP_ADDRESS])) {
-            vty_out(vty,
-                    "              %-18s %-5s %-5s %-5s%s",
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_IP_ADDRESS]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_PORT_OPERATOR]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_PORT]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_PORT_MAX]),
-                    VTY_NEWLINE);
+        if (acl_row->value_cfg_aces[i]->src_ip) {
+            vty_out(vty, "%-10s ", "");
+            print_ace_pretty_ip_address("%-31s ", acl_row->value_cfg_aces[i]->src_ip);
+            if (acl_row->value_cfg_aces[i]->n_src_l4_port_min &&
+                    acl_row->value_cfg_aces[i]->n_src_l4_port_max) {
+                print_ace_pretty_l4_ports(
+                        acl_row->value_cfg_aces[i]->src_l4_port_min[0],
+                        acl_row->value_cfg_aces[i]->src_l4_port_max[0],
+                        acl_row->value_cfg_aces[i]->n_src_l4_port_range_reverse);
+            }
+            vty_out(vty, "%s", VTY_NEWLINE);
         }
         /* Destination IP, port information */
-        if (json_object_get_string(ace, ace_key_names[ACE_KEY_DESTINATION_IP_ADDRESS])) {
-            vty_out(vty,
-                    "              %-18s %-5s %-5s %-5s%s",
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_IP_ADDRESS]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_PORT_OPERATOR]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_PORT]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_PORT_MAX]),
-                    VTY_NEWLINE);
+        if (acl_row->value_cfg_aces[i]->dst_ip) {
+            vty_out(vty, "%-10s ", "");
+            print_ace_pretty_ip_address("%-31s ", acl_row->value_cfg_aces[i]->dst_ip);
+            if (acl_row->value_cfg_aces[i]->n_dst_l4_port_min &&
+                    acl_row->value_cfg_aces[i]->n_dst_l4_port_max) {
+                print_ace_pretty_l4_ports(
+                        acl_row->value_cfg_aces[i]->dst_l4_port_min[0],
+                        acl_row->value_cfg_aces[i]->dst_l4_port_max[0],
+                        acl_row->value_cfg_aces[i]->n_dst_l4_port_range_reverse);
+            }
+            vty_out(vty, "%s", VTY_NEWLINE);
         }
-        /* Additional parameters */
-        if (json_object_get_string(ace, ace_key_names[ACE_KEY_LOG]) ||
-            json_object_get_string(ace, ace_key_names[ACE_KEY_COUNT])) {
-            vty_out(vty,
-                "              %s%s%s",
-                json_object_get_string(ace_printable, ace_key_names[ACE_KEY_LOG]),
-                json_object_get_string(ace_printable, ace_key_names[ACE_KEY_COUNT]),
-                VTY_NEWLINE);
+        /* Additional parameters, each on their own line */
+        if (acl_row->value_cfg_aces[i]->n_log) {
+            vty_out(vty, "%-10s Logging: enabled %s", "", VTY_NEWLINE);
         }
-
-        json_destroy(ace);
-        json_destroy(ace_printable);
+        if (acl_row->value_cfg_aces[i]->n_count) {
+            vty_out(vty, "%-10s Hit-counts: enabled %s", "", VTY_NEWLINE);
+        }
     }
-    free(aces_sorted);
 }
 
 /**
@@ -420,7 +732,15 @@ cli_print_acls(const char *acl_type,
                const char *acl_name,
                const char *config)
 {
+    const struct ovsrec_system *ovs;
     const struct ovsrec_acl *acl_row;
+
+    /* Get System table */
+    ovs = ovsrec_system_first(idl);
+    if (!ovs) {
+        assert(0);
+        return CMD_OVSDB_FAILURE;
+    }
 
     /* ACL specified, print just one */
     if (acl_type && acl_name) {
@@ -429,27 +749,25 @@ cli_print_acls(const char *acl_type,
             vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
             return CMD_SUCCESS;
         }
-        if (!config)
-        {
+        if (!config) {
             print_acl_tabular_header();
+            print_acl_horizontal_rule();
             print_acl_tabular(acl_row);
         } else {
             print_acl_config(acl_row);
         }
     /* Print all ACLs */
     } else {
-        if (!config)
-        {
+        if (!config && ovs->n_acls) {
             print_acl_tabular_header();
-        }
-        OVSREC_ACL_FOR_EACH(acl_row, idl) {
-            if (acl_row) {
-                if (!config)
-                {
-                    print_acl_tabular(acl_row);
-                } else {
-                    print_acl_config(acl_row);
-                }
+            OVSREC_ACL_FOR_EACH(acl_row, idl) {
+                print_acl_horizontal_rule();
+                print_acl_tabular(acl_row);
+            }
+            print_acl_horizontal_rule();
+        } else {
+            OVSREC_ACL_FOR_EACH(acl_row, idl) {
+                print_acl_config(acl_row);
             }
         }
     }
@@ -490,7 +808,7 @@ cli_create_acl_if_needed(const char *acl_type, const char *acl_name)
         return CMD_OVSDB_FAILURE;
     }
 
-    /* Get parent ACL row */
+    /* Get ACL row */
     acl_row = get_acl_by_type_name(acl_type, acl_name);
 
     /* Create */
@@ -500,7 +818,7 @@ cli_create_acl_if_needed(const char *acl_type, const char *acl_name)
         /* Create, populate new ACL table row */
         acl_row = ovsrec_acl_insert(transaction);
         ovsrec_acl_set_list_type(acl_row, acl_type);
-        ovsrec_acl_set_list_name(acl_row, acl_name);
+        ovsrec_acl_set_name(acl_row, acl_name);
 
         /* Update System (parent) table */
         acl_info = xmalloc(sizeof *ovs->acls * (ovs->n_acls + 1));
@@ -604,7 +922,7 @@ cli_delete_acl(const char *acl_type, const char *acl_name)
  *
  * @param  acl_type                       Type string
  * @param  acl_name                       Name string
- * @param  ace_sequence_number_tmp        Sequence number string (NULL = auto)
+ * @param  ace_sequence_number_str        Sequence number string (NULL = auto)
  * @param  ace_action                     Action string
  * @param  ace_ip_protocol                IP protocol string
  * @param  ace_source_ip_address          Source IP address string
@@ -617,14 +935,14 @@ cli_delete_acl(const char *acl_type, const char *acl_name)
  * @param  ace_destination_port_max       Second destination port (range only)
  * @param  ace_log_enabled                Is logging enabled on this entry?
  * @param  ace_count_enabled              Is counting enabled on this entry?
- * @param  ace_comment                    Text comment string
+ * @param  ace_comment                    Text comment string (must be freed)
  *
  * @return                                CMD_SUCCESS on success
  */
 static int
 cli_create_update_ace (const char *acl_type,
                        const char *acl_name,
-                       const char *ace_sequence_number_tmp,
+                       const char *ace_sequence_number_str,
                        const char *ace_action,
                        const char *ace_ip_protocol,
                        const char *ace_source_ip_address,
@@ -642,11 +960,10 @@ cli_create_update_ace (const char *acl_type,
     struct ovsdb_idl_txn *transaction;
     enum ovsdb_idl_txn_status txn_status;
     const struct ovsrec_acl *acl_row;
-    char *ace_sequence_number;
-    bool ace_sequence_number_allocated = false; /* stays false if no auto-seq */
-    struct smap aces;
-    struct json *ace;
-    char *ace_str;
+    const struct ovsrec_acl_entry *old_ace_row, *ace_row;
+    int64_t ace_sequence_number;
+    int64_t protocol_num, min_num, max_num;
+    bool flag;
 
     VLOG_DBG("Create/Update");
 
@@ -667,91 +984,185 @@ cli_create_update_ace (const char *acl_type,
     }
 
     /* If a sequence number is specified, use it */
-    if (ace_sequence_number_tmp) {
-        ace_sequence_number = (char *) ace_sequence_number_tmp;
-    /* Otherwise set sequence number to the current max + ACE_SEQ_AUTO_INCR */
+    if (ace_sequence_number_str) {
+        ace_sequence_number = strtoll(ace_sequence_number_str, NULL, 0);
+    /* Otherwise set sequence number to the current highest + auto-increment */
     } else {
-        const char *highest_ace_seq;
-        unsigned long highest_ace_seq_numeric;
-        if ((highest_ace_seq = acl_get_highest_seq(acl_row)) == NULL) {
-            highest_ace_seq_numeric = 0;
-        } else {
-            highest_ace_seq_numeric = strtoul(highest_ace_seq, NULL, 0);
+        int64_t highest_ace_seq = 0;
+        if (acl_row->n_cfg_aces > 0) {
+            /* ACEs are stored sorted, so just get the last one */
+            highest_ace_seq = acl_row->key_cfg_aces[acl_row->n_cfg_aces - 1];
         }
-        if (highest_ace_seq_numeric + ACE_SEQ_AUTO_INCR > ACE_SEQ_MAX) {
+        if (highest_ace_seq + ACE_SEQ_AUTO_INCR > ACE_SEQ_MAX) {
             vty_out(vty, "%% Unable to automatically set sequence number%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
             return CMD_SUCCESS;
         }
-        ace_sequence_number_allocated = true;
-        ace_sequence_number = xzalloc(ACE_SEQ_MAX_STR_LEN);
-        sprintf(ace_sequence_number, "%lu", highest_ace_seq_numeric + ACE_SEQ_AUTO_INCR);
+        ace_sequence_number = highest_ace_seq + ACE_SEQ_AUTO_INCR;
     }
 
-    /* Initialize ACL Entries as a clone of existing ACEs */
-    smap_clone(&aces, &acl_row->want);
-
-    /* Updating an ACE removes/replaces its current data */
-    if ((ace_str = CONST_CAST(char*, smap_get(CONST_CAST(struct smap*, &aces),
-                                              ace_sequence_number))) != NULL)
+    /* Create new, empty ACE table row (garbage collected if unused) */
+    ace_row = ovsrec_acl_entry_insert(transaction);
+    if (!ace_row)
     {
-        VLOG_DBG("Replacing ACE acl_type=%s acl_name=%s sequence_number=%s entry=%s",
-                 acl_type, acl_name, ace_sequence_number, ace_str);
-        smap_remove(&aces, ace_sequence_number);
+        vty_out(vty, "%% Unable to add ACL entry%s", VTY_NEWLINE);
+        cli_do_config_abort(transaction);
+        return CMD_SUCCESS;
     }
 
-    /* New/updated ACE starts empty, filled in via parameters below */
-    ace = json_object_create();
+    /* Updating an ACE always (except comments) creates a new row.
+       If the old ACE is no longer referenced it will be garbage-collected. */
+    old_ace_row = ovsrec_acl_cfg_aces_getvalue(acl_row, ace_sequence_number);
+    if (old_ace_row) {
+        VLOG_DBG("Updating ACE seq=%" PRId64, ace_sequence_number);
 
-    /* Parse ACE parameters */
-    if (ace_action)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_ACTION], ace_action);
-    if (ace_ip_protocol)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_IP_PROTOCOL], ace_ip_protocol);
-    if (ace_source_ip_address)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_SOURCE_IP_ADDRESS], ace_source_ip_address);
-    if (ace_source_port_operator)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_SOURCE_PORT_OPERATOR], ace_source_port_operator);
-    if (ace_source_port)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_SOURCE_PORT], ace_source_port);
-    if (ace_source_port_max)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_SOURCE_PORT_MAX], ace_source_port_max);
-    if (ace_destination_ip_address)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_DESTINATION_IP_ADDRESS], ace_destination_ip_address);
-    if (ace_destination_port_operator)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_DESTINATION_PORT_OPERATOR], ace_destination_port_operator);
-    if (ace_destination_port)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_DESTINATION_PORT], ace_destination_port);
-    if (ace_destination_port_max)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_DESTINATION_PORT_MAX], ace_destination_port_max);
-    if (ace_log_enabled)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_LOG], ACL_TRUE_STR);
-    if (ace_count_enabled)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_COUNT], ACL_TRUE_STR);
-    if (ace_comment)
-        json_object_put_string(ace, ace_key_names[ACE_KEY_COMMENT], ace_comment);
-
-    /* Create a JSON string */
-    ace_str = json_to_string(ace, 0);
-    VLOG_DBG("Constructed ACE JSON string: %s", ace_str);
-
-    /* Add new/updated ACE to ACL's entries */
-    smap_add(&aces, ace_sequence_number, ace_str);
-    ovsrec_acl_set_want(acl_row, &aces);
-
-    /* Clean up things allocated for us by json library */
-    json_destroy(ace);
-    free(ace_str);
-
-    /* Clean up automatic sequence number string (if allocated) */
-    if (ace_sequence_number_allocated) {
-        free(ace_sequence_number);
+        /* Comment applied to existing entry */
+        if (!strcmp(ace_action, "comment")) {
+            /* May set to NULL if action is comment and text is empty (remove) */
+            ovsrec_acl_entry_set_comment(old_ace_row, ace_comment);
+            if (ace_comment) {
+                free(ace_comment);
+            }
+            /* Complete transaction */
+            txn_status = cli_do_config_finish(transaction);
+            if (txn_status == TXN_SUCCESS || txn_status == TXN_UNCHANGED) {
+                return CMD_SUCCESS;
+            } else {
+                VLOG_ERR(OVSDB_TXN_COMMIT_ERROR);
+                return CMD_OVSDB_FAILURE;
+            }
+        /* Copy comment (if any) from old entry  */
+        } else {
+            ovsrec_acl_entry_set_comment(ace_row, old_ace_row->comment);
+        }
+    } else {
+        VLOG_DBG("Creating ACE seq=%" PRId64, ace_sequence_number);
     }
 
-    /* Clean up comment text buffer (if allocated) */
+    /* Set any updated columns */
+    if (ace_action) {
+        if (!strcmp(ace_action, "permit") || !strcmp(ace_action, "deny")) {
+            ovsrec_acl_entry_set_action(ace_row, ace_action);
+        }
+    }
+    if (ace_ip_protocol) {
+        if (protocol_is_number(ace_ip_protocol)) {
+            protocol_num = strtoll(ace_ip_protocol, NULL, 0);
+        } else {
+            protocol_num = protocol_get_number_from_name(ace_ip_protocol);
+        }
+        ovsrec_acl_entry_set_protocol(ace_row, &protocol_num, 1);
+    }
+    if (ace_source_ip_address) {
+        /** @todo conversion into A.B.C.D/W.X.Y.Z */
+        ovsrec_acl_entry_set_src_ip(ace_row, ace_source_ip_address);
+    }
+    if (ace_source_port_operator) {
+        if (!strcmp(ace_source_port_operator, "eq")) {
+            min_num = strtoll(ace_source_port, NULL, 0);
+            ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_src_l4_port_max(ace_row, &min_num, 1);
+        } else if (!strcmp(ace_source_port_operator, "neq")) {
+            flag = true;
+            min_num = strtoll(ace_source_port, NULL, 0);
+            ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_src_l4_port_max(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_src_l4_port_range_reverse(ace_row, &flag, 1);
+        } else if (!strcmp(ace_source_port_operator, "gt")) {
+            min_num = strtoll(ace_source_port, NULL, 0) + 1;
+            max_num = 65535;
+            if (min_num > max_num) {
+                vty_out(vty, "%% Invalid L4 source port%s", VTY_NEWLINE);
+                cli_do_config_abort(transaction);
+                return CMD_SUCCESS;
+            }
+            ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_src_l4_port_max(ace_row, &max_num, 1);
+        } else if (!strcmp(ace_source_port_operator, "lt")) {
+            min_num = 0;
+            max_num = strtoll(ace_source_port, NULL, 0) - 1;
+            if (min_num > max_num) {
+                vty_out(vty, "%% Invalid L4 source port%s", VTY_NEWLINE);
+                cli_do_config_abort(transaction);
+                return CMD_SUCCESS;
+            }
+            ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_src_l4_port_max(ace_row, &max_num, 1);
+        } else if (!strcmp(ace_source_port_operator, "range")) {
+            min_num = strtoll(ace_source_port, NULL, 0);
+            max_num = strtoll(ace_source_port_max, NULL, 0);
+            if (min_num > max_num) {
+                vty_out(vty, "%% Invalid L4 source port range%s", VTY_NEWLINE);
+                cli_do_config_abort(transaction);
+                return CMD_SUCCESS;
+            }
+            ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_src_l4_port_max(ace_row, &max_num, 1);
+        }
+    }
+    if (ace_destination_ip_address) {
+        /** @todo conversion into A.B.C.D/W.X.Y.Z */
+        ovsrec_acl_entry_set_dst_ip(ace_row, ace_destination_ip_address);
+    }
+    if (ace_destination_port_operator) {
+        if (!strcmp(ace_destination_port_operator, "eq")) {
+            min_num = strtoll(ace_destination_port, NULL, 0);
+            ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &min_num, 1);
+        } else if (!strcmp(ace_destination_port_operator, "neq")) {
+            flag = true;
+            min_num = strtoll(ace_destination_port, NULL, 0);
+            ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_dst_l4_port_range_reverse(ace_row, &flag, 1);
+        } else if (!strcmp(ace_destination_port_operator, "gt")) {
+            min_num = strtoll(ace_destination_port, NULL, 0) + 1;
+            max_num = 65535;
+            if (min_num > max_num) {
+                vty_out(vty, "%% Invalid L4 destination port%s", VTY_NEWLINE);
+                cli_do_config_abort(transaction);
+                return CMD_SUCCESS;
+            }
+            ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &max_num, 1);
+        } else if (!strcmp(ace_destination_port_operator, "lt")) {
+            min_num = 0;
+            max_num = strtoll(ace_destination_port, NULL, 0) - 1;
+            if (min_num > max_num) {
+                vty_out(vty, "%% Invalid L4 destination port%s", VTY_NEWLINE);
+                cli_do_config_abort(transaction);
+                return CMD_SUCCESS;
+            }
+            ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &max_num, 1);
+        } else if (!strcmp(ace_destination_port_operator, "range")) {
+            min_num = strtoll(ace_destination_port, NULL, 0);
+            max_num = strtoll(ace_destination_port_max, NULL, 0);
+            if (min_num > max_num) {
+                vty_out(vty, "%% Invalid L4 destination port range%s", VTY_NEWLINE);
+                cli_do_config_abort(transaction);
+                return CMD_SUCCESS;
+            }
+            ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
+            ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &max_num, 1);
+        }
+    }
+    if (ace_log_enabled) {
+        flag = true;
+        ovsrec_acl_entry_set_log(ace_row, &flag, 1);
+    }
+    if (ace_count_enabled) {
+        flag = true;
+        ovsrec_acl_entry_set_count(ace_row, &flag, 1);
+    }
+    /* New entry with only a comment */
     if (ace_comment) {
+        ovsrec_acl_entry_set_comment(ace_row, ace_comment);
         free(ace_comment);
     }
+
+    /* Update ACL (parent) table */
+    ovsrec_acl_update_cfg_aces_setkey_safe(acl_row, ace_sequence_number, (struct ovsrec_acl_entry *) ace_row);
 
     /* Complete transaction */
     txn_status = cli_do_config_finish(transaction);
@@ -766,23 +1177,22 @@ cli_create_update_ace (const char *acl_type,
 /**
  * Delete an ACE
  *
- * @param  acl_type             ACL type string
- * @param  acl_name             ACL name string
- * @param  ace_sequence_number  ACE parameter string
+ * @param  acl_type                 ACL type string
+ * @param  acl_name                 ACL name string
+ * @param  ace_sequence_number_str  ACE parameter string
  *
- * @return                      CMD_SUCCESS on success
+ * @return                          CMD_SUCCESS on success
  *
  */
 static int
 cli_delete_ace (const char *acl_type,
                 const char *acl_name,
-                const char *ace_sequence_number)
+                const char *ace_sequence_number_str)
 {
     struct ovsdb_idl_txn *transaction;
     enum ovsdb_idl_txn_status txn_status;
     const struct ovsrec_acl *acl_row;
-    struct smap aces;
-    char *ace_str;
+    int64_t ace_sequence_number;
 
     /* Start transaction */
     transaction = cli_do_config_start();
@@ -800,26 +1210,17 @@ cli_delete_ace (const char *acl_type,
         return CMD_SUCCESS;
     }
 
-    /* Initialize ACL Entries as a clone of existing ACEs */
-    smap_clone(&aces, &acl_row->want);
-
-    /* Remove associated ACE */
-    if ((ace_str = CONST_CAST(char*, smap_get(CONST_CAST(struct smap*, &aces),
-                                              ace_sequence_number))) != NULL)
-    {
-        VLOG_DBG("Deleting ACE acl_type=%s acl_name=%s sequence_number=%s entry=%s",
-                 acl_type, acl_name, ace_sequence_number, ace_str);
-        smap_remove(&aces, ace_sequence_number);
-    }
-    /* ACE does not exist */
-    else {
-        vty_out(vty, "%% ACL entry does not exist%s", VTY_NEWLINE);
+    /* Should already be guarded against by parser */
+    if (!ace_sequence_number_str) {
+        vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
         return CMD_SUCCESS;
     }
+    ace_sequence_number = strtoll(ace_sequence_number_str, NULL, 0);
 
-    /* Modify ACL's entries (to have one removed) */
-    ovsrec_acl_set_want(acl_row, &aces);
+    VLOG_DBG("Deleting ACE seq=%" PRId64, ace_sequence_number);
+    ovsrec_acl_update_cfg_aces_delkey(acl_row, ace_sequence_number);
+    /* If ACE is no longer referenced it will be garbage-collected */
 
     /* Complete transaction */
     txn_status = cli_do_config_finish(transaction);
@@ -850,10 +1251,9 @@ cli_resequence_acl (const char *acl_type,
     struct ovsdb_idl_txn *transaction;
     enum ovsdb_idl_txn_status txn_status;
     const struct ovsrec_acl *acl_row;
-    const struct smap_node **aces_sorted;
     unsigned long start_num, increment_num, current_num;
-    char current[ACE_SEQ_MAX_STR_LEN];
-    struct smap new_aces;
+    int64_t *key_list;
+    struct ovsrec_acl_entry **value_list;
     int i;
 
     /* Start transaction */
@@ -863,7 +1263,7 @@ cli_resequence_acl (const char *acl_type,
         return CMD_OVSDB_FAILURE;
     }
 
-    /* Get parent ACL row */
+    /* Get ACL row */
     acl_row = get_acl_by_type_name(acl_type, acl_name);
     if (!acl_row) {
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
@@ -872,7 +1272,7 @@ cli_resequence_acl (const char *acl_type,
     }
 
     /* Check for an empty list */
-    if (smap_is_empty(&acl_row->want)) {
+    if (!acl_row->n_cfg_aces) {
         vty_out(vty, "%% ACL is empty%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
         return CMD_SUCCESS;
@@ -889,32 +1289,29 @@ cli_resequence_acl (const char *acl_type,
      *   input should be accepted
      *   resequence should result in ACE #5 seq=4294967295
      */
-    if (start_num + ((smap_count(&acl_row->want) - 1) * increment_num) > ACE_SEQ_MAX) {
+    if (start_num + ((acl_row->n_cfg_aces - 1) * increment_num) > ACE_SEQ_MAX) {
         vty_out(vty, "%% Sequence numbers would exceed maximum%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
         return CMD_SUCCESS;
     }
 
     /* Initialize temporary data structures */
-    smap_init(&new_aces);
-    sprintf(current, "%lu", current_num);
-
-    /* Sort existing ACEs */
-    aces_sorted = smap_sort_numeric(&acl_row->want);
+    key_list = xmalloc(sizeof(int64_t) * (acl_row->n_cfg_aces));
+    value_list = xmalloc(sizeof *acl_row->value_cfg_aces * (acl_row->n_cfg_aces));
 
     /* Walk through sorted list, resequencing by adding into new_aces */
-    for (i = 0; i < smap_count(&acl_row->want); i++) {
-        smap_add(&new_aces, current, aces_sorted[i]->value);
+    for (i = 0; i < acl_row->n_cfg_aces; i++) {
+        key_list[i] = current_num;
+        value_list[i] = acl_row->value_cfg_aces[i];
         current_num += increment_num;
-        sprintf(current, "%lu", current_num);
     }
 
     /* Replace ACL's entries with resequenced ones */
-    ovsrec_acl_set_want(acl_row, &new_aces);
+    ovsrec_acl_set_cfg_aces(acl_row, key_list, value_list, acl_row->n_cfg_aces);
 
     /* Clean up temporary data structures */
-    free(aces_sorted);
-    smap_destroy(&new_aces);
+    free(key_list);
+    free(value_list);
 
     /* Complete transaction */
     txn_status = cli_do_config_finish(transaction);
@@ -955,24 +1352,28 @@ cli_print_applied_acls (const char *interface_type,
             return CMD_SUCCESS;
         }
 
-        if (port_row->aclv4_in_want) {
-            VLOG_DBG("Found ACL application port=%s list_name=%s",
-                     interface_id, port_row->aclv4_in_want->list_name);
-            if (!config)
+        if (port_row->aclv4_in_cfg) {
+            VLOG_DBG("Found ACL application port=%s name=%s",
+                     interface_id, port_row->aclv4_in_cfg->name);
+            if (config)
             {
-                vty_out(vty, "Direction: Inbound Type: IPv4%s", VTY_NEWLINE);
-                print_acl_tabular_header();
-                print_acl_tabular(port_row->aclv4_in_want);
+                print_acl_config(port_row->aclv4_in_cfg);
             } else {
-                print_acl_config(port_row->aclv4_in_want);
+                vty_out(vty, "%-10s %-31s%s", "Direction", "", VTY_NEWLINE);
+                print_acl_tabular_header();
+                print_acl_horizontal_rule();
+                vty_out(vty, "%-10s %-31s%s", "Inbound", "", VTY_NEWLINE);
+                print_acl_tabular(port_row->aclv4_in_cfg);
+                print_acl_horizontal_rule();
             }
         }
 
         /* Print application commands if printing config */
-        if (config && port_row->aclv4_in_want) {
-            vty_out(vty, "%s %s\n  %s %s %s %s %s%s",
+        if (config && port_row->aclv4_in_cfg) {
+            vty_out(vty, "%s %s\n    %s %s %s %s %s%s",
                     "interface", port_row->name,
-                    "apply", "access-list", "ip", port_row->aclv4_in_want->list_name, "in",
+                    "apply", "access-list", "ip",
+                    port_row->aclv4_in_cfg->name, "in",
                     VTY_NEWLINE);
         }
     } else if (!strcmp(interface_type, "vlan")) {
@@ -985,24 +1386,28 @@ cli_print_applied_acls (const char *interface_type,
             return CMD_SUCCESS;
         }
 
-        if (vlan_row->aclv4_in_want) {
-            VLOG_DBG("Found ACL application vlan=%s list_name=%s",
-                     interface_id, vlan_row->aclv4_in_want->list_name);
-            if (!config)
+        if (vlan_row->aclv4_in_cfg) {
+            VLOG_DBG("Found ACL application vlan=%s name=%s",
+                     interface_id, vlan_row->aclv4_in_cfg->name);
+            if (config)
             {
-                vty_out(vty, "Direction: Inbound Type: IPv4%s", VTY_NEWLINE);
-                print_acl_tabular_header();
-                print_acl_tabular(vlan_row->aclv4_in_want);
+                print_acl_config(vlan_row->aclv4_in_cfg);
             } else {
-                print_acl_config(vlan_row->aclv4_in_want);
+                vty_out(vty, "%-10s %-31s%s", "Direction", "", VTY_NEWLINE);
+                print_acl_tabular_header();
+                print_acl_horizontal_rule();
+                vty_out(vty, "%-10s %-31s%s", "Inbound", "", VTY_NEWLINE);
+                print_acl_tabular(vlan_row->aclv4_in_cfg);
+                print_acl_horizontal_rule();
             }
         }
 
         /* Print application commands if printing config */
-        if (config && vlan_row->aclv4_in_want) {
-            vty_out(vty, "%s %" PRId64 "\n  %s %s %s %s %s%s",
+        if (config && vlan_row->aclv4_in_cfg) {
+            vty_out(vty, "%s %" PRId64 "\n    %s %s %s %s %s%s",
                     "vlan", vlan_row->id,
-                    "apply", "access-list", "ip", vlan_row->aclv4_in_want->list_name, "in",
+                    "apply", "access-list", "ip",
+                    vlan_row->aclv4_in_cfg->name, "in",
                     VTY_NEWLINE);
         }
     }
@@ -1062,13 +1467,13 @@ cli_apply_acl (const char *interface_type,
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
             /* Check if we're replacing an already-applied ACL */
-            if (port_row->aclv4_in_want) {
+            if (port_row->aclv4_in_cfg) {
                 VLOG_DBG("Old ACL application port=%s acl_name=%s",
-                         interface_id, port_row->aclv4_in_want->list_name);
+                         interface_id, port_row->aclv4_in_cfg->name);
             }
             /* Apply the requested ACL to the Port */
             VLOG_DBG("New ACL application port=%s acl_name=%s", interface_id, acl_name);
-            ovsrec_port_set_aclv4_in_want(port_row, acl_row);
+            ovsrec_port_set_aclv4_in_cfg(port_row, acl_row);
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
@@ -1087,14 +1492,14 @@ cli_apply_acl (const char *interface_type,
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
             /* Check if we're replacing an already-applied ACL */
-            if (vlan_row->aclv4_in_want) {
+            if (vlan_row->aclv4_in_cfg) {
                 VLOG_DBG("Old ACL application vlan=%s acl_name=%s",
-                         interface_id, vlan_row->aclv4_in_want->list_name);
+                         interface_id, vlan_row->aclv4_in_cfg->name);
             }
 
             /* Apply the requested ACL to the VLAN */
             VLOG_DBG("New ACL application vlan=%s acl_name=%s", interface_id, acl_name);
-            ovsrec_vlan_set_aclv4_in_want(vlan_row, acl_row);
+            ovsrec_vlan_set_aclv4_in_cfg(vlan_row, acl_row);
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
@@ -1162,16 +1567,16 @@ cli_unapply_acl (const char *interface_type,
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
             /* Check that any ACL is currently applied to the port */
-            if (!port_row->aclv4_in_want) {
+            if (!port_row->aclv4_in_cfg) {
                 vty_out(vty, "%% No ACL is applied to port %s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
             }
 
             /* Check that the requested ACL to remove is the one applied to port */
-            if (strcmp(acl_name, port_row->aclv4_in_want->list_name)) {
+            if (strcmp(acl_name, port_row->aclv4_in_cfg->name)) {
                 vty_out(vty, "%% ACL %s is applied to port %s, not %s%s",
-                        port_row->aclv4_in_want->list_name,
+                        port_row->aclv4_in_cfg->name,
                         port_row->name, acl_name, VTY_NEWLINE);
                 cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
@@ -1179,7 +1584,7 @@ cli_unapply_acl (const char *interface_type,
 
             /* Un-apply the requested ACL application from the Port */
             VLOG_DBG("Removing ACL application port=%s acl_name=%s", interface_id, acl_name);
-            ovsrec_port_set_aclv4_in_want(port_row, NULL);
+            ovsrec_port_set_aclv4_in_cfg(port_row, NULL);
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
@@ -1198,16 +1603,16 @@ cli_unapply_acl (const char *interface_type,
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
             /* Check that any ACL is currently applied to the VLAN */
-            if (!vlan_row->aclv4_in_want) {
+            if (!vlan_row->aclv4_in_cfg) {
                 vty_out(vty, "%% No ACL is applied to VLAN %s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
             }
 
             /* Check that the requested ACL to remove is the one applied to vlan */
-            if (strcmp(acl_name, vlan_row->aclv4_in_want->list_name)) {
+            if (strcmp(acl_name, vlan_row->aclv4_in_cfg->name)) {
                 vty_out(vty, "%% ACL %s is applied to VLAN %" PRId64 ", not %s%s",
-                        vlan_row->aclv4_in_want->list_name,
+                        vlan_row->aclv4_in_cfg->name,
                         vlan_row->id, acl_name, VTY_NEWLINE);
                 cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
@@ -1215,7 +1620,7 @@ cli_unapply_acl (const char *interface_type,
 
             /* Un-apply the requested ACL application from the VLAN */
             VLOG_DBG("Removing ACL application vlan=%s acl_name=%s", interface_id, acl_name);
-            ovsrec_vlan_set_aclv4_in_want(vlan_row, NULL);
+            ovsrec_vlan_set_aclv4_in_cfg(vlan_row, NULL);
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
@@ -1234,7 +1639,91 @@ cli_unapply_acl (const char *interface_type,
 }
 
 /**
- * Print statistics for an ACL (optionally for a specific interface
+ * Print inbound IPv4 statistics for any ACLs applied to a given Port
+ *
+ * @param port_row Pointer to Port row
+ */
+static inline void
+print_port_aclv4_in_statistics(const struct ovsrec_port *port_row)
+{
+    int64_t hit_count;
+    char *ace_str;
+    int i;
+
+    vty_out(vty, "Interface %s (in):%s", port_row->name, VTY_NEWLINE);
+    vty_out(vty, "%20s  %s%s", "Hit Count", "Configuration", VTY_NEWLINE);
+
+    /* Print each ACL entry as a single line (ala CLI input) */
+    for (i = 0; i < port_row->aclv4_in_cfg->n_cfg_aces; i ++) {
+        /* If entry has or is a comment, print as its own line */
+        if (port_row->aclv4_in_cfg->value_cfg_aces[i]->comment) {
+            vty_out(vty,
+                    "%20s  %" PRId64 " comment %s%s",
+                    "",
+                    port_row->aclv4_in_cfg->key_cfg_aces[i],
+                    port_row->aclv4_in_cfg->value_cfg_aces[i]->comment,
+                    VTY_NEWLINE);
+        }
+        if (port_row->aclv4_in_cfg->value_cfg_aces[i]->action) {
+            if (port_row->aclv4_in_cfg->value_cfg_aces[i]->n_count) {
+                hit_count = ovsrec_port_aclv4_in_statistics_getvalue(
+                                    port_row, port_row->aclv4_in_cfg->key_cfg_aces[i]);
+                vty_out(vty, "%20" PRId64, hit_count);
+            } else {
+                vty_out(vty, "%20s", "-");
+            }
+            ace_str = ace_entry_config_to_string(port_row->aclv4_in_cfg->key_cfg_aces[i],
+                                                 port_row->aclv4_in_cfg->value_cfg_aces[i]);
+            vty_out(vty, "  %s%s", ace_str, VTY_NEWLINE);
+            free(ace_str);
+        }
+    }
+}
+
+/**
+ * Print inbound IPv4 statistics for any ACLs applied to a given VLAN
+ *
+ * @param vlan_row Pointer to VLAN row
+ */
+static inline void
+print_vlan_aclv4_in_statistics(const struct ovsrec_vlan *vlan_row)
+{
+    int64_t hit_count;
+    char *ace_str;
+    int i;
+
+    vty_out(vty,"VLAN %" PRId64 " (in):%s", vlan_row->id, VTY_NEWLINE);
+    vty_out(vty, "%20s  %s%s", "Hit Count", "Configuration", VTY_NEWLINE);
+
+    /* Print each ACL entry as a single line (ala CLI input) */
+    for (i = 0; i < vlan_row->aclv4_in_cfg->n_cfg_aces; i ++) {
+        /* If entry has or is a comment, print as its own line */
+        if (vlan_row->aclv4_in_cfg->value_cfg_aces[i]->comment) {
+            vty_out(vty,
+                    "%20s  %" PRId64 " comment %s%s",
+                    "",
+                    vlan_row->aclv4_in_cfg->key_cfg_aces[i],
+                    vlan_row->aclv4_in_cfg->value_cfg_aces[i]->comment,
+                    VTY_NEWLINE);
+        }
+        if (vlan_row->aclv4_in_cfg->value_cfg_aces[i]->action) {
+            if (vlan_row->aclv4_in_cfg->value_cfg_aces[i]->n_count) {
+                hit_count = ovsrec_vlan_aclv4_in_statistics_getvalue(
+                                    vlan_row, vlan_row->aclv4_in_cfg->key_cfg_aces[i]);
+                vty_out(vty, "%20" PRId64, hit_count);
+            } else {
+                vty_out(vty, "%20s", "-");
+            }
+            ace_str = ace_entry_config_to_string(vlan_row->aclv4_in_cfg->key_cfg_aces[i],
+                                                 vlan_row->aclv4_in_cfg->value_cfg_aces[i]);
+            vty_out(vty, "  %s%s", ace_str, VTY_NEWLINE);
+            free(ace_str);
+        }
+    }
+}
+
+/**
+ * Print statistics for a specified ACL (optionally for a specified interface
  * and/or direction)
  *
  * @param  acl_type        ACL type string
@@ -1254,91 +1743,66 @@ cli_print_acl_statistics (const char *acl_type,
 {
     const struct ovsrec_port *port_row;
     const struct ovsrec_vlan *vlan_row;
+    const struct ovsrec_acl *acl_row;
 
     VLOG_DBG("Showing statistics for %s ACL %s %s=%s direction=%s",
             acl_type, acl_name, interface_type, interface_id, direction);
 
-    if (!get_acl_by_type_name(acl_type, acl_name)) {
+    acl_row = get_acl_by_type_name(acl_type, acl_name);
+    if (!acl_row) {
         vty_out(vty, "%% ACL %s does not exist%s", acl_name, VTY_NEWLINE);
         return CMD_SUCCESS;
     }
 
+    /* No interface specified (implicit "all" interface type/id/direction) */
+    if (!interface_type) {
+        vty_out(vty, "Statistics for ACL %s (%s):%s", acl_row->name, acl_row->list_type, VTY_NEWLINE);
+        OVSREC_PORT_FOR_EACH(port_row, idl) {
+            if (port_row->aclv4_in_cfg && (port_row->aclv4_in_cfg == acl_row)) {
+                print_port_aclv4_in_statistics(port_row);
+            }
+        }
+        OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
+            if (vlan_row->aclv4_in_cfg && (vlan_row->aclv4_in_cfg == acl_row)) {
+                print_vlan_aclv4_in_statistics(vlan_row);
+            }
+        }
     /* Port (unfortunately called "interface" in the CLI) */
-    if (!strcmp(interface_type, "interface")) {
+    } else if (interface_type && !strcmp(interface_type, "interface")) {
         /* Get Port row */
         port_row = get_port_by_name(interface_id);
         if (!port_row) {
             vty_out(vty, "%% Port %s does not exist%s", interface_id, VTY_NEWLINE);
             return CMD_SUCCESS;
         }
-        if (port_row->aclv4_in_want && !strcmp(port_row->aclv4_in_want->list_name, acl_name)) {
-            vty_out(vty,"Statistics for ACL %s:%s", acl_name, VTY_NEWLINE);
-            vty_out(vty,"  Interface %s:%s", port_row->name, VTY_NEWLINE);
-            /** @todo find out if this should be an array with defined indices */
-            if (port_row->aclv4_in_statistics) {
-                vty_out(vty,"    Hits: %" PRId64 "%s", port_row->aclv4_in_statistics[0], VTY_NEWLINE);
-            } else {
-                vty_out(vty,"    Hits: 0%s", VTY_NEWLINE);
-            }
+        if (port_row->aclv4_in_cfg && (port_row->aclv4_in_cfg == acl_row)) {
+            vty_out(vty, "Statistics for ACL %s (%s):%s", acl_row->name, acl_row->list_type, VTY_NEWLINE);
+            print_port_aclv4_in_statistics(port_row);
         } else {
             vty_out(vty, "%% Specified ACL not applied to interface%s", VTY_NEWLINE);
             return CMD_SUCCESS;
         }
-
-    } else if (!strcmp(interface_type, "vlan")) {
+    /* VLAN */
+    } else if (interface_type && !strcmp(interface_type, "vlan")) {
         /* Get VLAN row */
         vlan_row = get_vlan_by_id_str(interface_id);
         if (!vlan_row) {
             vty_out(vty, "%% VLAN %s does not exist%s", interface_id, VTY_NEWLINE);
             return CMD_SUCCESS;
         }
-        if (vlan_row->aclv4_in_want && !strcmp(vlan_row->aclv4_in_want->list_name, acl_name)) {
-            vty_out(vty,"Statistics for ACL %s:%s", acl_name, VTY_NEWLINE);
-            vty_out(vty,"  VLAN %" PRId64 ":%s", vlan_row->id, VTY_NEWLINE);
-            /** @todo find out if this should be an array with defined indices */
-            if (vlan_row->aclv4_in_statistics) {
-                vty_out(vty,"    Hits: %" PRId64 "%s", vlan_row->aclv4_in_statistics[0], VTY_NEWLINE);
-            } else {
-                vty_out(vty,"    Hits: 0%s", VTY_NEWLINE);
-            }
+        if (vlan_row->aclv4_in_cfg && (vlan_row->aclv4_in_cfg == acl_row)) {
+            vty_out(vty, "Statistics for ACL %s (%s):%s", acl_row->name, acl_row->list_type, VTY_NEWLINE);
+            print_vlan_aclv4_in_statistics(vlan_row);
         } else {
             vty_out(vty, "%% Specified ACL not applied to VLAN%s", VTY_NEWLINE);
             return CMD_SUCCESS;
         }
-
-    /* No interface specified (implicit "all") */
-    } else {
-        vty_out(vty,"Statistics for ACL %s:%s", acl_name, VTY_NEWLINE);
-        OVSREC_PORT_FOR_EACH(port_row, idl) {
-            if (port_row->aclv4_in_want && !strcmp(port_row->aclv4_in_want->list_name, acl_name)) {
-                vty_out(vty,"  Interface %s:%s", port_row->name, VTY_NEWLINE);
-                /** @todo find out if this should be an array with defined indices */
-                if (port_row->aclv4_in_statistics) {
-                    vty_out(vty,"    Hits: %" PRId64 "%s", port_row->aclv4_in_statistics[0], VTY_NEWLINE);
-                } else {
-                    vty_out(vty,"    Hits: 0%s", VTY_NEWLINE);
-                }
-            }
-        }
-        OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
-            if (vlan_row->aclv4_in_want && !strcmp(vlan_row->aclv4_in_want->list_name, acl_name)) {
-                vty_out(vty,"  VLAN %" PRId64 ":%s", vlan_row->id, VTY_NEWLINE);
-                /** @todo find out if this should be an array with defined indices */
-                if (vlan_row->aclv4_in_statistics) {
-                    vty_out(vty,"    Hits: %" PRId64 "%s", vlan_row->aclv4_in_statistics[0], VTY_NEWLINE);
-                } else {
-                    vty_out(vty,"    Hits: 0%s", VTY_NEWLINE);
-                }
-            }
-        }
     }
-
     return CMD_SUCCESS;
 }
 
 /**
- * Clear statistics for an ACL (optionally for a specific ACL, interface,
- * direction)
+ * Clear ACL statistics (optionally for a specific ACL, interface, direction)
  *
  * @param  acl_type        ACL type string
  * @param  acl_name        ACL name string
@@ -1359,7 +1823,7 @@ cli_clear_acl_statistics (const char *acl_type,
     enum ovsdb_idl_txn_status txn_status;
     const struct ovsrec_port *port_row;
     const struct ovsrec_vlan *vlan_row;
-    const int64_t zero_value = 0;
+    const struct ovsrec_acl *acl_row;
 
     VLOG_DBG("Clearing statistics for %s ACL %s %s=%s direction=%s",
             acl_type, acl_name, interface_type, interface_id, direction);
@@ -1371,74 +1835,67 @@ cli_clear_acl_statistics (const char *acl_type,
         return CMD_OVSDB_FAILURE;
     }
 
-    /* Single ACL specified */
-    if (acl_name) {
+    /* No ACL specified (implicit "all" applied ACLs) */
+    if (!acl_name) {
+        OVSREC_PORT_FOR_EACH(port_row, idl) {
+            VLOG_DBG("Clearing ACL statistics port=%s", port_row->name);
+            ovsrec_port_set_aclv4_in_statistics(port_row, NULL, NULL, 0);
+        }
+        OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
+            VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 "", vlan_row->id);
+            ovsrec_vlan_set_aclv4_in_statistics(vlan_row, NULL, NULL, 0);
+        }
+    /* ACL specified */
+    } else {
+        acl_row = get_acl_by_type_name(acl_type, acl_name);
+        if (!acl_row) {
+            vty_out(vty, "%% ACL %s does not exist%s", acl_name, VTY_NEWLINE);
+            return CMD_SUCCESS;
+        }
+        /* No interface specified (implicit "all" interface type/id/direction) */
+        if (!interface_type) {
+            OVSREC_PORT_FOR_EACH(port_row, idl) {
+                if (port_row->aclv4_in_cfg && (port_row->aclv4_in_cfg == acl_row)) {
+                    VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s", port_row->name, acl_name);
+                    ovsrec_port_set_aclv4_in_statistics(port_row, NULL, NULL, 0);
+                }
+            }
+            OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
+                if (vlan_row->aclv4_in_cfg && (vlan_row->aclv4_in_cfg == acl_row)) {
+                    VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 " acl_name=%s", vlan_row->id, acl_name);
+                    ovsrec_vlan_set_aclv4_in_statistics(vlan_row, NULL, NULL, 0);
+                }
+            }
         /* Port (unfortunately called "interface" in the CLI) */
-        if (!strcmp(interface_type, "interface")) {
+        } else if (!strcmp(interface_type, "interface")) {
             /* Get Port row */
             port_row = get_port_by_name(interface_id);
             if (!port_row) {
                 vty_out(vty, "%% Port %s does not exist%s", interface_id, VTY_NEWLINE);
-                cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
             }
-            if (port_row->aclv4_in_want && !strcmp(port_row->aclv4_in_want->list_name, acl_name)) {
-                VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s", interface_id, acl_name);
-                /** @todo find out if this should be an array with defined indices */
-                ovsrec_port_set_aclv4_in_statistics(port_row, &zero_value, 1);
+            if (port_row->aclv4_in_cfg && (port_row->aclv4_in_cfg == acl_row)) {
+                VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s", port_row->name, acl_name);
+                ovsrec_port_set_aclv4_in_statistics(port_row, NULL, NULL, 0);
             } else {
                 vty_out(vty, "%% Specified ACL not applied to interface%s", VTY_NEWLINE);
-                cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
             }
-
+        /* VLAN */
         } else if (!strcmp(interface_type, "vlan")) {
             /* Get VLAN row */
             vlan_row = get_vlan_by_id_str(interface_id);
             if (!vlan_row) {
                 vty_out(vty, "%% VLAN %s does not exist%s", interface_id, VTY_NEWLINE);
-                cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
             }
-            if (vlan_row->aclv4_in_want && !strcmp(vlan_row->aclv4_in_want->list_name, acl_name)) {
-                VLOG_DBG("Clearing ACL statistics vlan=%s acl_name=%s", interface_id, acl_name);
-                /** @todo find out if this should be an array with defined indices */
-                ovsrec_vlan_set_aclv4_in_statistics(vlan_row, &zero_value, 1);
+            if (vlan_row->aclv4_in_cfg && (vlan_row->aclv4_in_cfg == acl_row)) {
+                VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 " acl_name=%s", vlan_row->id, acl_name);
+                ovsrec_vlan_set_aclv4_in_statistics(vlan_row, NULL, NULL, 0);
             } else {
                 vty_out(vty, "%% Specified ACL not applied to VLAN%s", VTY_NEWLINE);
-                cli_do_config_abort(transaction);
                 return CMD_SUCCESS;
             }
-
-        /* No interface specified (implicit "all") */
-        } else {
-            OVSREC_PORT_FOR_EACH(port_row, idl) {
-                if (port_row->aclv4_in_want && !strcmp(port_row->aclv4_in_want->list_name, acl_name)) {
-                    VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s", port_row->name, acl_name);
-                    /** @todo find out if this should be an array with defined indices */
-                    ovsrec_port_set_aclv4_in_statistics(port_row, &zero_value, 1);
-                }
-            }
-            OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
-                if (vlan_row->aclv4_in_want && !strcmp(vlan_row->aclv4_in_want->list_name, acl_name)) {
-                    VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 " acl_name=%s", vlan_row->id, acl_name);
-                    /** @todo find out if this should be an array with defined indices */
-                    ovsrec_vlan_set_aclv4_in_statistics(vlan_row, &zero_value, 1);
-                }
-            }
-
-        }
-    /* No ACL specified (implicit "all") */
-    } else {
-        OVSREC_PORT_FOR_EACH(port_row, idl) {
-            VLOG_DBG("Clearing ACL statistics port=%s", port_row->name);
-            /** @todo find out if this should be an array with defined indices */
-            ovsrec_port_set_aclv4_in_statistics(port_row, &zero_value, 1);
-        }
-        OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
-            VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 "", vlan_row->id);
-            /** @todo find out if this should be an array with defined indices */
-            ovsrec_vlan_set_aclv4_in_statistics(vlan_row, &zero_value, 1);
         }
     }
 
@@ -2430,18 +2887,20 @@ DEFUN (cli_access_list_entry_src_port_range_dst_port_op_no_seq,
 }
 
 /**
- * Action routine for setting an ACE with a text comment
+ * Action routine for setting an ACE comment
  */
 DEFUN (cli_access_list_entry_comment,
        cli_access_list_entry_comment_cmd,
        /* start of cmdstr, broken up to help readability */
        ACE_SEQ_CMDSTR
        ACE_COMMENT_CMDSTR
+       ACE_COMMENT_TEXT_CMDSTR
        , /* end of cmdstr, comment to avoid accidental comma loss */
 
        /* helpstr, newline delimited */
        ACE_SEQ_HELPSTR
        ACE_COMMENT_HELPSTR
+       ACE_COMMENT_TEXT_HELPSTR
       )
 {
     /* To be freed after use */
@@ -2466,17 +2925,18 @@ DEFUN (cli_access_list_entry_comment,
 }
 
 /**
- * Action routine for setting an ACE with a text comment without a sequence
- * number
+ * Action routine for setting an ACE comment without a sequence number
  */
 DEFUN (cli_access_list_entry_comment_no_seq,
        cli_access_list_entry_comment_no_seq_cmd,
        /* start of cmdstr, broken up to help readability */
        ACE_COMMENT_CMDSTR
+       ACE_COMMENT_TEXT_CMDSTR
        , /* end of cmdstr, comment to avoid accidental comma loss */
 
        /* helpstr, newline delimited */
        ACE_COMMENT_HELPSTR
+       ACE_COMMENT_TEXT_HELPSTR
       )
 {
     /* To be freed after use */
@@ -2501,6 +2961,60 @@ DEFUN (cli_access_list_entry_comment_no_seq,
 }
 
 /**
+ * Action routine for deleting an ACE comment
+ */
+DEFUN (cli_no_access_list_entry_comment,
+       cli_no_access_list_entry_comment_cmd,
+       /* start of cmdstr, broken up to help readability */
+       "no "
+       ACE_SEQ_CMDSTR
+       ACE_COMMENT_CMDSTR
+       , /* end of cmdstr, comment to avoid accidental comma loss */
+
+       /* helpstr, newline delimited */
+       ACE_SEQ_HELPSTR
+       ACE_COMMENT_HELPSTR
+      )
+{
+    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                 CONST_CAST(char*,vty->index_sub), /* Name */
+                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                 CONST_CAST(char*,argv[1]),        /* Action */
+                                 NULL,                             /* IP Protocol */
+                                 NULL,                             /* Source IP */
+                                 NULL,                             /* Source Port Operator */
+                                 NULL,                             /* Source Port 1 */
+                                 NULL,                             /* Source Port 2 */
+                                 NULL,                             /* Destination IP */
+                                 NULL,                             /* Destination Port Operator */
+                                 NULL,                             /* Destination Port 1 */
+                                 NULL,                             /* Destination Port 2 */
+                                 NULL,                             /* Log */
+                                 NULL,                             /* Count */
+                                 NULL);                            /* Comment */
+}
+
+/* Can't delete an ACE comment without a sequence number, so no DEFUN for it */
+
+/**
+ * Alternate form that ignores additional tokens when deleting an ACE comment
+ */
+ALIAS (cli_no_access_list_entry_comment,
+       cli_no_access_list_entry_comment_etc_cmd,
+       "no "
+       ACE_SEQ_CMDSTR
+       ACE_COMMENT_CMDSTR
+       ACE_ETC_CMDSTR
+       , /* end of cmdstr, comment to avoid accidental comma loss */
+
+       /* helpstr, newline delimited */
+       NO_STR
+       ACE_SEQ_HELPSTR
+       ACE_COMMENT_HELPSTR
+       ACE_ETC_HELPSTR
+      )
+
+/**
  * Action routine for deleting an ACE
  */
 DEFUN (cli_no_access_list_entry,
@@ -2520,10 +3034,15 @@ DEFUN (cli_no_access_list_entry,
  */
 ALIAS (cli_no_access_list_entry,
        cli_no_access_list_entry_etc_cmd,
-       "no " ACE_SEQ_CMDSTR " ....",
+       "no "
+       ACE_SEQ_CMDSTR
+       ACE_ETC_CMDSTR
+       , /* end of cmdstr, comment to avoid accidental comma loss */
+
+       /* helpstr, newline delimited */
        NO_STR
        ACE_SEQ_HELPSTR
-       "(ignored)\n"
+       ACE_ETC_HELPSTR
       )
 
 /**
@@ -2662,6 +3181,33 @@ DEFUN (cli_show_access_list_hitcounts,
 }
 
 /**
+ * Action routine for showing ACL statistics on all applied interfaces
+ */
+DEFUN (cli_show_access_list_hitcounts_all,
+       cli_show_access_list_hitcounts_all_cmd,
+       "show access-list hitcounts (ip) NAME",
+       SHOW_STR
+       ACL_STR
+       ACL_HITCOUNTS_STR
+       ACL_IP_STR
+       ACL_NAME_STR
+      )
+{
+    const char ipv4_str[] = "ipv4";
+    const char *type_str;
+    if (argv[0] && !strcmp(argv[0], "ip")) {
+        type_str = ipv4_str;
+    } else {
+        type_str = argv[0];
+    }
+    return cli_print_acl_statistics(CONST_CAST(char*,type_str), /* type */
+                                    CONST_CAST(char*,argv[1]),  /* name */
+                                    NULL,                       /* interface type */
+                                    NULL,                       /* interface id */
+                                    NULL);                      /* direction */
+}
+
+/**
  * Action routine for clearing ACL statistics on a specified interface
  */
 DEFUN (cli_clear_access_list_hitcounts,
@@ -2747,30 +3293,45 @@ access_list_ovsdb_init(void)
 
     /* ACL table, columns */
     ovsdb_idl_add_table(idl, &ovsrec_table_acl);
-    ovsdb_idl_add_column(idl, &ovsrec_acl_col_list_name);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_name);
     ovsdb_idl_add_column(idl, &ovsrec_acl_col_list_type);
-    ovsdb_idl_add_column(idl, &ovsrec_acl_col_cur);
-    ovsdb_idl_add_column(idl, &ovsrec_acl_col_want);
-    ovsdb_idl_add_column(idl, &ovsrec_acl_col_want_version);
-    ovsdb_idl_add_column(idl, &ovsrec_acl_col_want_status);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_cfg_aces);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_cfg_version);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_cur_aces);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_in_progress_aces);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_status);
+
+    /* ACL_Entry table, columns */
+    ovsdb_idl_add_table(idl, &ovsrec_table_acl_entry);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_action);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_protocol);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_src_ip);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_src_l4_port_min);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_src_l4_port_max);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_src_l4_port_range_reverse);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_dst_ip);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_dst_l4_port_min);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_dst_l4_port_max);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_dst_l4_port_range_reverse);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_log);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_count);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_entry_col_comment);
 
     /* ACL columns in Port table */
     ovsdb_idl_add_table(idl, &ovsrec_table_port);
-    ovsdb_idl_add_column(idl, &ovsrec_port_col_acl_applied);
-    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_cur);
-    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_want);
-    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_want_version);
-    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_want_status);
+    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_applied);
+    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_cfg);
+    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_cfg_version);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_statistics);
+    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_status);
 
     /* ACL columns in VLAN table */
     ovsdb_idl_add_table(idl, &ovsrec_table_vlan);
-    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_acl_applied);
-    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_cur);
-    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_want);
-    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_want_version);
-    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_want_status);
+    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_applied);
+    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_cfg);
+    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_cfg_version);
     ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_statistics);
+    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_status);
 }
 
 /**
@@ -2812,6 +3373,8 @@ access_list_vty_init(void)
 
     install_element(ACCESS_LIST_NODE, &cli_access_list_entry_comment_cmd);
     install_element(ACCESS_LIST_NODE, &cli_access_list_entry_comment_no_seq_cmd);
+    install_element(ACCESS_LIST_NODE, &cli_no_access_list_entry_comment_cmd);
+    install_element(ACCESS_LIST_NODE, &cli_no_access_list_entry_comment_etc_cmd);
 
     install_element(ACCESS_LIST_NODE, &cli_no_access_list_entry_cmd);
     install_element(ACCESS_LIST_NODE, &cli_no_access_list_entry_etc_cmd);
@@ -2825,9 +3388,11 @@ access_list_vty_init(void)
     install_element(VLAN_NODE, &cli_no_apply_access_list_cmd);
 
     install_element(ENABLE_NODE, &cli_show_access_list_hitcounts_cmd);
+    install_element(ENABLE_NODE, &cli_show_access_list_hitcounts_all_cmd);
+    install_element(VIEW_NODE, &cli_show_access_list_hitcounts_cmd);
+    install_element(VIEW_NODE, &cli_show_access_list_hitcounts_all_cmd);
     install_element(ENABLE_NODE, &cli_clear_access_list_hitcounts_cmd);
     install_element(ENABLE_NODE, &cli_clear_access_list_hitcounts_all_cmd);
-    install_element(VIEW_NODE, &cli_show_access_list_hitcounts_cmd);
 
     install_element(CONFIG_NODE, &cli_access_list_log_timer_cmd);
 
@@ -2845,6 +3410,8 @@ access_list_vty_init(void)
  *                   structure object
  *
  * @return           e_vtysh_ok on success
+ *
+ * @sa print_acl_config A similar function that uses a different print method
  */
 static vtysh_ret_val
 show_run_access_list_callback(void *p_private)
@@ -2852,9 +3419,8 @@ show_run_access_list_callback(void *p_private)
     vtysh_ovsdb_cbmsg_ptr p_msg = (vtysh_ovsdb_cbmsg *) p_private;
     const struct ovsrec_system *ovs;
     const struct ovsrec_acl *acl_row;
-    const struct smap_node **aces_sorted;
-    struct json *ace, *ace_printable;
-    int ace_idx;
+    char *ace_str;
+    int i;
 
     /* Get System table */
     ovs = ovsrec_system_first(idl);
@@ -2870,37 +3436,27 @@ show_run_access_list_callback(void *p_private)
                                   "%s %s %s",
                                   "access-list",
                                   "ip",
-                                  acl_row->list_name);
-
-            aces_sorted = smap_sort_numeric(&acl_row->want);
-            for (ace_idx = 0; ace_idx < smap_count(&acl_row->want); ace_idx++) {
-                ace = json_from_string(aces_sorted[ace_idx]->value);
-                ace_printable = ace_clone_printable(ace);
-
-                /* Print as a single line of values (ala CLI input) */
-                vtysh_ovsdb_cli_print(p_msg,
-                    "    %s %s%s%s%s%s%s%s%s%s%s%s%s%s",
-                    aces_sorted[ace_idx]->key, /* key = sequence number */
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_ACTION]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_IP_PROTOCOL]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_IP_ADDRESS]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_PORT_OPERATOR]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_PORT]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_SOURCE_PORT_MAX]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_IP_ADDRESS]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_PORT_OPERATOR]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_PORT]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_DESTINATION_PORT_MAX]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_LOG]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_COUNT]),
-                    json_object_get_string(ace_printable, ace_key_names[ACE_KEY_COMMENT]));
-
-                json_destroy(ace);
-                json_destroy(ace_printable);
+                                  acl_row->name);
+            /* Print each ACL entry as a single line (ala CLI input) */
+            for (i = 0; i < acl_row->n_cfg_aces; i ++) {
+                /* If entry has or is a comment, print as its own line */
+                if (acl_row->value_cfg_aces[i]->comment) {
+                    vtysh_ovsdb_cli_print(p_msg,
+                                          "    %" PRId64 " comment %s",
+                                          acl_row->key_cfg_aces[i],
+                                          acl_row->value_cfg_aces[i]->comment);
+                }
+                if (acl_row->value_cfg_aces[i]->action) {
+                    ace_str = ace_entry_config_to_string(acl_row->key_cfg_aces[i],
+                                                         acl_row->value_cfg_aces[i]);
+                    vtysh_ovsdb_cli_print(p_msg, "    %s", ace_str);
+                    free(ace_str);
+                }
             }
-            free(aces_sorted);
         }
     }
+
+    /* Print log timer configuration (if not default) */
     if (smap_get(&ovs->other_config, ACL_LOG_TIMER_STR))
     {
         vtysh_ovsdb_cli_print(p_msg, "access-list log-timer %s",
@@ -2939,16 +3495,16 @@ show_run_access_list_subcontext_callback(void *p_private)
     }
 
     /* Print VLAN ACL, if any */
-    if (vlan_row && vlan_row->aclv4_in_want) {
+    if (vlan_row && vlan_row->aclv4_in_cfg) {
         vtysh_ovsdb_cli_print(p_msg, "    apply access-list ip %s in",
-                              vlan_row->aclv4_in_want->list_name);
+                              vlan_row->aclv4_in_cfg->name);
     }
     /* Print port ACL, if any (LAGs won't have interface name == port name) */
     if (interface_row) {
         port_row = get_port_by_name(interface_row->name);
-        if (port_row && port_row->aclv4_in_want) {
+        if (port_row && port_row->aclv4_in_cfg) {
             vtysh_ovsdb_cli_print(p_msg, "    apply access-list ip %s in",
-                                  port_row->aclv4_in_want->list_name);
+                                  port_row->aclv4_in_cfg->name);
         }
     }
     return e_vtysh_ok;
