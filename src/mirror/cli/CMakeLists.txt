@@ -48,13 +48,13 @@ include_directories (${CMAKE_INCL_DIR}
 		    )
 
 # CLI libraries source files
-set (SOURCES_CLI)
+set (SOURCES_CLI  ${PROJECT_SOURCE_DIR}/mirror_cli.c ${PROJECT_SOURCE_DIR}/mirror_vty.c)
 
-#add_library (${LIBMIRRORCLI} SHARED ${SOURCES_CLI})
+add_library (${LIBMIRRORCLI} SHARED ${SOURCES_CLI})
 
-#target_link_libraries(${LIBMIRRORCLI} audit)
+target_link_libraries(${LIBMIRRORCLI} audit)
 
 # Installation
-#install(TARGETS ${LIBMIRRORCLI}
-#        LIBRARY DESTINATION lib/cli/plugins
-#       )
+install(TARGETS ${LIBMIRRORCLI}
+        LIBRARY DESTINATION lib/cli/plugins
+       )
