@@ -21,7 +21,7 @@
 #include "vswitch-idl.h"
 #include "openvswitch/vlog.h"
 #include "ofproto/ofproto-provider.h"
-#include "ofproto-ops-classifier.h"
+#include "ops-cls-asic-plugin.h"
 #include "acl_parse.h"
 #include "acl_ofproto.h"
 #include "p2acl.h"
@@ -45,15 +45,15 @@ VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
 #define ACE_KEY_DESTINATION_PORT_MAX      "dst_l4_port_max"
 #endif
 
-#define ACL_CFG_STATUS_STR     "status_string"
-#define ACL_CFG_STATUS_VERSION "version"
-#define ACL_CFG_STATUS_STATE   "state"
-#define ACL_CFG_STATUS_CODE    "code"
-#define ACL_CFG_STATUS_MSG     "message"
-#define ACL_CFG_STATE_APPLIED  "applied"
-#define ACL_CFG_STATE_REJECTED "rejected"
-#define ACL_CFG_STATE_IN_PROGRESS "in_progress"
-#define ACL_CFG_STATE_CANCELLED   "cancelled"
+#define ACL_CFG_STATUS_STR          "status_string"
+#define ACL_CFG_STATUS_VERSION      "version"
+#define ACL_CFG_STATUS_STATE        "state"
+#define ACL_CFG_STATUS_CODE         "code"
+#define ACL_CFG_STATUS_MSG          "message"
+#define ACL_CFG_STATE_APPLIED       "applied"
+#define ACL_CFG_STATE_REJECTED      "rejected"
+#define ACL_CFG_STATE_IN_PROGRESS   "in_progress"
+#define ACL_CFG_STATE_CANCELLED     "cancelled"
 
 struct db_ace {
     uint32_t sequence_number;
@@ -78,110 +78,6 @@ sort_swap_aces(size_t a, size_t b, void *ptrs_)
     ptrs[a] = ptrs[b];
     ptrs[b] = tmp;
 }
-#if 0
-static bool
-populate_entry_from_json_string(struct ops_cls_list_entry *entry,
-                                const char *json_str)
-{
-    bool valid = true;
-    struct json *jsonace = json_from_string(json_str);
-    struct shash *ace = json_object(jsonace);
-
-    /* TODO: support more than ipv4 */
-
-    struct shash_node *elem;
-    SHASH_FOR_EACH (elem, ace) {
-        const char *name = elem->name;
-        const char *val  = json_string(elem->data);
-        if (strcmp(name, ACE_KEY_SOURCE_IP_ADDRESS)==0) {
-            if (!acl_parse_ipv4_address
-                (val,
-                 OPS_CLS_SRC_IPADDR_VALID,
-                 &entry->entry_fields.entry_flags,
-                 &entry->entry_fields.src_ip_address.v4,
-                 &entry->entry_fields.src_ip_address_mask.v4,
-                 &entry->entry_fields.src_addr_family)) {
-                VLOG_ERR("invalid source ip addr %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_DESTINATION_IP_ADDRESS)==0) {
-            if (!acl_parse_ipv4_address
-                (val,
-                 OPS_CLS_DEST_IPADDR_VALID,
-                 &entry->entry_fields.entry_flags,
-                 &entry->entry_fields.dst_ip_address.v4,
-                 &entry->entry_fields.dst_ip_address_mask.v4,
-                 &entry->entry_fields.dst_addr_family)) {
-                VLOG_ERR("invalid destination ip addr %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_IP_PROTOCOL)==0) {
-            if (!acl_parse_protocol(val,
-                                    OPS_CLS_PROTOCOL_VALID,
-                                    &entry->entry_fields.entry_flags,
-                                    &entry->entry_fields.protocol)) {
-                VLOG_ERR("invalid protocol %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_ACTION)==0) {
-            if (!acl_parse_actions(val,
-                                   &entry->entry_actions)) {
-                VLOG_ERR("invalid action %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_SOURCE_PORT_OPERATOR)==0) {
-            if (!acl_parse_l4_operator
-                (val,
-                 OPS_CLS_L4_SRC_PORT_VALID,
-                 &entry->entry_fields.entry_flags,
-                 &entry->entry_fields.L4_src_port_op)) {
-                VLOG_ERR("invalid L4 source port op %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_SOURCE_PORT)==0) {
-            if (!acl_parse_l4_port
-                (val,
-                 &entry->entry_fields.L4_src_port_min)) {
-                VLOG_ERR("invalid L4 source port min %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_SOURCE_PORT_MAX)==0) {
-            if (!acl_parse_l4_port
-                (val,
-                 &entry->entry_fields.L4_src_port_max)) {
-                VLOG_ERR("invalid L4 source port max %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_DESTINATION_PORT_OPERATOR)==0) {
-            if (!acl_parse_l4_operator
-                (val,
-                 OPS_CLS_L4_DEST_PORT_VALID,
-                 &entry->entry_fields.entry_flags,
-                 &entry->entry_fields.L4_dst_port_op)) {
-                VLOG_ERR("invalid L4 destination port op %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_DESTINATION_PORT)==0) {
-            if (!acl_parse_l4_port
-                (val,
-                 &entry->entry_fields.L4_dst_port_min)) {
-                VLOG_ERR("invalid L4 destination port min %s", val);
-                valid = false;
-            }
-        } else if (strcmp(name, ACE_KEY_DESTINATION_PORT_MAX)==0) {
-            if (!acl_parse_l4_port
-                (val,
-                 &entry->entry_fields.L4_dst_port_max)) {
-                VLOG_ERR("invalid L4 destination port max %s", val);
-                valid = false;
-            }
-        }
-    }
-
-    json_destroy(jsonace);
-    return valid;
-}
-#endif
 
 static bool
 populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,

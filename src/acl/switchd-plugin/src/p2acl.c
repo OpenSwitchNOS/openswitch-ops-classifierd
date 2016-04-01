@@ -16,7 +16,6 @@
 
 #include "p2acl.h"
 #include "openvswitch/vlog.h"
-#include "ofproto-ops-classifier.h"
 #include "acl.h"
 #include "p2acl_colgrp.h"
 #include "acl_port.h"
@@ -25,14 +24,14 @@
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_p2acl);
 
-#define P2ACL_CFG_STATUS_VERSION "version"
-#define P2ACL_CFG_STATUS_STATE   "state"
-#define P2ACL_CFG_STATUS_CODE    "code"
-#define P2ACL_CFG_STATUS_MSG     "message"
-#define P2ACL_CFG_STATE_APPLIED  "applied"
-#define P2ACL_CFG_STATE_REJECTED "rejected"
-#define P2ACL_CFG_STATE_IN_PROGRESS "in_progress"
-#define P2ACL_CFG_STATE_CANCELLED   "cancelled"
+#define P2ACL_CFG_STATUS_VERSION     "version"
+#define P2ACL_CFG_STATUS_STATE       "state"
+#define P2ACL_CFG_STATUS_CODE        "code"
+#define P2ACL_CFG_STATUS_MSG         "message"
+#define P2ACL_CFG_STATE_APPLIED      "applied"
+#define P2ACL_CFG_STATE_REJECTED     "rejected"
+#define P2ACL_CFG_STATE_IN_PROGRESS  "in_progress"
+#define P2ACL_CFG_STATE_CANCELLED    "cancelled"
 
 /*************************************************************
  * struct ops_cls_interface_info helper routines
@@ -233,7 +232,6 @@ p2acl_update_cfg_internal(struct p2acl *p2acl, struct port *bridgec_port,
                  ops_cls_direction_strings[p2acl->colgrp->direction],
                  method_called);
         VLOG_DBG(details);
-        /* TODO: report success to OVSDB */
         p2acl_set_hw_acl(p2acl, acl);
         p2acl_colgrp_set_applied(p2acl->colgrp, bridgec_port->cfg,
                                  acl->ovsdb_row);

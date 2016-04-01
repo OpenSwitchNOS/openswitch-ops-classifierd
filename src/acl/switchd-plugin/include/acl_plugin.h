@@ -21,4 +21,6 @@
 #define ACL_PLUGIN_MAJOR 0
 #define ACL_PLUGIN_MINOR 1
 
+ void acl_ofproto_init();
+
 #endif

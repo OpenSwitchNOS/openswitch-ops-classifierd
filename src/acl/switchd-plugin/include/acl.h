@@ -21,7 +21,7 @@
 #include "hmap.h"
 #include "uuid.h"
 #include "list.h"
-#include "ofproto-ops-classifier.h"
+#include "ops-cls-asic-plugin.h"
 #include "reconfigure-blocks.h"
 
 struct classifier_list;

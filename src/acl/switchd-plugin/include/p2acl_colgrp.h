@@ -19,7 +19,7 @@
 
 #include <unistd.h>
 #include "vswitch-idl.h"
-#include "ofproto-ops-classifier.h"
+#include "ops-cls-asic-plugin.h"
 #include "smap.h"
 
 /*************************************************************

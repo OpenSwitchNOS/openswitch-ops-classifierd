@@ -18,7 +18,6 @@
 #define __SWITCHD__PLUGIN__ACL_OFPROTO_H__ 1
 
 #include "acl.h"
-#include "ofproto-ops-classifier.h"
 
 struct port;
 
