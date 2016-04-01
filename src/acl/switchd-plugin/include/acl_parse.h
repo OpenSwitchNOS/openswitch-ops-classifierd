@@ -19,7 +19,6 @@
 
 #include <stdlib.h>
 #include <ctype.h>
-#include "ofproto-ops-classifier.h"
 #include "acl.h"
 
 #define ACL_PROTOCOL_ICMP    1

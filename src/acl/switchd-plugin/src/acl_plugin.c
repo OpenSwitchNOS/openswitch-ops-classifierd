@@ -24,6 +24,8 @@
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin);
 
+static bool plugin_init_done = false;
+
 /*************************************************************************//**
  * ACL plugin for switchd. This file contains plugin functions that register
  * callbacks into reconfigure blocks.
@@ -63,6 +65,11 @@ int init (int phase_id)
 
 int run(void)
 {
+    if (!plugin_init_done) {
+        acl_ofproto_init();
+        plugin_init_done = true;
+    }
+
     VLOG_DBG("ACL_PLUGIN is running");
     return 0;
 }
