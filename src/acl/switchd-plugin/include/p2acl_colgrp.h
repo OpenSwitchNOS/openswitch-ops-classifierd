@@ -63,7 +63,8 @@ struct p2acl_colgrp {
     void (*set_cfg)(const struct ovsrec_port *,
                      const struct ovsrec_acl *want);
     void (*set_cfg_version)(const struct ovsrec_port *,
-                             int64_t want_version);
+                            const int64_t *cfg_version,
+                            size_t n_cfg_version);
     void (*set_cfg_status)(const struct ovsrec_port *,
                             const struct smap *want_status);
 };
@@ -91,9 +92,6 @@ void p2acl_colgrp_set_applied(const struct p2acl_colgrp *colgrp,
 void p2acl_colgrp_set_cfg(const struct p2acl_colgrp *colgrp,
                            const struct ovsrec_port *port,
                            const struct ovsrec_acl *want);
-void p2acl_colgrp_set_cfg_version(const struct p2acl_colgrp *colgrp,
-                                   const struct ovsrec_port *port,
-                                   int64_t want_version);
 void p2acl_colgrp_set_cfg_status(const struct p2acl_colgrp *colgrp,
                                   const struct ovsrec_port *port,
                                   const struct smap *want_status);

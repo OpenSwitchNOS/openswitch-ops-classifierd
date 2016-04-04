@@ -155,8 +155,9 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
 
     /* Port modify routine */
     HMAP_FOR_EACH(port, hmap_node, blk_params->ports) {
-        if (OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno) ||
-            (OVSREC_IDL_IS_ROW_INSERTED(port->cfg, blk_params->idl_seqno))) {
+        if ((OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno) ||
+            (OVSREC_IDL_IS_ROW_INSERTED(port->cfg, blk_params->idl_seqno))) &&
+            port->cfg->aclv4_in_cfg) {
             acl_port = port_lookup(&port->cfg->header_.uuid);
             if (!acl_port) {
                 /* We ned to create a port here */

@@ -109,9 +109,10 @@ p2acl_set_cfg_status(struct p2acl *p2acl, const struct ovsrec_port *row,
                      char *state, unsigned int code, char *details)
 {
     struct smap cfg_status;
-    char version[25], code_str[10];
+    char code_str[10];
+    //char version[25];
 
-    smap_clone(&cfg_status, &row->aclv4_in_cfg_status);
+    smap_clone(&cfg_status, &row->aclv4_in_status);
 
     /* Remove any values that exist */
     smap_remove(&cfg_status, P2ACL_CFG_STATUS_VERSION);
@@ -120,9 +121,13 @@ p2acl_set_cfg_status(struct p2acl *p2acl, const struct ovsrec_port *row,
     smap_remove(&cfg_status, P2ACL_CFG_STATUS_MSG);
 
     /* Add values to the smap */
-    sprintf(version, "%" PRId64"", row->aclv4_in_cfg_version);
-    smap_add(&cfg_status, P2ACL_CFG_STATUS_VERSION,
-             version);
+    /*
+     * TODO: Uncomment this code when UI fills version field
+     *
+     * sprintf(version, "%" PRId64"", row->aclv4_in_cfg_version[0]);
+     * smap_add(&cfg_status, P2ACL_CFG_STATUS_VERSION,
+     *          version);
+     */
     smap_add(&cfg_status, P2ACL_CFG_STATUS_STATE, state);
     sprintf(code_str, "%u", code);
     smap_add(&cfg_status, P2ACL_CFG_STATUS_CODE, code_str);

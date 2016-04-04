@@ -26,15 +26,15 @@ struct p2acl_colgrp p2acl_colgrps[NUM_P2ACL_COLGRPS];
     p2acl_colgrps[idx].column_applied = &ovsrec_port_col_##base##_applied;      \
     p2acl_colgrps[idx].column_cfg = &ovsrec_port_col_##base##_cfg;    \
     p2acl_colgrps[idx].column_cfg_version = &ovsrec_port_col_##base##_cfg_version; \
-    p2acl_colgrps[idx].column_cfg_status = &ovsrec_port_col_##base##_cfg_status; \
+    p2acl_colgrps[idx].column_cfg_status = &ovsrec_port_col_##base##_status; \
     p2acl_colgrps[idx].offset_applied = offsetof(struct ovsrec_port, base##_applied); \
     p2acl_colgrps[idx].offset_cfg = offsetof(struct ovsrec_port, base##_cfg); \
     p2acl_colgrps[idx].offset_cfg_version = offsetof(struct ovsrec_port, base##_cfg_version); \
-    p2acl_colgrps[idx].offset_cfg_status = offsetof(struct ovsrec_port, base##_cfg_status); \
+    p2acl_colgrps[idx].offset_cfg_status = offsetof(struct ovsrec_port, base##_status); \
     p2acl_colgrps[idx].set_applied = ovsrec_port_set_##base##_applied;          \
     p2acl_colgrps[idx].set_cfg = ovsrec_port_set_##base##_cfg;        \
     p2acl_colgrps[idx].set_cfg_version = ovsrec_port_set_##base##_cfg_version; \
-    p2acl_colgrps[idx].set_cfg_status = ovsrec_port_set_##base##_cfg_status
+    p2acl_colgrps[idx].set_cfg_status = ovsrec_port_set_##base##_status
 
 void
 p2acl_colgroup_init(void) {
@@ -90,14 +90,6 @@ p2acl_colgrp_set_cfg(const struct p2acl_colgrp *colgrp,
                       const struct ovsrec_acl *cfg)
 {
     (*colgrp->set_cfg)(port, cfg);
-}
-
-void
-p2acl_colgrp_set_cfg_version(const struct p2acl_colgrp *colgrp,
-                              const struct ovsrec_port *port,
-                              int64_t want_version)
-{
-    (*colgrp->set_cfg_version)(port, want_version);
 }
 
 void
