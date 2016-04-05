@@ -74,6 +74,8 @@ Note: No form using a different direction (tx) than is configured (both)
             - end
     - 'show mirror' lists DUP as inactive
     - 'show mirror DUP' displays correct info
+    - CLI: clean up
+        - no mirror session DUP
 6. **Attempt another session with destination using existing RX source interface fails**
     - CLI fails:
         - mirror session DUP
@@ -173,7 +175,7 @@ Note: No form using a different direction (tx) than is configured (both)
     - 'show running-config' contains no mirror sessions
 19. **Create LAG succeeds**
     - CLI succeeds:
-        - interface lag100
+        - interface lag 100
             - no shutdown
         - interface 1
             - lag 100
@@ -200,7 +202,7 @@ Note: No form using a different direction (tx) than is configured (both)
     - 'show mirror' lists BAR as active
     - 'show mirror BAR' display correct info
     - Remove mirror
-        - no mirror session FOO
+        - no mirror session BAR
 
 ### Test Result Criteria
 - Does '[no] shutdown' command succeed or fail as expected
