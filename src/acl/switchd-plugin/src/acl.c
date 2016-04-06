@@ -476,12 +476,9 @@ acl_reconfigure_init(struct blk_params *blk_params)
         acls_created = OVSREC_IDL_ANY_TABLE_ROWS_INSERTED(acl_row, idl_seqno);
         acls_updated = OVSREC_IDL_ANY_TABLE_ROWS_MODIFIED(acl_row, idl_seqno);
 
-        /* We only care about acls_deleted if we already have some acls.
-         * If this reconfigure is the result of an ovsdb reconnect, we have to
-         * assume that records have been deleted while we were away. */
+        /* We only care about acls_deleted if we already have some acls. */
         acls_deleted = have_acls &&
-            (blk_params->ovsdb_reconnected ||
-             OVSREC_IDL_ANY_TABLE_ROWS_DELETED(acl_row, idl_seqno));
+            OVSREC_IDL_ANY_TABLE_ROWS_DELETED(acl_row, idl_seqno);
     } else {
         /* There are no ACL rows in OVSDB. */
         acls_created = false;
