@@ -132,42 +132,42 @@ void acl_callback_port_delete(struct blk_params *blk_params)
 {
     /* Handle port deletes here */
     bool have_ports = !hmap_is_empty(&all_ports);
-    struct port *port;
-    struct acl_port *acl_port;
+    // struct port *port;
+    // struct acl_port *acl_port;
 
     if (!have_ports) {
         VLOG_DBG("[%s]No ports to delete", ACL_PLUGIN_NAME);
         return;
     }
     /* There are ports to delete. Run through the list of ports */
-    HMAP_FOR_EACH(port, hmap_node, blk_params->ports) {
-       acl_port = port_lookup(&port->cfg->header_.uuid);
-       if (acl_port) {
-           acl_port_cfg_delete(acl_port, port, blk_params->ofproto);
-       }
-    }
+    // HMAP_FOR_EACH(port, hmap_node, blk_params->ports) {
+    //    acl_port = port_lookup(&port->cfg->header_.uuid);
+    //    if (acl_port) {
+    //        acl_port_cfg_delete(acl_port, port, blk_params->ofproto);
+    //    }
+    // }
 }
 
 void acl_callback_port_reconfigure(struct blk_params *blk_params)
 {
-    struct acl_port *acl_port;
-    struct port *port = NULL;
+    // struct acl_port *acl_port;
+    // struct port *port = NULL;
 
-    /* Port modify routine */
-    HMAP_FOR_EACH(port, hmap_node, blk_params->ports) {
-        if ((OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno) ||
-            (OVSREC_IDL_IS_ROW_INSERTED(port->cfg, blk_params->idl_seqno))) &&
-            port->cfg->aclv4_in_cfg) {
-            acl_port = port_lookup(&port->cfg->header_.uuid);
-            if (!acl_port) {
-                /* We ned to create a port here */
-                acl_port_cfg_create(port, blk_params->idl_seqno,
-                                    blk_params->ofproto);
-            } else {
-                acl_port->ovsdb_row = port->cfg;
-                acl_port->delete_seqno = blk_params->idl_seqno;
-                acl_port_cfg_update(acl_port, port, blk_params->ofproto);
-            }
-        }
-    }
+    // /* Port modify routine */
+    // HMAP_FOR_EACH(port, hmap_node, blk_params->ports) {
+    //     if ((OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno) ||
+    //         (OVSREC_IDL_IS_ROW_INSERTED(port->cfg, blk_params->idl_seqno))) &&
+    //         port->cfg->aclv4_in_cfg) {
+    //         acl_port = port_lookup(&port->cfg->header_.uuid);
+    //         if (!acl_port) {
+    //             /* We ned to create a port here */
+    //             acl_port_cfg_create(port, blk_params->idl_seqno,
+    //                                 blk_params->ofproto);
+    //         } else {
+    //             acl_port->ovsdb_row = port->cfg;
+    //             acl_port->delete_seqno = blk_params->idl_seqno;
+    //             acl_port_cfg_update(acl_port, port, blk_params->ofproto);
+    //         }
+    //     }
+    // }
 }
