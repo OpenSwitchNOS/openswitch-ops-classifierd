@@ -48,13 +48,13 @@ int init(int phase_id)
     VLOG_INFO("[%s] Registering in BLK_INIT_RECONFIGURE", QOS_PLUGIN_NAME);
     register_reconfigure_callback(&qos_callback_init, BLK_INIT_RECONFIGURE, NO_PRIORITY);
 
-    VLOG_INFO("[%s] Registering in BLK_BR_FEATURE_RECONFIG", QOS_PLUGIN_NAME);
-    register_reconfigure_callback(&qos_callback_reconfigure,
-                                  BLK_BR_FEATURE_RECONFIG, NO_PRIORITY);
+    VLOG_INFO("[%s] Registering in BLK_BR_RECONFIGURE_PORTS", QOS_PLUGIN_NAME);
+    register_reconfigure_callback(&qos_callback_reconfigure_bridge,
+                                  BLK_BR_RECONFIGURE_PORTS, NO_PRIORITY);
 
-    VLOG_INFO("[%s] Registering in BLK_RECONFIGURE_NEIGHBORS", QOS_PLUGIN_NAME);
-    register_reconfigure_callback(&qos_callback_reconfigure,
-                                  BLK_RECONFIGURE_NEIGHBORS, NO_PRIORITY);
+    VLOG_INFO("[%s] Registering in BLK_VRF_RECONFIGURE_PORTS", QOS_PLUGIN_NAME);
+    register_reconfigure_callback(&qos_callback_reconfigure_vrf,
+                                  BLK_VRF_RECONFIGURE_PORTS, NO_PRIORITY);
 
     return ret;
 }

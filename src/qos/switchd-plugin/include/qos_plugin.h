@@ -26,9 +26,10 @@
 
 
 /* bridge_reconfigure callback functions (registered by qos_plugin:init) */
-void qos_configure(struct ofproto *ofproto, struct ovsdb_idl *idl, unsigned int idl_seqno);
-void qos_callback_init(struct blk_params *params);
-void qos_callback_reconfigure(struct blk_params *params);
+void qos_configure(struct ofproto *, struct ovsdb_idl *, unsigned int);
+void qos_callback_init(struct blk_params *);
+void qos_callback_reconfigure_bridge(struct blk_params *);
+void qos_callback_reconfigure_vrf(struct blk_params *);
 
 /* Configuration of QOS tables. */
 enum qos_trust get_qos_trust_value(const struct smap *);

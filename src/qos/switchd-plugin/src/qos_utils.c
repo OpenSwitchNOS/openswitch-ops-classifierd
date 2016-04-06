@@ -22,29 +22,17 @@
 #include "qos_profile.h"
 #include "qos_trust.h"
 
+#include "bridge.h"
 #include "openswitch-idl.h"
 #include "ovsdb-idl.h"
 #include "reconfigure-blocks.h"
 #include "smap.h"
 #include "vswitch-idl.h"
+#include "vrf.h"
 #include "openvswitch/vlog.h"
 
 VLOG_DEFINE_THIS_MODULE(qos_utils);
 
-
-// TODO: from bridge.h -- should come from bridge.h
-struct port {
-    struct hmap_node hmap_node; /* Element in struct bridge's "ports" hmap. */
-    struct bridge *bridge;
-    char *name;
-
-    const struct ovsrec_port *cfg;
-
-    /* An ordinary bridge port has 1 interface.
-     * A bridge port for bonding has at least 2 interfaces. */
-    struct ovs_list ifaces;    /* List of "struct iface"s. */
-    int bond_hw_handle;        /* Hardware bond identifier. */
-};
 
 /**
  * Configure QOS maps & profiles for a particular bridge.
@@ -79,26 +67,51 @@ void qos_callback_init(struct blk_params *blk_params)
 /**
  * bridge_reconfigure BLK_BR_xxx and BLK_VRF_xxx callback handler
  *
- * handles all Bridge- and VRF-type callbacks from bridge_reconfigure.
+ * handles all Bridge- and VRF- post add/delete reconfigure-type callbacks
+ * from bridge_reconfigure.
  */
-void qos_callback_reconfigure(struct blk_params *blk_params)
+void qos_callback_reconfigure(struct blk_params *blk_params, struct hmap *ports)
 {
-    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d opfproto@ %p ports@ %p",
-             __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
-             blk_params->ofproto, blk_params->ports);
+    struct port     *port;
 
     /* loop through all ports */
-    struct port *port;
-    HMAP_FOR_EACH (port, hmap_node, blk_params->ports) {
-        VLOG_DBG("%s: port %s", __FUNCTION__, port->cfg->name);
+    HMAP_FOR_EACH(port, hmap_node, ports) {
+        VLOG_DBG("%s: port %s", __FUNCTION__, blk_params->port->cfg->name);
 
         qos_trust_send_change(blk_params->ofproto,
                               port, port->cfg,
                               blk_params->idl_seqno);
 
         qos_configure_port_profiles(blk_params->ofproto,
-                                    port->cfg,
-                                    port,
+                                    port->cfg, port,
                                     blk_params->idl, blk_params->idl_seqno);
     }
+}
+
+/**
+ * bridge_reconfigure BLK_BR_RECONFIGURE_PORTS callback
+ *
+ * handles all Bridge post add/delete reconfigure event
+ */
+void qos_callback_reconfigure_bridge(struct blk_params *blk_params)
+{
+    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d opfproto@ %p bridge@ %p",
+             __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
+             blk_params->ofproto, blk_params->br);
+
+    qos_callback_reconfigure(blk_params, &blk_params->br->ports);
+}
+
+/**
+ * bridge_reconfigure BLK_VRF_RECONFIGURE_PORTS callback
+ *
+ * handles all VRF post add/delete reconfigure event
+ */
+void qos_callback_reconfigure_vrf(struct blk_params *blk_params)
+{
+    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d opfproto@ %p vrf@ %p",
+             __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
+             blk_params->ofproto, blk_params->vrf);
+
+    qos_callback_reconfigure(blk_params, &blk_params->vrf->up->ports);
 }
