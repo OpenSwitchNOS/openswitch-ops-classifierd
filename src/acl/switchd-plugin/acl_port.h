@@ -22,25 +22,6 @@
 #include "reconfigure-blocks.h"
 #include "acl_port_binding_helper.h"
 
-/******************************************************************************
- * Copied over from bridge.h
- * TODO: Get rid of this struct from here and include the relevant header file
- *****************************************************************************/
-struct port {
-    struct hmap_node hmap_node; /* Element in struct bridge's "ports" hmap. */
-    struct bridge *bridge;
-    char *name;
-
-    const struct ovsrec_port *cfg;
-
-    /* An ordinary bridge port has 1 interface.
-     * A bridge port for bonding has at least 2 interfaces. */
-    struct ovs_list ifaces;    /* List of "struct iface"s. */
-#ifdef OPS
-    int bond_hw_handle;        /* Hardware bond identifier. */
-#endif
-};
-
 /*************************************************************
  * acl_port structures
  *
@@ -83,7 +64,37 @@ struct acl_port *acl_port_lookup_by_uuid(const struct uuid* uuid);
 /************************************************************
  * Top level routine to check if a port's ACLs need to reconfigure
  ************************************************************/
+
+/**************************************************************************//**
+ * Reconfigure block callback for port delete operation.
+ * This function is called when @see bridge_reconfigure() is called from
+ * switchd. This callback will look for all ports that are about to be deleted
+ * and unapply any applied ACLs from such ports
+ *
+ * @param[in] blk_params - Pointer to the block parameters structure
+ *****************************************************************************/
 void acl_callback_port_delete(struct blk_params *blk_params);
+
+/**************************************************************************//**
+ * Reconfigure block callback for port reconfigure operation.
+ * This function is called when @see bridge_reconfigure() is called from
+ * switchd. This callback will look for all ports that are modified
+ * and reconfigure ACL on such such ports
+ *
+ * @param[in] blk_params - Pointer to the block parameters structure
+ *****************************************************************************/
 void acl_callback_port_reconfigure(struct blk_params *blk_params);
+
+/**************************************************************************//**
+ * Reconfigure block callback for Port Update operation.
+ * This function is called when @see port_configure() is called from switchd.
+ * At this point in time, switchd has finished configuring a port in PI and
+ * PD data structures. During init sequence, if we encounter a port row
+ * that has an ACL applied in the cfg column, that ACL will be applied to
+ * the given port from here.
+ *
+ * @param[in] blk_params - Pointer to the block parameters structure
+ *****************************************************************************/
+void acl_callback_port_update(struct blk_params *blk_params);
 
 #endif  /* __SWITCHD__PLUGIN__ACL_PORT_H__ */
