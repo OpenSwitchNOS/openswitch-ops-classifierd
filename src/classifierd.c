@@ -15,7 +15,7 @@
  */
 
 #include <stdio.h>
-#include <ops-classifierd.h>
+#include "classifierd.h"
 
 int main(int argc, char *argv[])
 {

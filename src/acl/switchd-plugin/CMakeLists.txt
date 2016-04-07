@@ -34,14 +34,13 @@ pkg_check_modules(OVSCOMMON REQUIRED libovscommon)
 include_directories(
    ${PROJECT_BINARY_DIR}
    ${PROJECT_SOURCE_DIR}
-   ${INCL_DIR}/util
+   ${ACL_INCL_DIR}
    ${OVSCOMMON_INCLUDE_DIRS}
    ${INCLUDE_DIR}
 )
 
 # Sources to build acl
-set(SRC_DIR src)
-file(GLOB SOURCES "${SRC_DIR}/*.c")
+file(GLOB SOURCES "${PROJECT_SOURCE_DIR}/*.c" "${ACL_SOURCE_DIR}/util/*.c")
 add_library(${ACL} SHARED ${SOURCES})
 install(TARGETS ${ACL} LIBRARY DESTINATION lib/openvswitch/plugins)
 
