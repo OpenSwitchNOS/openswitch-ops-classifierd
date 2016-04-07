@@ -35,8 +35,6 @@ extern "C" {
  * for each enum use by the API.
  */
 
-
-
 const char *const temp_copp_keys[COPP_NUM_CLASSES] = {
     [COPP_ACL_LOGGING] =        "temp_copp_acl_logging",
     [COPP_ARP_BROADCAST] =      "temp_copp_arp_broadcast",
