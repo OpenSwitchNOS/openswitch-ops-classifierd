@@ -16,6 +16,6 @@ cmake_minimum_required (VERSION 2.8)
 
 # Add any sub-feature directories here
 # add_subdirectory(acl)
-# add_subdirectory(copp)
+add_subdirectory(copp)
 # add_subdirectory(mirror)
 # add_subdirectory(qos)
