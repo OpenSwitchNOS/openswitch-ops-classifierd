@@ -22,7 +22,7 @@
 
 
 #ifndef COPP_TEMP_KEYS_H
-#define COPP_TEMP_KEYS_H 1
+#define COPP_TEMP_KEYS_H
 
 #ifdef  __cplusplus
 extern "C" {
@@ -34,8 +34,6 @@ extern "C" {
  * Use designated initializer to pre-fill an array of pointer to key names
  * for each enum use by the API.
  */
-
-
 
 const char *const temp_copp_keys[COPP_NUM_CLASSES] = {
     [COPP_ACL_LOGGING] =        "temp_copp_acl_logging",
@@ -58,6 +56,24 @@ const char *const temp_copp_keys[COPP_NUM_CLASSES] = {
     [COPP_STP_BPDU] =           "temp_copp_stp_bpdu",
     [COPP_UNKNOWN_IP_UNICAST] = "temp_copp_unknown_ip_unicast"
 };
+
+enum copp_totals {
+    COPP_STATS_TOTAL_PKTS_PASSED = 0,
+    COPP_STATS_TOTAL_BYTES_PASSED,
+    COPP_STATS_TOTAL_PKTS_DROPPED,
+    COPP_STATS_TOTAL_BYTES_DROPPED,
+    /***/
+    COPP_STATS_TOTAL_MAX
+};
+
+#define COPP_NUM_TOTALS COPP_STATS_TOTAL_MAX
+const char *const temp_copp_totals_keys[COPP_STATS_TOTAL_MAX] = {
+    [COPP_STATS_TOTAL_PKTS_PASSED] =        "temp_total_pkts_passed",
+    [COPP_STATS_TOTAL_BYTES_PASSED] =       "temp_total_bytes_passed",
+    [COPP_STATS_TOTAL_PKTS_DROPPED] =       "temp_total_pkts_dropped",
+    [COPP_STATS_TOTAL_BYTES_DROPPED] =      "temp_total_bytes_dropped"
+};
+
 
 #define TEMP_COPP_STATS_BUF_FMT "%lu,%lu,%lu,%lu,%lu,%lu,%lu "
 #define TEMP_COPP_STATS_VARS(h, c)         \

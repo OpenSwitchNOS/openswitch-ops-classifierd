@@ -21,5 +21,4 @@ set(COPP_INCL_DIR "${PROJECT_SOURCE_DIR}/include")
 MESSAGE("PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
 MESSAGE("COPP_INCL_DIR=${COPP_INCL_DIR}")
 
-#add_subdirectory(cli)
-#add_subdirectory(switchd-plugin)
+add_subdirectory(switchd-plugin)
