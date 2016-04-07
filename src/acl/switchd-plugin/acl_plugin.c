@@ -19,7 +19,7 @@
 #include "plugin-extensions.h"
 #include "acl.h"
 #include "acl_plugin.h"
-#include "p2acl.h"
+#include "acl_port_bindings.h"
 #include "acl_port.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin);

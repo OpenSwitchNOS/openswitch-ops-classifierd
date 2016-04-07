@@ -17,7 +17,6 @@ cmake_minimum_required (VERSION 2.8)
 set (CLASSIFIERD ops-classifierd)
 project (${CLASSIFIERD})
 set (SRC_DIR src)
-set (INCL_DIR include)
 
 # Define compile flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wall -Werror")
@@ -28,12 +27,11 @@ pkg_check_modules(CONFIG_YAML REQUIRED ops-config-yaml)
 pkg_check_modules(OVSCOMMON REQUIRED libovscommon)
 pkg_check_modules(OVSDB REQUIRED libovsdb)
 
-include_directories (${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/${INCL_DIR}
-                     ${OVSCOMMON_INCLUDE_DIRS}
+include_directories (${PROJECT_BINARY_DIR} ${OVSCOMMON_INCLUDE_DIRS}
 )
 
 # Sources to build ops-classifierd
-set (SOURCES ${SRC_DIR}/ops-classifierd.c)
+set (SOURCES ${SRC_DIR}/classifierd.c)
 
 # Rules to build ops-classifierd
 add_executable (${CLASSIFIERD} ${SOURCES})
