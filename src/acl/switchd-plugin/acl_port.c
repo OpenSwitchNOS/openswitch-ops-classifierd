@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "bridge.h"
+#include "vrf.h"
 #include "acl_port_bindings.h"
 #include "acl_port.h"
 #include "vswitch-idl.h"
@@ -131,19 +133,32 @@ void acl_callback_port_delete(struct blk_params *blk_params)
 {
     /* Handle port deletes here */
     bool have_ports = !hmap_is_empty(&all_ports);
-    struct port *port;
     struct acl_port *acl_port;
+    struct bridge *br;
+    struct port *del_port, *next_del_port;
 
     if (!have_ports) {
         VLOG_DBG("[%s]No ports to delete", ACL_PLUGIN_NAME);
         return;
     }
-    /* There are ports to delete. Run through the list of ports */
-    HMAP_FOR_EACH(port, hmap_node, blk_params->ports) {
-       acl_port = port_lookup(&port->cfg->header_.uuid);
-       if (acl_port) {
-           acl_port_cfg_delete(acl_port, port, blk_params->ofproto);
-       }
+
+    /* Find the list of ports to operate on. Only one out of bridge and vrf
+     * is populated at any given point
+     */
+    if (blk_params->br) {
+        br = blk_params->br;
+    } else {
+        br = blk_params->vrf->up;
+    }
+
+    /* Find and delete ACL cfg for the ports that are being deleted */
+    HMAP_FOR_EACH_SAFE(del_port, next_del_port, hmap_node, &br->ports) {
+        if (!shash_find_data(&br->wanted_ports, del_port->name)) {
+            acl_port = port_lookup(&del_port->cfg->header_.uuid);
+            if (acl_port) {
+                acl_port_cfg_delete(acl_port, del_port, blk_params->ofproto);
+            }
+        }
     }
 }
 
@@ -151,22 +166,54 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
 {
     struct acl_port *acl_port;
     struct port *port = NULL;
+    struct bridge *br;
+
+    /* Find the bridge to work with */
+    if (blk_params->br) {
+        br = blk_params->br;
+    } else {
+        br = blk_params->vrf->up;
+    }
 
     /* Port modify routine */
-    HMAP_FOR_EACH(port, hmap_node, blk_params->ports) {
-        if ((OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno) ||
-            (OVSREC_IDL_IS_ROW_INSERTED(port->cfg, blk_params->idl_seqno))) &&
-            port->cfg->aclv4_in_cfg) {
+    HMAP_FOR_EACH(port, hmap_node, &br->ports) {
+        if (OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno)) {
             acl_port = port_lookup(&port->cfg->header_.uuid);
-            if (!acl_port) {
-                /* We ned to create a port here */
-                acl_port_cfg_create(port, blk_params->idl_seqno,
-                                    blk_params->ofproto);
-            } else {
-                acl_port->ovsdb_row = port->cfg;
-                acl_port->delete_seqno = blk_params->idl_seqno;
-                acl_port_cfg_update(acl_port, port, blk_params->ofproto);
+            if (acl_port) {
+                if (port->cfg->aclv4_in_cfg) {
+                    /* Reconfigure ACL */
+                    acl_port->ovsdb_row = port->cfg;
+                    acl_port->delete_seqno = blk_params->idl_seqno;
+                    acl_port_cfg_update(acl_port, port, blk_params->ofproto);
+                } else {
+                    /* If the port row modification was unapply ACL, then
+                     * this case is hit.
+                     */
+                    acl_port_cfg_delete(acl_port, port, blk_params->ofproto);
+                }
             }
+        }
+    }
+}
+
+void
+acl_callback_port_update(struct blk_params *blk_params)
+{
+    struct acl_port *acl_port;
+
+    VLOG_DBG("Port Update called for %s\n", blk_params->port->name);
+
+    acl_port = port_lookup(&blk_params->port->cfg->header_.uuid);
+    if (!acl_port) {
+        /* Create and apply if ACL is configured on the port.*/
+        if (blk_params->port->cfg->aclv4_in_cfg) {
+            acl_port_cfg_create(blk_params->port, blk_params->idl_seqno,
+                                blk_params->ofproto);
+        } else {
+            /* We still create a port entry. However, it will not be programmed
+             * until we have an ACL applied to it
+             */
+             acl_port_new(blk_params->port->cfg, blk_params->idl_seqno);
         }
     }
 }

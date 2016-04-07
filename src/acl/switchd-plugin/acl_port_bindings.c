@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "bridge.h"
 #include "acl_port_bindings.h"
 #include "openvswitch/vlog.h"
 #include "acl.h"
