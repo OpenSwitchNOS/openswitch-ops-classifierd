@@ -382,6 +382,7 @@ DEFUN ( vtysh_show_copp_generic_statistics,
     return CMD_SUCCESS;
 }
 
+extern struct ovsdb_idl *idl;
 /*================================================================================================*/
 
 /* Initialize ops-copp cli node.
@@ -404,4 +405,7 @@ void cli_post_init (void)
     install_element (ENABLE_NODE, &vtysh_show_copp_protocol_statistics_cmd);
     install_element (VIEW_NODE, &vtysh_show_copp_generic_statistics_cmd);
     install_element (ENABLE_NODE, &vtysh_show_copp_generic_statistics_cmd);
+
+    /* register cli as listener to the copps stats column from the db */
+    ovsdb_idl_add_column(idl, &ovsrec_system_col_copp_statistics);
 }
