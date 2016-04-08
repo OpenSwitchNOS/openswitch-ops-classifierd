@@ -1,4 +1,4 @@
-# (c) Copyright 2015 Hewlett Packard Enterprise Development LP
+# (c) Copyright 2016 Hewlett Packard Enterprise Development LP
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -16,9 +16,18 @@ cmake_minimum_required (VERSION 2.8)
 
 set (CLASSIFIERD ops-classifierd)
 project (${CLASSIFIERD})
-set (SRC_DIR src)
-set (CLS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-set (INCL_DIR include)
+# top level src and include dir
+set (OPS_CLS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/src)
+set (OPS_CLS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+# dirs under top level src, src/common and src/include dir
+set (CLS_COMMON_DIR ${OPS_CLS_SOURCE_DIR}/common)
+set (CLS_INCLUDE_DIR ${OPS_CLS_SOURCE_DIR}/include)
+
+MESSAGE("PROJECT_SRC_DIR=${PROJECT_SOURCE_DIR}")
+MESSAGE("OPS_CLS_SOURCE_DIR=${OPS_CLS_SOURCE_DIR}")
+MESSAGE("OPS_CLS_INCLUDE_DIR=${OPS_CLS_INCLUDE_DIR}")
+MESSAGE("CLS_COMMON_DIR=${CLS_COMMON_DIR}")
+MESSAGE("CLS_INCLUDE_DIR=${CLS_INCLUDE_DIR}")
 
 # Define compile flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wall -Werror")
@@ -34,9 +43,9 @@ include_directories (${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/${INCL_DIR}
 )
 
 # Sources to build ops-classifierd
-set (SOURCES ${SRC_DIR}/ops-classifierd.c)
+set (SOURCES ${OPS_CLS_SOURCE_DIR}/classifierd.c)
 
-set (HEADERS ${CLS_INCLUDE_DIR}/ops-cls-asic-plugin.h)
+set (HEADERS ${OPS_CLS_INCLUDE_DIR}/ops-cls-asic-plugin.h)
 
 # Rules to build ops-classifierd
 add_executable (${CLASSIFIERD} ${SOURCES})

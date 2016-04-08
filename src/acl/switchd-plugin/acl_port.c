@@ -22,6 +22,7 @@
 #include "reconfigure-blocks.h"
 #include "acl_plugin.h"
 #include "acl_ofproto.h"
+#include "ops_cls_status_msgs.h"
 
 /** TODO: Remove these when error-handling code is pushed */
 #define ACL_PORT_MAP_CFG_STATUS_VERSION     "version"
@@ -204,7 +205,10 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                      acl_port_map->parent, port);
     int rc;
     const char *method_called = NULL;
+    /* details is used to log message in VLOG */
     char details[256];
+    /* status_str used to store status description in db */
+    char status_str[OPS_CLS_STATUS_MSG_MAX_LEN] = {0};
 
     struct acl* acl;
     /* TODO: Start looking at want_version too.
@@ -221,7 +225,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                              &interface_info,
                                              acl_port_map->acl_db->direction,
                                              &status);
-            method_called = "port_remove";
+            method_called =  OPS_CLS_STATUS_MSG_OP_REMOVE_STR;
         } else {
             /* Nothing to delete in PD for this ACL_PORT_MAP */
         }
@@ -250,7 +254,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                             &interface_info,
                                             acl_port_map->acl_db->direction,
                                             &status);
-            method_called = "port_apply";
+            method_called = OPS_CLS_STATUS_MSG_OP_APPLY_STR;
         } else {
             VLOG_DBG("ACL_PORT_MAP %s:%s:%s replacing %s with %s",
                      acl_port_map->parent->name,
@@ -265,7 +269,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                               &interface_info,
                                               acl_port_map->acl_db->direction,
                                               &status);
-            method_called = "port_replace";
+            method_called = OPS_CLS_STATUS_MSG_OP_REPLACE_STR;
         }
     }
 
@@ -275,7 +279,9 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
                  ops_cls_direction_strings[acl_port_map->acl_db->direction]);
         VLOG_DBG(details);
-        acl_port_map_set_cfg_status(acl_port_map, port->cfg, ACL_PORT_MAP_CFG_STATE_APPLIED, 0, details);
+        /* status_str will be NULL on success */
+        acl_port_map_set_cfg_status(acl_port_map, port->cfg,
+                            ACL_PORT_MAP_CFG_STATE_APPLIED, 0, status_str);
     } else if (rc == 0) {
         /* success */
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s succeeded",
@@ -287,10 +293,23 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
         acl_port_map_set_hw_acl(acl_port_map, acl);
         acl_db_util_set_applied(acl_port_map->acl_db, port->cfg,
                                  acl->ovsdb_row);
-        acl_port_map_set_cfg_status(acl_port_map, port->cfg, ACL_PORT_MAP_CFG_STATE_APPLIED,
-                             status.status_code, details);
+        /* status_str will be NULL on success */
+        acl_port_map_set_cfg_status(acl_port_map, port->cfg,
+                                    ACL_PORT_MAP_CFG_STATE_APPLIED,
+                                    status.status_code, status_str);
     } else {
         /* failure */
+
+        /* @todo entry_id needs to be converted to sequence no here
+         * but that infra structure is not ready yet.
+         */
+        ops_cls_status_msgs_get(status.status_code,
+                                method_called,
+                                OPS_CLS_STATUS_MSG_FEATURE_ACL_STR,
+                                OPS_CLS_STATUS_MSG_IFACE_PORT_STR,
+                                acl_port_map->parent->name,
+                                status.entry_id,OPS_CLS_STATUS_MSG_MAX_LEN,
+                                status_str);
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s failed",
                  acl_port_map->parent->name,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
@@ -298,8 +317,8 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                  method_called);
         VLOG_DBG(details);
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
-                             ACL_PORT_MAP_CFG_STATE_REJECTED,
-                             status.status_code, details);
+                                    ACL_PORT_MAP_CFG_STATE_REJECTED,
+                                    status.status_code, status_str);
     }
 }
 

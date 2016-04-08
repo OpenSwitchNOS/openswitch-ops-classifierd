@@ -21,6 +21,7 @@
 #include "acl_plugin.h"
 #include "acl_port.h"
 #include "vswitch-idl.h"
+#include "ops_cls_status_msgs.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin);
 
@@ -91,6 +92,13 @@ acl_callback_bridge_init(struct blk_params *blk_params)
 
     /* Initialize ACL DB Util array */
     acl_db_util_init();
+    /* Populate the global cls status table for cls status messages
+     * @todo Ideally this should be populated from the classifier
+     * plugin init callback instead of acl plugin callback, but we
+     * don't have such callback as of now. please move this call to
+     * classifier plugin init callback once that infra is available
+     */
+     ops_cls_status_msgs_populate();
 
     /* Find and initialize the asic plugin */
     acl_ofproto_init();
