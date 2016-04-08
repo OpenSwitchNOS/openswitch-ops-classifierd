@@ -17,6 +17,7 @@ cmake_minimum_required (VERSION 2.8)
 set (CLASSIFIERD ops-classifierd)
 project (${CLASSIFIERD})
 set (SRC_DIR src)
+set (CLS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
 # Define compile flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wall -Werror")
@@ -33,6 +34,9 @@ include_directories (${PROJECT_BINARY_DIR} ${OVSCOMMON_INCLUDE_DIRS}
 # Sources to build ops-classifierd
 set (SOURCES ${SRC_DIR}/classifierd.c)
 
+set (HEADERS ${CLS_INCLUDE_DIR}/acl-log.h
+             ${CLS_INCLUDE_DIR}/ops-cls-asic-plugin.h)
+
 # Rules to build ops-classifierd
 add_executable (${CLASSIFIERD} ${SOURCES})
 
@@ -44,5 +48,6 @@ target_link_libraries (${CLASSIFIERD}
 install(TARGETS ${CLASSIFIERD}
         RUNTIME DESTINATION bin)
 
+install(FILES ${HEADERS} DESTINATION include)
 # Build sub-features
 add_subdirectory(src)

@@ -34,6 +34,7 @@ pkg_check_modules(OVSCOMMON REQUIRED libovscommon)
 include_directories(
    ${PROJECT_BINARY_DIR}
    ${PROJECT_SOURCE_DIR}
+   ${CLS_INCLUDE_DIR}
    ${ACL_INCL_DIR}
    ${OVSCOMMON_INCLUDE_DIRS}
    ${INCLUDE_DIR}
