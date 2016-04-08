@@ -366,7 +366,6 @@ struct ops_cls_statistics
     uint64_t        hitcounts;       /* hitcounts from hw */
 };
 
-
 /**************************************************************************//**
  * Classifier Plugin Interface
  *

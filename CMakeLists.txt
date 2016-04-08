@@ -16,8 +16,15 @@ cmake_minimum_required (VERSION 2.8)
 
 set (CLASSIFIERD ops-classifierd)
 project (${CLASSIFIERD})
-set (SRC_DIR src)
+set (CLS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/src)
 set (CLS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+set (CLS_COMMON_SOURCE_DIR ${CLS_SOURCE_DIR}/common)
+set (CLS_COMMON_INCLUDE_DIR ${CLS_SOURCE_DIR}/include)
+MESSAGE("PROJECT_SRC_DIR=${PROJECT_SOURCE_DIR}")
+MESSAGE("CLS_SOURCE_DIR=${CLS_SOURCE_DIR}")
+MESSAGE("CLS_INCLUDE_DIR=${CLS_INCLUDE_DIR}")
+MESSAGE("CLS_COMMON_SOURCE_DIR=${CLS_COMMON_SOURCE_DIR}")
+MESSAGE("CLS_COMMON_INCLUDE_DIR=${CLS_COMMON_INCLUDE_DIR}")
 
 # Define compile flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wall -Werror")
@@ -32,7 +39,7 @@ include_directories (${PROJECT_BINARY_DIR} ${OVSCOMMON_INCLUDE_DIRS}
 )
 
 # Sources to build ops-classifierd
-set (SOURCES ${SRC_DIR}/classifierd.c)
+set (SOURCES ${CLS_SOURCE_DIR}/classifierd.c)
 
 set (HEADERS ${CLS_INCLUDE_DIR}/ops-cls-asic-plugin.h)
 

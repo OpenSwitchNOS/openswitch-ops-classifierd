@@ -22,6 +22,7 @@
 #include "acl_port_bindings.h"
 #include "acl_port.h"
 #include "vswitch-idl.h"
+#include "cls_status_msgs.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin);
 
@@ -92,6 +93,14 @@ acl_callback_bridge_init(struct blk_params *blk_params)
     ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_external_ids);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_cur_aces);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_status);
+
+    /* Populate the global cls status table for cls status messages
+     * @todo Ideally this should be populated from the classifier
+     * plugin init callback instead of acl plugin callback, but we
+     * don't have such callback as of now. please move this call to
+     * classifier plugin init callback once that infra is available
+     */
+     cls_status_msgs_populate();
 
     /* Find and initialize the asic plugin */
     acl_ofproto_init();
