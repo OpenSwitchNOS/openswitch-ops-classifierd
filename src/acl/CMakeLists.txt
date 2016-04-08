@@ -17,13 +17,15 @@ cmake_minimum_required (VERSION 2.8)
 PROJECT(acl)
 
 MESSAGE("got to acl")
-set(INCL_DIR "${PROJECT_SOURCE_DIR}")
-set(ACL_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
-set(ACL_INCL_DIR "${PROJECT_SOURCE_DIR}/include")
+# acl/include directory
+set(ACL_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+
+# acl/util directory
+set(ACL_UTIL_DIR "${PROJECT_SOURCE_DIR}/util")
+
 MESSAGE("PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}")
-MESSAGE("INCL_DIR=${INCL_DIR}")
-MESSAGE("ACL_SOURCE_DIR=${ACL_SOURCE_DIR}")
-MESSAGE("ACL_INCL_DIR=${ACL_INCL_DIR}")
+MESSAGE("ACL_INCLUDE_DIR=${ACL_INCLUDE_DIR}")
+MESSAGE("ACL_UTIL_DIR=${ACL_UTIL_DIR}")
 
 add_subdirectory(cli-plugin)
 add_subdirectory(switchd-plugin)
