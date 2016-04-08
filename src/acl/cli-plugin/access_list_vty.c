@@ -32,6 +32,7 @@
 #include <vtysh/vtysh_ovsdb_if.h>
 #include <vtysh/vtysh_ovsdb_config.h>
 
+#include <libaudit.h>
 #include <openvswitch/vlog.h>
 #include <smap.h>
 #include <json.h>
@@ -432,6 +433,58 @@ protocol_get_name_from_number(uint8_t proto_number)
     return protocol_names[proto_number];
 }
 
+/* = Audit Logging = */
+
+/** Enough room for ACL name and all key-value pairs of an ACE */
+#define ACL_CLI_AUDIT_BUFFER_SIZE 512
+
+/** File descriptor for audit logging */
+static int audit_fd;
+
+/**
+ * Initialize the audit log
+ */
+static void
+acl_audit_init(void) {
+    audit_fd = audit_open();
+}
+
+/**
+ * Encode the given arg_name and arg_value into the given aubuf and ausize
+ */
+static void
+acl_audit_encode(char *aubuf, size_t ausize,
+                 const char *arg_name, const char *arg_value)
+{
+    char *cfg;
+    if (arg_value != NULL) {
+        cfg = audit_encode_nv_string(arg_name, arg_value, 0);
+        if (cfg != NULL) {
+            /* New length includes trailing space and NULL byte */
+            if (strlen(aubuf) + strlen(cfg) + 2 <= ausize) {
+                strcat(aubuf, cfg);
+                strcat(aubuf, " ");
+            } else {
+                VLOG_ERR("Audit log message buffer length exceeded");
+            }
+            free(cfg);
+        }
+    }
+}
+
+/**
+ * Log the given aubuf and command_result to the audit log
+ */
+static void
+acl_audit_log(char *aubuf, int command_result)
+{
+    char hostname[HOST_NAME_MAX];
+    gethostname(hostname, HOST_NAME_MAX);
+    aubuf[strlen(aubuf) - 1] = '\0'; /* Chomp trailing space */
+    audit_log_user_message(audit_fd, AUDIT_USYS_CONFIG, aubuf, hostname,
+                           NULL, NULL, command_result);
+}
+
 /* = OVSDB Manipulation Functions = */
 
 /**
@@ -725,7 +778,7 @@ print_acl_tabular(const struct ovsrec_acl *acl_row)
  * @param  acl_name  ACL name string
  * @param  config    Print as configuration input?
  *
- * @return CMD_SUCCESS
+ * @return CMD_SUCCESS on success
  */
 static int
 cli_print_acls(const char *acl_type,
@@ -747,7 +800,7 @@ cli_print_acls(const char *acl_type,
         acl_row = get_acl_by_type_name(acl_type, acl_name);
         if (!acl_row) {
             vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
         if (!config) {
             print_acl_tabular_header();
@@ -904,7 +957,7 @@ cli_delete_acl(const char *acl_type, const char *acl_name)
     else {
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Complete transaction */
@@ -980,7 +1033,7 @@ cli_create_update_ace (const char *acl_type,
         /* Should not be possible; context should have created if needed */
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* If a sequence number is specified, use it */
@@ -996,7 +1049,7 @@ cli_create_update_ace (const char *acl_type,
         if (highest_ace_seq + ACE_SEQ_AUTO_INCR > ACE_SEQ_MAX) {
             vty_out(vty, "%% Unable to automatically set sequence number%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
         ace_sequence_number = highest_ace_seq + ACE_SEQ_AUTO_INCR;
     }
@@ -1007,7 +1060,7 @@ cli_create_update_ace (const char *acl_type,
     {
         vty_out(vty, "%% Unable to add ACL entry%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Updating an ACE always (except comments) creates a new row.
@@ -1074,7 +1127,7 @@ cli_create_update_ace (const char *acl_type,
             if (min_num > max_num) {
                 vty_out(vty, "%% Invalid L4 source port%s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
             ovsrec_acl_entry_set_src_l4_port_max(ace_row, &max_num, 1);
@@ -1084,7 +1137,7 @@ cli_create_update_ace (const char *acl_type,
             if (min_num > max_num) {
                 vty_out(vty, "%% Invalid L4 source port%s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
             ovsrec_acl_entry_set_src_l4_port_max(ace_row, &max_num, 1);
@@ -1094,7 +1147,7 @@ cli_create_update_ace (const char *acl_type,
             if (min_num > max_num) {
                 vty_out(vty, "%% Invalid L4 source port range%s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             ovsrec_acl_entry_set_src_l4_port_min(ace_row, &min_num, 1);
             ovsrec_acl_entry_set_src_l4_port_max(ace_row, &max_num, 1);
@@ -1121,7 +1174,7 @@ cli_create_update_ace (const char *acl_type,
             if (min_num > max_num) {
                 vty_out(vty, "%% Invalid L4 destination port%s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
             ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &max_num, 1);
@@ -1131,7 +1184,7 @@ cli_create_update_ace (const char *acl_type,
             if (min_num > max_num) {
                 vty_out(vty, "%% Invalid L4 destination port%s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
             ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &max_num, 1);
@@ -1141,7 +1194,7 @@ cli_create_update_ace (const char *acl_type,
             if (min_num > max_num) {
                 vty_out(vty, "%% Invalid L4 destination port range%s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             ovsrec_acl_entry_set_dst_l4_port_min(ace_row, &min_num, 1);
             ovsrec_acl_entry_set_dst_l4_port_max(ace_row, &max_num, 1);
@@ -1207,14 +1260,14 @@ cli_delete_ace (const char *acl_type,
         /* Should not be possible; context should have created */
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Should already be guarded against by parser */
     if (!ace_sequence_number_str) {
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
     ace_sequence_number = strtoll(ace_sequence_number_str, NULL, 0);
 
@@ -1268,14 +1321,14 @@ cli_resequence_acl (const char *acl_type,
     if (!acl_row) {
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Check for an empty list */
     if (!acl_row->n_cfg_aces) {
         vty_out(vty, "%% ACL is empty%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Set numeric values */
@@ -1292,7 +1345,7 @@ cli_resequence_acl (const char *acl_type,
     if (start_num + ((acl_row->n_cfg_aces - 1) * increment_num) > ACE_SEQ_MAX) {
         vty_out(vty, "%% Sequence numbers would exceed maximum%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Initialize temporary data structures */
@@ -1349,7 +1402,7 @@ cli_print_applied_acls (const char *interface_type,
         port_row = get_port_by_name(interface_id);
         if (!port_row) {
             vty_out(vty, "%% Port does not exist%s", VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
         if (port_row->aclv4_in_cfg) {
@@ -1383,7 +1436,7 @@ cli_print_applied_acls (const char *interface_type,
         vlan_row = get_vlan_by_id_str(interface_id);
         if (!vlan_row) {
             vty_out(vty, "%% VLAN does not exist%s", VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
         if (vlan_row->aclv4_in_cfg) {
@@ -1451,7 +1504,7 @@ cli_apply_acl (const char *interface_type,
     if (!acl_row) {
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Port (unfortunately called "interface" in the CLI) */
@@ -1462,7 +1515,7 @@ cli_apply_acl (const char *interface_type,
         if (!port_row) {
             vty_out(vty, "%% Port does not exist%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
@@ -1477,7 +1530,7 @@ cli_apply_acl (const char *interface_type,
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
     } else if (!strcmp(interface_type, "vlan")) {
@@ -1487,7 +1540,7 @@ cli_apply_acl (const char *interface_type,
         if (!vlan_row) {
             vty_out(vty, "%% VLAN does not exist%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
@@ -1503,7 +1556,7 @@ cli_apply_acl (const char *interface_type,
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
     }
 
@@ -1551,7 +1604,7 @@ cli_unapply_acl (const char *interface_type,
     if (!acl_row) {
         vty_out(vty, "%% ACL does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* Port (unfortunately called "interface" in the CLI) */
@@ -1562,7 +1615,7 @@ cli_unapply_acl (const char *interface_type,
         if (!port_row) {
             vty_out(vty, "%% Port does not exist%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
@@ -1570,7 +1623,7 @@ cli_unapply_acl (const char *interface_type,
             if (!port_row->aclv4_in_cfg) {
                 vty_out(vty, "%% No ACL is applied to port %s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
 
             /* Check that the requested ACL to remove is the one applied to port */
@@ -1579,7 +1632,7 @@ cli_unapply_acl (const char *interface_type,
                         port_row->aclv4_in_cfg->name,
                         port_row->name, acl_name, VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
 
             /* Un-apply the requested ACL application from the Port */
@@ -1588,7 +1641,7 @@ cli_unapply_acl (const char *interface_type,
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
     } else if (!strcmp(interface_type, "vlan")) {
@@ -1598,7 +1651,7 @@ cli_unapply_acl (const char *interface_type,
         if (!vlan_row) {
             vty_out(vty, "%% VLAN does not exist%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
 
         if (!strcmp(acl_type, "ipv4") && !strcmp(direction, "in")) {
@@ -1606,7 +1659,7 @@ cli_unapply_acl (const char *interface_type,
             if (!vlan_row->aclv4_in_cfg) {
                 vty_out(vty, "%% No ACL is applied to VLAN %s", VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
 
             /* Check that the requested ACL to remove is the one applied to vlan */
@@ -1615,7 +1668,7 @@ cli_unapply_acl (const char *interface_type,
                         vlan_row->aclv4_in_cfg->name,
                         vlan_row->id, acl_name, VTY_NEWLINE);
                 cli_do_config_abort(transaction);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
 
             /* Un-apply the requested ACL application from the VLAN */
@@ -1624,7 +1677,7 @@ cli_unapply_acl (const char *interface_type,
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
     }
 
@@ -1751,7 +1804,7 @@ cli_print_acl_statistics (const char *acl_type,
     acl_row = get_acl_by_type_name(acl_type, acl_name);
     if (!acl_row) {
         vty_out(vty, "%% ACL %s does not exist%s", acl_name, VTY_NEWLINE);
-        return CMD_SUCCESS;
+        return CMD_ERR_NOTHING_TODO;
     }
 
     /* No interface specified (implicit "all" interface type/id/direction) */
@@ -1773,14 +1826,14 @@ cli_print_acl_statistics (const char *acl_type,
         port_row = get_port_by_name(interface_id);
         if (!port_row) {
             vty_out(vty, "%% Port %s does not exist%s", interface_id, VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
         if (port_row->aclv4_in_cfg && (port_row->aclv4_in_cfg == acl_row)) {
             vty_out(vty, "Statistics for ACL %s (%s):%s", acl_row->name, acl_row->list_type, VTY_NEWLINE);
             print_port_aclv4_in_statistics(port_row);
         } else {
             vty_out(vty, "%% Specified ACL not applied to interface%s", VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
     /* VLAN */
     } else if (interface_type && !strcmp(interface_type, "vlan")) {
@@ -1788,14 +1841,14 @@ cli_print_acl_statistics (const char *acl_type,
         vlan_row = get_vlan_by_id_str(interface_id);
         if (!vlan_row) {
             vty_out(vty, "%% VLAN %s does not exist%s", interface_id, VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
         if (vlan_row->aclv4_in_cfg && (vlan_row->aclv4_in_cfg == acl_row)) {
             vty_out(vty, "Statistics for ACL %s (%s):%s", acl_row->name, acl_row->list_type, VTY_NEWLINE);
             print_vlan_aclv4_in_statistics(vlan_row);
         } else {
             vty_out(vty, "%% Specified ACL not applied to VLAN%s", VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
     }
     return CMD_SUCCESS;
@@ -1850,7 +1903,7 @@ cli_clear_acl_statistics (const char *acl_type,
         acl_row = get_acl_by_type_name(acl_type, acl_name);
         if (!acl_row) {
             vty_out(vty, "%% ACL %s does not exist%s", acl_name, VTY_NEWLINE);
-            return CMD_SUCCESS;
+            return CMD_ERR_NOTHING_TODO;
         }
         /* No interface specified (implicit "all" interface type/id/direction) */
         if (!interface_type) {
@@ -1872,14 +1925,14 @@ cli_clear_acl_statistics (const char *acl_type,
             port_row = get_port_by_name(interface_id);
             if (!port_row) {
                 vty_out(vty, "%% Port %s does not exist%s", interface_id, VTY_NEWLINE);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             if (port_row->aclv4_in_cfg && (port_row->aclv4_in_cfg == acl_row)) {
                 VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s", port_row->name, acl_name);
                 ovsrec_port_set_aclv4_in_statistics(port_row, NULL, NULL, 0);
             } else {
                 vty_out(vty, "%% Specified ACL not applied to interface%s", VTY_NEWLINE);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
         /* VLAN */
         } else if (!strcmp(interface_type, "vlan")) {
@@ -1887,14 +1940,14 @@ cli_clear_acl_statistics (const char *acl_type,
             vlan_row = get_vlan_by_id_str(interface_id);
             if (!vlan_row) {
                 vty_out(vty, "%% VLAN %s does not exist%s", interface_id, VTY_NEWLINE);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
             if (vlan_row->aclv4_in_cfg && (vlan_row->aclv4_in_cfg == acl_row)) {
                 VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 " acl_name=%s", vlan_row->id, acl_name);
                 ovsrec_vlan_set_aclv4_in_statistics(vlan_row, NULL, NULL, 0);
             } else {
                 vty_out(vty, "%% Specified ACL not applied to VLAN%s", VTY_NEWLINE);
-                return CMD_SUCCESS;
+                return CMD_ERR_NOTHING_TODO;
             }
         }
     }
@@ -1982,6 +2035,8 @@ DEFUN (cli_access_list,
     /* static buffers because CLI context persists past this function */
     static char acl_ip_version[IP_VER_STR_LEN];
     static char acl_name[MAX_ACL_NAME_LENGTH];
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl create/update ";
+    int result;
 
     if ((strnlen(argv[0], MAX_ACL_NAME_LENGTH) < MAX_ACL_NAME_LENGTH)) {
         strncpy(acl_ip_version, "ipv4", IP_VER_STR_LEN);
@@ -1995,8 +2050,13 @@ DEFUN (cli_access_list,
     vty->index_sub = acl_name;
     vty->node = ACCESS_LIST_NODE;
 
-    return cli_create_acl_if_needed(CONST_CAST(char*,vty->index),      /* Type */
-                                    CONST_CAST(char*,vty->index_sub)); /* Name */
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+
+    result = cli_create_acl_if_needed(CONST_CAST(char*,vty->index),      /* Type */
+                                      CONST_CAST(char*,vty->index_sub)); /* Name */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2011,8 +2071,16 @@ DEFUN (cli_no_access_list,
        ACL_NAME_STR
       )
 {
-    return cli_delete_acl("ipv4",
-                          CONST_CAST(char*,argv[0]));
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl delete ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", "ipv4");
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", argv[0]);
+
+    result =cli_delete_acl("ipv4",
+                           CONST_CAST(char*,argv[0]));
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2080,10 +2148,20 @@ DEFUN (cli_access_list_resequence,
        "Re-sequence increment\n"
       )
 {
-    return cli_resequence_acl("ipv4",
-                              CONST_CAST(char*,argv[0]),
-                              CONST_CAST(char*,argv[1]),
-                              CONST_CAST(char*,argv[2]));
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl resequence ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",      "ipv4");
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",      argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "start",     argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "increment", argv[2]);
+
+    result = cli_resequence_acl("ipv4",
+                                CONST_CAST(char*,argv[0]),
+                                CONST_CAST(char*,argv[1]),
+                                CONST_CAST(char*,argv[2]));
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /* ACE create/update command functions.
@@ -2127,22 +2205,37 @@ DEFUN (cli_access_list_entry,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[4]),        /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[5]),        /* Log */
-                                 CONST_CAST(char*,argv[6]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number", argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",          argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",     argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",  argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",  argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[5] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[6] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[4]),        /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[5]),        /* Log */
+                                   CONST_CAST(char*,argv[6]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2170,22 +2263,39 @@ DEFUN (cli_access_list_entry_src_port_op,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[7]),        /* Log */
-                                 CONST_CAST(char*,argv[8]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[7] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[8] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[7]),        /* Log */
+                                   CONST_CAST(char*,argv[8]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2213,22 +2323,40 @@ DEFUN (cli_access_list_entry_src_port_range,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 1 */
-                                 CONST_CAST(char*,argv[6]),        /* Source Port 2 */
-                                 CONST_CAST(char*,argv[7]),        /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[8]),        /* Log */
-                                 CONST_CAST(char*,argv[9]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_max",      argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[8] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[9] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 1 */
+                                   CONST_CAST(char*,argv[6]),        /* Source Port 2 */
+                                   CONST_CAST(char*,argv[7]),        /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[8]),        /* Log */
+                                   CONST_CAST(char*,argv[9]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2256,22 +2384,39 @@ DEFUN (cli_access_list_entry_dst_port_op,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[4]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[5]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[6]),        /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[7]),        /* Log */
-                                 CONST_CAST(char*,argv[8]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[7] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[8] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[4]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[5]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[6]),        /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[7]),        /* Log */
+                                   CONST_CAST(char*,argv[8]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2299,22 +2444,40 @@ DEFUN (cli_access_list_entry_dst_port_range,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[4]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[5]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[6]),        /* Destination Port 1 */
-                                 CONST_CAST(char*,argv[7]),        /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[8]),        /* Log */
-                                 CONST_CAST(char*,argv[9]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_max",      argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[8] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[9] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[4]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[5]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[6]),        /* Destination Port 1 */
+                                   CONST_CAST(char*,argv[7]),        /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[8]),        /* Log */
+                                   CONST_CAST(char*,argv[9]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2345,22 +2508,41 @@ DEFUN (cli_access_list_entry_src_port_op_dst_port_op,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[9]),        /* Log */
-                                 CONST_CAST(char*,argv[10]),       /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[8]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[9]  ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[10] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[9]),        /* Log */
+                                   CONST_CAST(char*,argv[10]),       /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2391,22 +2573,43 @@ DEFUN (cli_access_list_entry_src_port_range_dst_port_range,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 1 */
-                                 CONST_CAST(char*,argv[6]),        /* Source Port 2 */
-                                 CONST_CAST(char*,argv[7]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[8]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[9]),        /* Destination Port 1 */
-                                 CONST_CAST(char*,argv[10]),       /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[11]),       /* Log */
-                                 CONST_CAST(char*,argv[12]),       /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_max",      argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[8]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[9]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_max",      argv[10]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[11] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[12] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 1 */
+                                   CONST_CAST(char*,argv[6]),        /* Source Port 2 */
+                                   CONST_CAST(char*,argv[7]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[8]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[9]),        /* Destination Port 1 */
+                                   CONST_CAST(char*,argv[10]),       /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[11]),       /* Log */
+                                   CONST_CAST(char*,argv[12]),       /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2437,22 +2640,42 @@ DEFUN (cli_access_list_entry_src_port_op_dst_port_range,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
-                                 CONST_CAST(char*,argv[9]),        /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[10]),       /* Log */
-                                 CONST_CAST(char*,argv[11]),       /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[8]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_max",      argv[9]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[10] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[11] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
+                                   CONST_CAST(char*,argv[9]),        /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[10]),       /* Log */
+                                   CONST_CAST(char*,argv[11]),       /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2483,22 +2706,42 @@ DEFUN (cli_access_list_entry_src_port_range_dst_port_op,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 CONST_CAST(char*,argv[2]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[3]),        /* Source IP */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 1 */
-                                 CONST_CAST(char*,argv[6]),        /* Source Port 2 */
-                                 CONST_CAST(char*,argv[7]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[8]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[9]),        /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[10]),       /* Log */
-                                 CONST_CAST(char*,argv[11]),       /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number",   argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_max",      argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[8]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[9]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[10] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[11] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   CONST_CAST(char*,argv[2]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[3]),        /* Source IP */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 1 */
+                                   CONST_CAST(char*,argv[6]),        /* Source Port 2 */
+                                   CONST_CAST(char*,argv[7]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[8]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[9]),        /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[10]),       /* Log */
+                                   CONST_CAST(char*,argv[11]),       /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /* ACE commands omitting sequence number */
@@ -2524,22 +2767,36 @@ DEFUN (cli_access_list_entry_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[3]),        /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[4]),        /* Log */
-                                 CONST_CAST(char*,argv[5]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",         argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address", argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[5] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[6] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[3]),        /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[4]),        /* Log */
+                                   CONST_CAST(char*,argv[5]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2566,22 +2823,38 @@ DEFUN (cli_access_list_entry_src_port_op_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 CONST_CAST(char*,argv[3]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[5]),        /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Log */
-                                 CONST_CAST(char*,argv[7]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[6] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[7] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   CONST_CAST(char*,argv[3]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[5]),        /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Log */
+                                   CONST_CAST(char*,argv[7]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2608,22 +2881,39 @@ DEFUN (cli_access_list_entry_src_port_range_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 CONST_CAST(char*,argv[3]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port 1 */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[7]),        /* Log */
-                                 CONST_CAST(char*,argv[8]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_max",      argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[7] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[8] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   CONST_CAST(char*,argv[3]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port 1 */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[7]),        /* Log */
+                                   CONST_CAST(char*,argv[8]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2650,22 +2940,38 @@ DEFUN (cli_access_list_entry_dst_port_op_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[3]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[4]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Log */
-                                 CONST_CAST(char*,argv[7]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[6] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[7] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[3]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[4]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Log */
+                                   CONST_CAST(char*,argv[7]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2692,22 +2998,39 @@ DEFUN (cli_access_list_entry_dst_port_range_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[3]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[4]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[5]),        /* Destination Port 1 */
-                                 CONST_CAST(char*,argv[6]),        /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[7]),        /* Log */
-                                 CONST_CAST(char*,argv[8]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_max",      argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[7] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[8] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[3]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[4]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[5]),        /* Destination Port 1 */
+                                   CONST_CAST(char*,argv[6]),        /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[7]),        /* Log */
+                                   CONST_CAST(char*,argv[8]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2736,22 +3059,40 @@ DEFUN (cli_access_list_entry_src_port_op_dst_port_op_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 CONST_CAST(char*,argv[3]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[5]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[6]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[7]),        /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[8]),        /* Log */
-                                 CONST_CAST(char*,argv[9]),        /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[8] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[9] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   CONST_CAST(char*,argv[3]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[5]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[6]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[7]),        /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[8]),        /* Log */
+                                   CONST_CAST(char*,argv[9]),        /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2780,22 +3121,42 @@ DEFUN (cli_access_list_entry_src_port_range_dst_port_range_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 CONST_CAST(char*,argv[3]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port 1 */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
-                                 CONST_CAST(char*,argv[9]),        /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[10]),       /* Log */
-                                 CONST_CAST(char*,argv[11]),       /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_max",      argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[8]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_max",      argv[9]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[10] ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[11] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   CONST_CAST(char*,argv[3]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port 1 */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
+                                   CONST_CAST(char*,argv[9]),        /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[10]),       /* Log */
+                                   CONST_CAST(char*,argv[11]),       /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2824,22 +3185,41 @@ DEFUN (cli_access_list_entry_src_port_op_dst_port_range_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 CONST_CAST(char*,argv[3]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 CONST_CAST(char*,argv[5]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[6]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[7]),        /* Destination Port 1 */
-                                 CONST_CAST(char*,argv[8]),        /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[9]),        /* Log */
-                                 CONST_CAST(char*,argv[10]),       /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_max",      argv[8]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[9]  ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[10] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   CONST_CAST(char*,argv[3]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   CONST_CAST(char*,argv[5]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[6]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[7]),        /* Destination Port 1 */
+                                   CONST_CAST(char*,argv[8]),        /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[9]),        /* Log */
+                                   CONST_CAST(char*,argv[10]),       /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2868,22 +3248,41 @@ DEFUN (cli_access_list_entry_src_port_range_dst_port_op_no_seq,
        ACE_ADDITIONAL_OPTIONS_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 CONST_CAST(char*,argv[1]),        /* IP Protocol */
-                                 CONST_CAST(char*,argv[2]),        /* Source IP */
-                                 CONST_CAST(char*,argv[3]),        /* Source Port Operator */
-                                 CONST_CAST(char*,argv[4]),        /* Source Port 1 */
-                                 CONST_CAST(char*,argv[5]),        /* Source Port 2 */
-                                 CONST_CAST(char*,argv[6]),        /* Destination IP */
-                                 CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
-                                 CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 CONST_CAST(char*,argv[9]),        /* Log */
-                                 CONST_CAST(char*,argv[10]),       /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type", vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name", vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "action",            argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "ip_protocol",       argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_ip_address",    argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_operator", argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port",          argv[4]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "src_port_max",      argv[5]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_ip_address",    argv[6]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port_operator", argv[7]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "dst_port",          argv[8]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "log",   argv[9]  ? "enable" : NULL);
+    acl_audit_encode(aubuf, sizeof(aubuf), "count", argv[10] ? "enable" : NULL);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   CONST_CAST(char*,argv[1]),        /* IP Protocol */
+                                   CONST_CAST(char*,argv[2]),        /* Source IP */
+                                   CONST_CAST(char*,argv[3]),        /* Source Port Operator */
+                                   CONST_CAST(char*,argv[4]),        /* Source Port 1 */
+                                   CONST_CAST(char*,argv[5]),        /* Source Port 2 */
+                                   CONST_CAST(char*,argv[6]),        /* Destination IP */
+                                   CONST_CAST(char*,argv[7]),        /* Destination Port Operator */
+                                   CONST_CAST(char*,argv[8]),        /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   CONST_CAST(char*,argv[9]),        /* Log */
+                                   CONST_CAST(char*,argv[10]),       /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2903,25 +3302,35 @@ DEFUN (cli_access_list_entry_comment,
        ACE_COMMENT_TEXT_HELPSTR
       )
 {
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
     /* To be freed after use */
     char *comment_text = argv_concat(argv, argc, 2);
 
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 NULL,                             /* IP Protocol */
-                                 NULL,                             /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 NULL,                             /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 NULL,                             /* Log */
-                                 NULL,                             /* Count */
-                                 comment_text);                    /* Comment */
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",            vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",            vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number", argv[0]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "comment",         comment_text);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   NULL,                             /* IP Protocol */
+                                   NULL,                             /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   NULL,                             /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   NULL,                             /* Log */
+                                   NULL,                             /* Count */
+                                   comment_text);                    /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2939,25 +3348,34 @@ DEFUN (cli_access_list_entry_comment_no_seq,
        ACE_COMMENT_TEXT_HELPSTR
       )
 {
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify ";
+    int result;
+
     /* To be freed after use */
     char *comment_text = argv_concat(argv, argc, 1);
 
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 NULL,                             /* Sequence number */
-                                 CONST_CAST(char*,argv[0]),        /* Action */
-                                 NULL,                             /* IP Protocol */
-                                 NULL,                             /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 NULL,                             /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 NULL,                             /* Log */
-                                 NULL,                             /* Count */
-                                 comment_text);                    /* Comment */
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",    vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",    vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "comment", comment_text);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   NULL,                             /* Sequence number */
+                                   CONST_CAST(char*,argv[0]),        /* Action */
+                                   NULL,                             /* IP Protocol */
+                                   NULL,                             /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   NULL,                             /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   NULL,                             /* Log */
+                                   NULL,                             /* Count */
+                                   comment_text);                    /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -2976,22 +3394,31 @@ DEFUN (cli_no_access_list_entry_comment,
        ACE_COMMENT_HELPSTR
       )
 {
-    return cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
-                                 CONST_CAST(char*,vty->index_sub), /* Name */
-                                 CONST_CAST(char*,argv[0]),        /* Sequence number */
-                                 CONST_CAST(char*,argv[1]),        /* Action */
-                                 NULL,                             /* IP Protocol */
-                                 NULL,                             /* Source IP */
-                                 NULL,                             /* Source Port Operator */
-                                 NULL,                             /* Source Port 1 */
-                                 NULL,                             /* Source Port 2 */
-                                 NULL,                             /* Destination IP */
-                                 NULL,                             /* Destination Port Operator */
-                                 NULL,                             /* Destination Port 1 */
-                                 NULL,                             /* Destination Port 2 */
-                                 NULL,                             /* Log */
-                                 NULL,                             /* Count */
-                                 NULL);                            /* Comment */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl modify comment delete ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",            vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",            vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number", argv[0]);
+
+    result = cli_create_update_ace(CONST_CAST(char*,vty->index),     /* Type */
+                                   CONST_CAST(char*,vty->index_sub), /* Name */
+                                   CONST_CAST(char*,argv[0]),        /* Sequence number */
+                                   CONST_CAST(char*,argv[1]),        /* Action */
+                                   NULL,                             /* IP Protocol */
+                                   NULL,                             /* Source IP */
+                                   NULL,                             /* Source Port Operator */
+                                   NULL,                             /* Source Port 1 */
+                                   NULL,                             /* Source Port 2 */
+                                   NULL,                             /* Destination IP */
+                                   NULL,                             /* Destination Port Operator */
+                                   NULL,                             /* Destination Port 1 */
+                                   NULL,                             /* Destination Port 2 */
+                                   NULL,                             /* Log */
+                                   NULL,                             /* Count */
+                                   NULL);                            /* Comment */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /* Can't delete an ACE comment without a sequence number, so no DEFUN for it */
@@ -3024,9 +3451,18 @@ DEFUN (cli_no_access_list_entry,
        ACE_SEQ_HELPSTR
       )
 {
-    return cli_delete_ace(CONST_CAST(char*,vty->index),     /* Type */
-                          CONST_CAST(char*,vty->index_sub), /* Name */
-                          CONST_CAST(char*,argv[0]));       /* Sequence number */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl entry delete ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",            vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",            vty->index_sub);
+    acl_audit_encode(aubuf, sizeof(aubuf), "sequence_number", argv[0]);
+
+    result = cli_delete_ace(CONST_CAST(char*,vty->index),     /* Type */
+                            CONST_CAST(char*,vty->index_sub), /* Name */
+                            CONST_CAST(char*,argv[0]));       /* Sequence number */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -3091,6 +3527,8 @@ DEFUN (cli_apply_access_list, cli_apply_access_list_cmd,
     const char *interface_type_str;
     const char ipv4_str[] = "ipv4";
     const char *type_str;
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl apply ";
+    int result;
 
     if (vty->node == VLAN_NODE) {
         interface_type_str = vlan_str;
@@ -3104,11 +3542,20 @@ DEFUN (cli_apply_access_list, cli_apply_access_list_cmd,
     } else {
         type_str = argv[0];
     }
-    return cli_apply_acl(interface_type_str,           /* interface type */
-                         CONST_CAST(char*,vty->index), /* interface id */
-                         type_str,                     /* type */
-                         CONST_CAST(char*,argv[1]),    /* name */
-                         CONST_CAST(char*,argv[2]));   /* direction */
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "interface_type", interface_type_str);
+    acl_audit_encode(aubuf, sizeof(aubuf), "interface_id",   vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",           type_str);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",           argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "direction",      argv[2]);
+
+    result = cli_apply_acl(interface_type_str,           /* interface type */
+                           CONST_CAST(char*,vty->index), /* interface id */
+                           type_str,                     /* type */
+                           CONST_CAST(char*,argv[1]),    /* name */
+                           CONST_CAST(char*,argv[2]));   /* direction */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -3129,6 +3576,8 @@ DEFUN (cli_no_apply_access_list, cli_no_apply_access_list_cmd,
     const char *interface_type_str;
     const char ipv4_str[] = "ipv4";
     const char *type_str;
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl apply remove ";
+    int result;
 
     if (vty->node == VLAN_NODE) {
         interface_type_str = vlan_str;
@@ -3142,11 +3591,20 @@ DEFUN (cli_no_apply_access_list, cli_no_apply_access_list_cmd,
     } else {
         type_str = argv[0];
     }
-    return cli_unapply_acl(interface_type_str,           /* interface type */
-                           CONST_CAST(char*,vty->index), /* interface id */
-                           type_str,                     /* type */
-                           CONST_CAST(char*,argv[1]),    /* name */
-                           CONST_CAST(char*,argv[2]));   /* direction */
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "interface_type", interface_type_str);
+    acl_audit_encode(aubuf, sizeof(aubuf), "interface_id",   vty->index);
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",           type_str);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",           argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "direction",      argv[2]);
+
+    result = cli_unapply_acl(interface_type_str,           /* interface type */
+                             CONST_CAST(char*,vty->index), /* interface id */
+                             type_str,                     /* type */
+                             CONST_CAST(char*,argv[1]),    /* name */
+                             CONST_CAST(char*,argv[2]));   /* direction */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -3226,16 +3684,28 @@ DEFUN (cli_clear_access_list_hitcounts,
 {
     const char ipv4_str[] = "ipv4";
     const char *type_str;
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl statistics clear ";
+    int result;
+
     if (argv[0] && !strcmp(argv[0], "ip")) {
         type_str = ipv4_str;
     } else {
         type_str = argv[0];
     }
-    return cli_clear_acl_statistics(CONST_CAST(char*,type_str), /* type */
-                                    CONST_CAST(char*,argv[1]),  /* name */
-                                    CONST_CAST(char*,argv[2]),  /* interface type */
-                                    CONST_CAST(char*,argv[3]),  /* interface id */
-                                    CONST_CAST(char*,argv[4])); /* direction */
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "type",           type_str);
+    acl_audit_encode(aubuf, sizeof(aubuf), "name",           argv[1]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "interface_type", argv[2]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "interface_id",   argv[3]);
+    acl_audit_encode(aubuf, sizeof(aubuf), "direction",      argv[4]);
+
+    result = cli_clear_acl_statistics(CONST_CAST(char*,type_str), /* type */
+                                      CONST_CAST(char*,argv[1]),  /* name */
+                                      CONST_CAST(char*,argv[2]),  /* interface type */
+                                      CONST_CAST(char*,argv[3]),  /* interface id */
+                                      CONST_CAST(char*,argv[4])); /* direction */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -3251,11 +3721,18 @@ DEFUN (cli_clear_access_list_hitcounts_all,
        ACL_IN_STR
       )
 {
-    return cli_clear_acl_statistics(NULL,                       /* type */
-                                    NULL,                       /* name */
-                                    NULL,                       /* interface type */
-                                    NULL,                       /* interface id */
-                                    CONST_CAST(char*,argv[0])); /* direction */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl statistics clear ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "direction", argv[0]);
+
+    result = cli_clear_acl_statistics(NULL,                       /* type */
+                                      NULL,                       /* name */
+                                      NULL,                       /* interface type */
+                                      NULL,                       /* interface id */
+                                      CONST_CAST(char*,argv[0])); /* direction */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /**
@@ -3269,7 +3746,14 @@ DEFUN (cli_access_list_log_timer, cli_access_list_log_timer_cmd,
        "Specify value (in seconds)\n"
       )
 {
-    return cli_set_acl_log_timer(CONST_CAST(char*,argv[0])); /* timer_value */
+    char aubuf[ACL_CLI_AUDIT_BUFFER_SIZE] = "op=CLI: acl log-timer ";
+    int result;
+
+    acl_audit_encode(aubuf, sizeof(aubuf), "value", argv[0]);
+
+    result = cli_set_acl_log_timer(CONST_CAST(char*,argv[0])); /* timer_value */
+    acl_audit_log(aubuf, !result);
+    return result;
 }
 
 /* = Initialization = */
@@ -3572,4 +4056,7 @@ cli_post_init (void)
         assert(0);
         return;
     }
+
+    /* Initialize audit logging */
+    acl_audit_init();
 }
