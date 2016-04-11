@@ -34,8 +34,7 @@ include_directories (${PROJECT_BINARY_DIR} ${OVSCOMMON_INCLUDE_DIRS}
 # Sources to build ops-classifierd
 set (SOURCES ${SRC_DIR}/classifierd.c)
 
-set (HEADERS ${CLS_INCLUDE_DIR}/acl-log.h
-             ${CLS_INCLUDE_DIR}/ops-cls-asic-plugin.h)
+set (HEADERS ${CLS_INCLUDE_DIR}/ops-cls-asic-plugin.h)
 
 # Rules to build ops-classifierd
 add_executable (${CLASSIFIERD} ${SOURCES})

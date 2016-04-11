@@ -19,6 +19,9 @@
 #include "ovs-thread.h"
 #include "poll-loop.h"
 #include "seq.h"
+#include "openvswitch/vlog.h"
+
+VLOG_DEFINE_THIS_MODULE(acl_log);
 
 static struct seq *acl_log_pktrx_seq;
 
@@ -70,8 +73,10 @@ void
 acl_log_pkt_data_set(struct acl_log_info *new_pkt)
 {
    /* validate the input */
-   if (!new_pkt)
+   if (!new_pkt) {
+      VLOG_ERR("PD Called PI Successfully in %s", __func__);
       return;
+   }
 
    /* take the mutex */
    ovs_mutex_lock(&acl_log_mutex);
@@ -81,4 +86,7 @@ acl_log_pkt_data_set(struct acl_log_info *new_pkt)
 
    /* give the mutex */
    ovs_mutex_unlock(&acl_log_mutex);
+
+   /* Call seq_change */
+   seq_change(acl_log_pktrx_seq_get());
 }

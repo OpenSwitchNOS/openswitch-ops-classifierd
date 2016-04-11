@@ -23,6 +23,7 @@
 #include "openvswitch/vlog.h"
 #include "acl.h"
 #include "acl_plugin.h"
+#include "acl-log.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_ofproto);
 
@@ -180,5 +181,7 @@ acl_ofproto_init()
     if (rc == 0) {
         plugin = (struct ops_cls_plugin_interface *)
                   extension->plugin_interface;
+        /* Initialize ACL logging */
+        plugin->ofproto_ops_cls_acl_log_pkt_data_set(&acl_log_pkt_data_set);
     }
 }
