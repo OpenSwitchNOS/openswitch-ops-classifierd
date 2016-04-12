@@ -182,6 +182,9 @@ acl_ofproto_init()
         plugin = (struct ops_cls_plugin_interface *)
                   extension->plugin_interface;
         /* Initialize ACL logging */
-        plugin->ofproto_ops_cls_acl_log_pkt_data_set(&acl_log_pkt_data_set);
+        if (plugin && plugin->ofproto_ops_cls_acl_log_pkt_data_set) {
+            plugin->ofproto_ops_cls_acl_log_pkt_data_set(
+                                                        &acl_log_pkt_data_set);
+        }
     }
 }
