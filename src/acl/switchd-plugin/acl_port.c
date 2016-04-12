@@ -24,16 +24,6 @@
 #include "acl_ofproto.h"
 #include "ops_cls_status_msgs.h"
 
-/** TODO: Remove these when error-handling code is pushed */
-#define ACL_PORT_MAP_CFG_STATUS_VERSION     "version"
-#define ACL_PORT_MAP_CFG_STATUS_STATE       "state"
-#define ACL_PORT_MAP_CFG_STATUS_CODE        "code"
-#define ACL_PORT_MAP_CFG_STATUS_MSG         "message"
-#define ACL_PORT_MAP_CFG_STATE_APPLIED      "applied"
-#define ACL_PORT_MAP_CFG_STATE_REJECTED     "rejected"
-#define ACL_PORT_MAP_CFG_STATE_IN_PROGRESS  "in_progress"
-#define ACL_PORT_MAP_CFG_STATE_CANCELLED    "cancelled"
-
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_port);
 
@@ -166,23 +156,23 @@ acl_port_map_set_cfg_status(struct acl_port_map *acl_port_map,
     smap_clone(&cfg_status, &row->aclv4_in_status);
 
     /* Remove any values that exist */
-    smap_remove(&cfg_status, ACL_PORT_MAP_CFG_STATUS_VERSION);
-    smap_remove(&cfg_status, ACL_PORT_MAP_CFG_STATUS_STATE);
-    smap_remove(&cfg_status, ACL_PORT_MAP_CFG_STATUS_CODE);
-    smap_remove(&cfg_status, ACL_PORT_MAP_CFG_STATUS_MSG);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_VERSION_STR);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_STATE_STR);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_CODE_STR);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_MSG_STR);
 
     /* Add values to the smap */
     /*
      * TODO: Uncomment this code when UI fills version field
      *
      * sprintf(version, "%" PRId64"", row->aclv4_in_cfg_version[0]);
-     * smap_add(&cfg_status, ACL_PORT_MAP_CFG_STATUS_VERSION,
+     * smap_add(&cfg_status, OPS_CLS_STATUS_VERSION_STR,
      *          version);
      */
-    smap_add(&cfg_status, ACL_PORT_MAP_CFG_STATUS_STATE, state);
+    smap_add(&cfg_status, OPS_CLS_STATUS_STATE_STR, state);
     sprintf(code_str, "%u", code);
-    smap_add(&cfg_status, ACL_PORT_MAP_CFG_STATUS_CODE, code_str);
-    smap_add(&cfg_status, ACL_PORT_MAP_CFG_STATUS_MSG, details);
+    smap_add(&cfg_status, OPS_CLS_STATUS_CODE_STR, code_str);
+    smap_add(&cfg_status, OPS_CLS_STATUS_MSG_STR, details);
 
     /* Write cfg_status column */
     acl_db_util_set_cfg_status(acl_port_map->acl_db, row, &cfg_status);
@@ -284,7 +274,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
         VLOG_DBG(details);
         /* status_str will be NULL on success */
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
-                            ACL_PORT_MAP_CFG_STATE_APPLIED, 0, status_str);
+                            OPS_CLS_STATE_APPLIED_STR, 0, status_str);
     } else if (rc == 0) {
         /* success */
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s succeeded",
@@ -298,7 +288,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                  acl->ovsdb_row);
         /* status_str will be NULL on success */
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
-                                    ACL_PORT_MAP_CFG_STATE_APPLIED,
+                                    OPS_CLS_STATE_APPLIED_STR,
                                     status.status_code, status_str);
     } else {
         /* failure */
@@ -322,7 +312,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                  method_called);
         VLOG_DBG(details);
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
-                                    ACL_PORT_MAP_CFG_STATE_REJECTED,
+                                    OPS_CLS_STATE_REJECTED_STR,
                                     status.status_code, status_str);
     }
 }
