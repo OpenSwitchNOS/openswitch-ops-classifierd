@@ -422,6 +422,13 @@ qos_configure_port_profiles(struct ofproto *ofproto,
     bool apply_profile_needed;
 
 
+    /* Make sure this port has interfaces that are 'system' type.
+       QoS should not affect other types. */
+    if (strcmp(port_cfg->interfaces[0]->type, OVSREC_INTERFACE_TYPE_SYSTEM)) {
+        /* Return if not system */
+        return;
+    }
+
     ovs_row = ovsrec_system_first(idl);
 
     /* if no queue profile is configured, try to find something to use:
