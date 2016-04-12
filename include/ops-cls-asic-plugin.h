@@ -287,14 +287,35 @@ struct ops_cls_list
 };
 
 /**
- * Classifier List Platform Dependent status codes
+ * Classifier List status codes
  */
-enum ops_cls_list_pd_status_code
+enum ops_cls_list_status_code
 {
-    OPS_CLS_PD_STATUS_SUCCESS = 0,
-    OPS_CLS_PD_STATUS_COUNTER_ERROR,
-    OPS_CLS_PD_STATUS_L4_PORT_RANGE_ERROR,
-    OPS_CLS_PD_STATUS_HW_ENTRY_ALLOCATION_ERROR
+    OPS_CLS_STATUS_SUCCESS = 0,
+
+    /* PD status codes */
+    OPS_CLS_PD_STATUS_INTERNAL,
+    OPS_CLS_PD_STATUS_MEMORY,
+    OPS_CLS_PD_STATUS_UNIT,
+    OPS_CLS_PD_STATUS_PARAM,
+    OPS_CLS_PD_STATUS_EMPTY,
+    OPS_CLS_PD_STATUS_FULL,
+    OPS_CLS_PD_STATUS_NOT_FOUND,
+    OPS_CLS_PD_STATUS_EXISTS,
+    OPS_CLS_PD_STATUS_TIMEOUT,
+    OPS_CLS_PD_STATUS_BUSY,
+    OPS_CLS_PD_STATUS_FAIL,
+    OPS_CLS_PD_STATUS_DISABLED,
+    OPS_CLS_PD_STATUS_BADIO,
+    OPS_CLS_PD_STATUS_RESOURCE,
+    OPS_CLS_PD_STATUS_CONFIG,
+    OPS_CLS_PD_STATUS_UNAVAIL,
+    OPS_CLS_PD_STATUS_INIT,
+    OPS_CLS_PD_STATUS_PORT,
+    OPS_CLS_PD_STATUS_UNKNOWN,
+
+    /* This must be last entry */
+    OPS_CLS_STATUS_MAX
 };
 
 /**
@@ -302,8 +323,8 @@ enum ops_cls_list_pd_status_code
  */
 struct ops_cls_pd_status
 {
-    enum ops_cls_list_pd_status_code    status_code; /**< Status of this port's set operation */
-    uint16_t                            entry_id;    /**< First entry that encountered an error, 0 based index into array of entries as created by user  */
+    enum ops_cls_list_status_code    status_code; /**< Status of this port's set operation */
+    uint16_t                         entry_id;    /**< First entry that encountered an error, 0 based index into array of entries as created by user  */
 };
 
 /**
@@ -311,9 +332,9 @@ struct ops_cls_pd_status
  */
 struct ops_cls_pd_list_status
 {
-    enum ops_cls_list_pd_status_code    status_code;    /**< Status of this list define operation */
-    uint16_t                            entry_id;       /**< First entry that encountered an error, 0 based index into array of entries as created by user  */
-    struct ofport                       *port;          /**< first interface on which this failed */
+    enum ops_cls_list_status_code    status_code;    /**< Status of this list define operation */
+    uint16_t                         entry_id;       /**< First entry that encountered an error, 0 based index into array of entries as created by user  */
+    struct ofport                    *port;          /**< first interface on which this failed */
 };
 
 /**
