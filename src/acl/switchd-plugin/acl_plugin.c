@@ -21,6 +21,7 @@
 #include "acl_plugin.h"
 #include "acl_port_bindings.h"
 #include "acl_port.h"
+#include "vswitch-idl.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin);
 
@@ -32,7 +33,7 @@ int init (int phase_id)
 {
     /* Register callbacks */
     VLOG_INFO("[%s] - Registering BLK_BRIDGE_INIT", ACL_PLUGIN_NAME);
-    register_reconfigure_callback(&acl_ofproto_init, BLK_BRIDGE_INIT,
+    register_reconfigure_callback(&acl_callback_bridge_init, BLK_BRIDGE_INIT,
                                   NO_PRIORITY);
     VLOG_INFO("[%s] - Registering BLK_INIT_RECONFIGURE", ACL_PLUGIN_NAME);
     register_reconfigure_callback(&acl_reconfigure_init, BLK_INIT_RECONFIGURE,
@@ -79,4 +80,19 @@ int destroy(void)
     unregister_plugin_extension("ACL_PLUGIN");
     VLOG_DBG("ACL_PLUGIN was destroyed");
     return 0;
+}
+
+void
+acl_callback_bridge_init(struct blk_params *blk_params)
+{
+    /* Add omit alerts for ACL and port tables */
+    ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_applied);
+    ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_status);
+    ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_other_config);
+    ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_external_ids);
+    ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_cur_aces);
+    ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_status);
+
+    /* Find and initialize the asic plugin */
+    acl_ofproto_init();
 }
