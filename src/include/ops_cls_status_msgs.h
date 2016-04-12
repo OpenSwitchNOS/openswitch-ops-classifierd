@@ -19,6 +19,25 @@
 
 #define OPS_CLS_STATUS_MSG_MAX_LEN 512  /**< status msg max length*/
 
+#define OPS_CLS_STATUS_VERSION_STR     "version"        /**< "version" string
+                                                             for status smap */
+#define OPS_CLS_STATUS_STATE_STR       "state"          /**< "state" string
+                                                             for status smap */
+#define OPS_CLS_STATUS_CODE_STR        "code"           /**< "code" string
+                                                             for status smap */
+#define OPS_CLS_STATUS_MSG_STR         "message"        /**< "message" string
+                                                             for status smap */
+#define OPS_CLS_STATE_APPLIED_STR      "applied"        /**< "applied" string
+                                                             for state smap */
+#define OPS_CLS_STATE_REJECTED_STR     "rejected"       /**< "rejected" string
+                                                             for state smap */
+#define OPS_CLS_STATE_IN_PROGRESS_STR  "in_progress"    /**< "in_progress"
+                                                             string for
+                                                             state smap */
+#define OPS_CLS_STATE_CANCELLED_STR    "cancelled"      /**< "cancelled" string
+                                                             for state smap */
+
+
 /* Following macros define the strings that can be used by the
  * callers to fill in variable operation str in ops_cls_status_msgs
  */
