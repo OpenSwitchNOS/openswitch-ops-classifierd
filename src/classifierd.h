@@ -14,8 +14,40 @@
  *   under the License.
  */
 
-#ifndef _OPS_CLASSIFIERD_H_
+#ifndef _CLASSIFIERD_H_
 
-#define _OPS_CLASSIFIERD_H_
+#define _CLASSIFIERD_H_
+
+/**
+ * Initializes the connection to the OVSDB at db_path and create a db cache
+ * for this daemon.
+ *
+ * @param[in]  db_path string representing OVSDB socket path
+ *
+ */
+void classifierd_ovsdb_init(const char *db_path);
+
+/**
+ * Destroys the db cache for this daemon.
+ */
+void classifierd_ovsdb_exit(void);
+
+/**
+ * This function processes the batch of messages from OVSDB and
+ * pushed any changes back to db
+ */
+void classifierd_run(void);
+
+/**
+ * Arranges for poll_block() to wake up when classifierd_run has
+ * something to process or when activity occurs on transaction on
+ * idl.
+ */
+void classifierd_wait(void);
+
+/**
+ * Displays the debug information from classifier daemon
+ */
+void classifierd_debug_dump(struct ds *ds, int argc, const char *argv[]);
 
 #endif /* _CLASSIFIERD_H_ */
