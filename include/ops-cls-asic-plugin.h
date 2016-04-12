@@ -287,14 +287,35 @@ struct ops_cls_list
 };
 
 /**
- * Classifier List Platform Dependent status codes
+ * Classifier List status codes
  */
-enum ops_cls_list_pd_status_code
+enum ops_cls_list_status_code
 {
-    OPS_CLS_PD_STATUS_SUCCESS = 0,
-    OPS_CLS_PD_STATUS_COUNTER_ERROR,
-    OPS_CLS_PD_STATUS_L4_PORT_RANGE_ERROR,
-    OPS_CLS_PD_STATUS_HW_ENTRY_ALLOCATION_ERROR
+    OPS_CLS_STATUS_SUCCESS = 0,		/**< Success */
+
+    /* PD status codes */
+    OPS_CLS_STATUS_HW_INTERNAL_ERR,	/**< Internal error */
+    OPS_CLS_STATUS_HW_MEMORY_ERR,	/**< Out of memory error */
+    OPS_CLS_STATUS_HW_UNIT_ERR,		/**< Invalid unit error */
+    OPS_CLS_STATUS_HW_PARAM_ERR,	/**< Invalid parameter error */
+    OPS_CLS_STATUS_HW_EMPTY_ERR,	/**< Table empty error */
+    OPS_CLS_STATUS_HW_FULL_ERR,		/**< Table full error */
+    OPS_CLS_STATUS_HW_NOT_FOUND_ERR,	/**< Entry not found error */
+    OPS_CLS_STATUS_HW_EXISTS_ERR,	/**< Entry exists error */
+    OPS_CLS_STATUS_HW_TIMEOUT_ERR,	/**< Operation timed out error */
+    OPS_CLS_STATUS_HW_BUSY_ERR,		/**< Operation still running error */
+    OPS_CLS_STATUS_HW_FAIL_ERR,		/**< Operation failed error */
+    OPS_CLS_STATUS_HW_DISABLED_ERR,	/**< Operation disabled error */
+    OPS_CLS_STATUS_HW_BADID_ERR,	/**< Invalid identifier error */
+    OPS_CLS_STATUS_HW_RESOURCE_ERR,	/**< No resource for operation error */
+    OPS_CLS_STATUS_HW_CONFIG_ERR,	/**< Invalid configuration error */
+    OPS_CLS_STATUS_HW_UNAVAIL_ERR,	/**< Feature unavailable error */
+    OPS_CLS_STATUS_HW_INIT_ERR,		/**< Feature not initialized error */
+    OPS_CLS_STATUS_HW_PORT_ERR,		/**< Invalid port error */
+    OPS_CLS_STATUS_HW_UNKNOWN_ERR,	/**< Unknown error */
+
+    /* This must be last entry */
+    OPS_CLS_STATUS_MAX			/**< Max status codes */
 };
 
 /**
@@ -302,8 +323,16 @@ enum ops_cls_list_pd_status_code
  */
 struct ops_cls_pd_status
 {
-    enum ops_cls_list_pd_status_code    status_code; /**< Status of this port's set operation */
-    uint16_t                            entry_id;    /**< First entry that encountered an error, 0 based index into array of entries as created by user  */
+    enum ops_cls_list_status_code    status_code; /**< Status of the classifier
+						       feature operation such
+						       as apply,remove,replace
+						       on the interface (port,
+						       vlan, etc) */
+    uint16_t                         entry_id;    /**< First entry that
+						       encountered an error,
+						       0 based index into
+						       array of entries as
+						       created by user  */
 };
 
 /**
@@ -311,9 +340,21 @@ struct ops_cls_pd_status
  */
 struct ops_cls_pd_list_status
 {
-    enum ops_cls_list_pd_status_code    status_code;    /**< Status of this list define operation */
-    uint16_t                            entry_id;       /**< First entry that encountered an error, 0 based index into array of entries as created by user  */
-    struct ofport                       *port;          /**< first interface on which this failed */
+    enum ops_cls_list_status_code    status_code; /**< Status of the classifier
+						       feature list operations
+						       such as list update,
+						       stats get,clear,etc on
+						       the interfaces that has
+						       the feaure list applied
+						       */
+    uint16_t                         entry_id;    /**< First entry that
+						       encountered an error,
+						       0 based index into
+						       array of entries as
+						       created by user  */
+    struct ofport                    *port;       /**< first interface on
+						       which list operation
+						       has failed */
 };
 
 /**
