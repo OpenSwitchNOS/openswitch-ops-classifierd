@@ -1,0 +1,9 @@
+Code-Review+2: Brian Krelle <brian.krelle@hpe.com>
+Code-Review+1: Ricky Charlet <ricky.charlet@hpe.com>
+Verified+2: Ricky Charlet <ricky.charlet@hpe.com>
+Workflow+1: Ricky Charlet <ricky.charlet@hpe.com>
+Submitted-by: Ricky Charlet <ricky.charlet@hpe.com>
+Submitted-at: Wed, 13 Apr 2016 23:25:36 +0000
+Reviewed-on: https://review.openswitch.net/7128
+Project: openswitch/ops-classifierd
+Branch: refs/heads/feature/copp
