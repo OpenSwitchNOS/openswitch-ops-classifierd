@@ -61,7 +61,7 @@ struct acl_port {
     struct port        *port;       /*< struct port */
     /* Hold all of my p2acl records internally, no need to
        allocate them separately. */
-    struct acl_port_map port_map[NUM_ACL_CFG_TYPES];
+    struct acl_port_map port_map[ACL_CFG_NUM_OF_TYPES];
 
     const struct ovsrec_port *ovsdb_row;
     unsigned int       delete_seqno; /* mark/sweep to identify deleted */

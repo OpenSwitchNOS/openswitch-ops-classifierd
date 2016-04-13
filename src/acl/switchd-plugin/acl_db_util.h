@@ -69,9 +69,12 @@ struct acl_db_util {
                             const struct smap *want_status);
 };
 
-#define NUM_ACL_CFG_TYPES 1
+enum acl_db_util_index {
+    ACL_CFG_V4_IN = 0,
+    ACL_CFG_NUM_OF_TYPES
+};
 
-extern struct acl_db_util acl_db_accessor[NUM_ACL_CFG_TYPES];
+extern struct acl_db_util acl_db_accessor[ACL_CFG_NUM_OF_TYPES];
 
 /**
  * Initialize acl_db_accessor array. All possible configurations and their
