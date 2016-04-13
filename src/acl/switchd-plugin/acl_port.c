@@ -574,7 +574,6 @@ acl_port_delete(struct acl_port* acl_port)
 {
     if (acl_port) {
         hmap_remove(&all_ports, &acl_port->all_node_uuid);
-        free(CONST_CAST(char *, acl_port->port->name));
 
         /* cleanup my port_map */
         for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
