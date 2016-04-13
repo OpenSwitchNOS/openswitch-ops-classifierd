@@ -18,6 +18,7 @@
 #include "openvswitch/vlog.h"
 #include "plugin-extensions.h"
 #include "acl.h"
+#include "acl_log.h"
 #include "acl_plugin.h"
 #include "acl_port.h"
 #include "vswitch-idl.h"
@@ -56,6 +57,15 @@ int init (int phase_id)
     VLOG_INFO("[%s] - Registering BLK_VRF_PORT_UPDATE", ACL_PLUGIN_NAME);
     register_reconfigure_callback(&acl_callback_port_update,
                                   BLK_VRF_PORT_UPDATE, NO_PRIORITY);
+
+    VLOG_INFO("[%s] - Registering BLK_RUN_COMPLETE", ACL_PLUGIN_NAME);
+    register_run_callback(&acl_log_run, BLK_RUN_COMPLETE, NO_PRIORITY);
+
+    VLOG_INFO("[%s] - Registering BLK_WAIT_COMPLETE", ACL_PLUGIN_NAME);
+    register_run_callback(&acl_log_wait, BLK_WAIT_COMPLETE, NO_PRIORITY);
+
+    /* initialize ACL logging code */
+    acl_log_init();
 
     return 0;
 }

@@ -17,8 +17,10 @@
 #define ACL_LOG_H
 
 #include <stdint.h>
+#include <linux/if_ether.h>
 
 #include "ops-cls-asic-plugin.h"
+#include "run-blocks.h"
 
 /**
  * The main loop of some processes, such as the main loop of switchd, will wake
@@ -55,5 +57,11 @@ void acl_log_pkt_data_get(struct acl_log_info *pkt_info_to_get);
  *
  */
 void acl_log_pkt_data_set(struct acl_log_info *new_pkt);
+
+void acl_log_init(void);
+
+void acl_log_run(struct run_blk_params *blk_params);
+
+void acl_log_wait(struct run_blk_params *blk_params);
 
 #endif /* ACL_LOG_H */

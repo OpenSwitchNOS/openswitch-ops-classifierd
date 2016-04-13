@@ -540,7 +540,7 @@ acl_port_new(struct port *port, unsigned int seqno,
     acl_port->uuid = port->cfg->header_.uuid;
 
     /* setup my port_map to know about me and which colgrp they represent */
-    for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
+    for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
         acl_port_map_construct(&acl_port->port_map[i], acl_port, i);
     }
 
@@ -564,10 +564,9 @@ acl_port_delete(struct acl_port* acl_port)
 {
     if (acl_port) {
         hmap_remove(&all_ports, &acl_port->all_node_uuid);
-        free(CONST_CAST(char *, acl_port->port->name));
 
         /* cleanup my port_map */
-        for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
+        for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
             acl_port_map_destruct(&acl_port->port_map[i]);
         }
 
@@ -594,7 +593,7 @@ acl_port_cfg_create(struct port *port, unsigned int seqno,
     struct acl_port *acl_port = acl_port_new(port, seqno,
                                              interface_flags);
 
-    for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
+    for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
         acl_port_map_cfg_create(&acl_port->port_map[i], port, ofproto);
     }
 
@@ -617,7 +616,7 @@ acl_port_cfg_update(struct acl_port *acl_port, struct port *port,
     /* TODO: rework this when we have the full
        Change/Transaction structure */
     /* Defer PD update to P2ACL structs */
-    for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
+    for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
         acl_port_map_cfg_update(&acl_port->port_map[i], port, ofproto);
     }
 }
@@ -635,7 +634,7 @@ acl_port_cfg_delete(struct acl_port* acl_port, struct port *port,
                     struct ofproto *ofproto)
 {
     VLOG_DBG("PORT %s deleted", port->name);
-    for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
+    for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
         acl_port_map_cfg_delete(&acl_port->port_map[i], port, ofproto);
     }
 }
