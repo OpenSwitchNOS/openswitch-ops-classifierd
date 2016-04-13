@@ -33,6 +33,12 @@
 #define ACL_PROTOCOL_SCTP    132
 #define ACL_PROTOCOL_INVALID 255
 
+/* Log timer constants */
+#define ACL_LOG_TIMER_STR "acl_log_timer"
+#define ACL_LOG_TIMER_MIN "30"
+#define ACL_LOG_TIMER_MAX "300"
+#define ACL_LOG_TIMER_DEFAULT ACL_LOG_TIMER_MAX
+
 in_addr_t ipv4_mask_create(uint8_t prefix_len);
 bool acl_parse_ipv4_address(const char *in_address,
                             enum ops_cls_list_entry_flags flag,
@@ -52,5 +58,6 @@ bool acl_parse_l4_operator(const char *in_op,
                            enum ops_cls_list_entry_flags flag,
                            uint32_t *flags,
                            enum ops_cls_L4_operator *op);
+const char *acl_parse_protocol_get_name_from_number(uint8_t proto_number);
 
 #endif  /* __SWITCHD__PLUGIN__ACL_PARSE_H__ */
