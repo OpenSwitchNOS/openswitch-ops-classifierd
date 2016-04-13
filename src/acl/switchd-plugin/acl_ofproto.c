@@ -23,7 +23,7 @@
 #include "openvswitch/vlog.h"
 #include "acl.h"
 #include "acl_plugin.h"
-#include "acl-log.h"
+#include "acl_log.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_ofproto);
 

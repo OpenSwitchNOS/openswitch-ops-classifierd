@@ -33,6 +33,12 @@
 #define ACL_PROTOCOL_SCTP    132
 #define ACL_PROTOCOL_INVALID 255
 
+/* Log timer constants */
+#define ACL_LOG_TIMER_STR "acl_log_timer"
+#define ACL_LOG_TIMER_MIN "30"
+#define ACL_LOG_TIMER_MAX "300"
+#define ACL_LOG_TIMER_DEFAULT ACL_LOG_TIMER_MAX
+
 bool acl_parse_ipv4_address(const char *in_address,
                             enum ops_cls_list_entry_flags flag,
                             uint32_t *flags,

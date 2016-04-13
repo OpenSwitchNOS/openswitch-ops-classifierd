@@ -59,10 +59,6 @@ extern struct ovsdb_idl *idl;
 #define ACL_TRUE_STR "true"
 
 /* Log timer constants */
-#define ACL_LOG_TIMER_STR "acl_log_timer"
-#define ACL_LOG_TIMER_MIN "30"
-#define ACL_LOG_TIMER_MAX "300"
-#define ACL_LOG_TIMER_DEFAULT ACL_LOG_TIMER_MAX
 #define ACL_LOG_TIMER_DEFAULT_STR "default"
 
 /* Constants related to ACE sequence numbers */
