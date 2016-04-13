@@ -44,6 +44,7 @@
 
 #include "acl_parse.h"
 #include "access_list_vty.h"
+#include "acl_parse.h"
 
 /** Create logging module */
 VLOG_DEFINE_THIS_MODULE(vtysh_access_list_cli);
@@ -59,10 +60,6 @@ extern struct ovsdb_idl *idl;
 #define ACL_TRUE_STR "true"
 
 /* Log timer constants */
-#define ACL_LOG_TIMER_STR "acl_log_timer"
-#define ACL_LOG_TIMER_MIN "30"
-#define ACL_LOG_TIMER_MAX "300"
-#define ACL_LOG_TIMER_DEFAULT ACL_LOG_TIMER_MAX
 #define ACL_LOG_TIMER_DEFAULT_STR "default"
 
 /* Constants related to ACE sequence numbers */
@@ -438,7 +435,7 @@ ace_entry_config_to_string(const int64_t sequence_num,
     ds_put_format(&dstring, "%" PRId64 " ", sequence_num);
     ds_put_format(&dstring, "%s ", ace_row->action);
     if (ace_row->n_protocol != 0) {
-        ds_put_format(&dstring, "%s ", protocol_get_name_from_number(ace_row->protocol[0]));
+        ds_put_format(&dstring, "%s ", acl_parse_protocol_get_name_from_number(ace_row->protocol[0]));
     }
     if (ace_row->src_ip) {
         ace_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
@@ -622,7 +619,7 @@ print_acl_tabular(const struct ovsrec_acl *acl_row)
             vty_out(vty, "%-31s ", "");
         }
         if (acl_row->value_cfg_aces[i]->n_protocol != 0) {
-            vty_out(vty, "%s ", protocol_get_name_from_number(acl_row->value_cfg_aces[i]->protocol[0]));
+            vty_out(vty, "%s ", acl_parse_protocol_get_name_from_number(acl_row->value_cfg_aces[i]->protocol[0]));
         } else {
             vty_out(vty, "%s ", "");
         }
