@@ -1353,25 +1353,9 @@ DEFUN (cli_mirror_source_iface_dir,
 
 }
 
-DEFUN (cli_mirror_no_source_iface,
-       cli_mirror_no_source_iface_cmd,
-       "no source interface INTERFACE",
-       SRC_STR
-       IFACE_STR
-       IFACE_NAME_STR)
-{
-   if (NULL == argv[0]) {
-      vty_out (vty, "Interface name required%s", VTY_NEWLINE);
-      return 1;
-   }
-
-   return source_iface_exec((const char*)argv[0], NULL, true);
-
-}
-
 DEFUN (cli_mirror_no_source_iface_dir,
        cli_mirror_no_source_iface_dir_cmd,
-       "no source interface INTERFACE (rx|tx)",
+       "no source interface INTERFACE {rx|tx}",
        SRC_STR
        IFACE_STR
        IFACE_NAME_STR
@@ -1383,7 +1367,14 @@ DEFUN (cli_mirror_no_source_iface_dir,
       return 1;
    }
 
-   return source_iface_exec((const char*)argv[0], (const char*)argv[1], true);
+
+   if (argv[1] != NULL) {
+      return source_iface_exec((const char*)argv[0], (const char*)argv[1], true);
+   } else if (argv[2] != NULL) {
+      return source_iface_exec((const char*)argv[0], (const char*)argv[2], true);
+   } else {
+      return source_iface_exec((const char*)argv[0], NULL, true);
+   }
 
 }
 
@@ -1483,7 +1474,6 @@ mirror_vty_init(void)
     install_element(MIRROR_NODE, &cli_mirror_no_output_iface_cmd);
 
     install_element(MIRROR_NODE, &cli_mirror_source_iface_dir_cmd);
-    install_element(MIRROR_NODE, &cli_mirror_no_source_iface_cmd);
     install_element(MIRROR_NODE, &cli_mirror_no_source_iface_dir_cmd);
 
     install_element(MIRROR_NODE, &cli_mirror_shutdown_cmd);
