@@ -22,7 +22,7 @@
 
 
 #ifndef COPP_TEMP_KEYS_H
-#define COPP_TEMP_KEYS_H 1
+#define COPP_TEMP_KEYS_H
 
 #ifdef  __cplusplus
 extern "C" {
