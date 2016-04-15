@@ -1291,11 +1291,50 @@ DEFUN(qos_queue_profile_show_all,
 }
 
 /**
- * Shows the running config for queue_profile. Returns true if the applied
- * profile differs from the default profile.
+ * Prints the profile.
  */
-bool
-qos_queue_profile_show_running_config(void)
+static void
+print_profile(struct ovsrec_q_profile *profile_row)
+{
+    /* Show profile name. */
+    vty_out(vty, "qos queue-profile %s%s", profile_row->name,
+            VTY_NEWLINE);
+
+    int i;
+    for (i = 0; i < profile_row->n_q_profile_entries; i++) {
+        int64_t queue_num =
+                profile_row->key_q_profile_entries[i];
+        struct ovsrec_q_profile_entry *profile_entry =
+                profile_row->value_q_profile_entries[i];
+
+        /* Show local-priorities. */
+        char applied_buffer[QOS_CLI_STRING_BUFFER_SIZE];
+        applied_buffer[0] = '\0';
+        snprintf_local_priorities(applied_buffer,
+                sizeof(applied_buffer), profile_entry);
+        if (applied_buffer != NULL &&
+                strncmp(applied_buffer, "",
+                        QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            vty_out(vty, "    map queue %" PRId64 " local-priority %s%s",
+                    queue_num, applied_buffer, VTY_NEWLINE);
+        }
+
+        /* Show description. */
+        if (profile_entry->description != NULL &&
+                strncmp(profile_entry->description, "",
+                        QOS_CLI_STRING_BUFFER_SIZE) != 0) {
+            vty_out(vty, "    name queue %" PRId64 " %s%s",
+                    queue_num, profile_entry->description,
+                    VTY_NEWLINE);
+        }
+    }
+}
+
+/**
+ * Returns true if the given profile differs from the factory default.
+ */
+static bool
+differs_from_factory_default(struct ovsrec_q_profile *profile_row)
 {
     struct ovsrec_q_profile *default_profile_row = qos_get_queue_profile_row(
             QOS_FACTORY_DEFAULT_NAME);
@@ -1305,15 +1344,12 @@ qos_queue_profile_show_running_config(void)
         return false;
     }
 
-    const struct ovsrec_system *system_row = ovsrec_system_first(idl);
-    struct ovsrec_q_profile *applied_profile_row = system_row->q_profile;
-
     bool differs_from_default = false;
 
     /* Compare profile name. */
-    if (strncmp(applied_profile_row->name, default_profile_row->name,
+    if (strncmp(profile_row->name, default_profile_row->name,
             QOS_CLI_STRING_BUFFER_SIZE) != 0 &&
-            strncmp(applied_profile_row->name, QOS_DEFAULT_NAME,
+            strncmp(profile_row->name, QOS_DEFAULT_NAME,
                     QOS_CLI_STRING_BUFFER_SIZE) != 0) {
         differs_from_default = true;
     }
@@ -1325,10 +1361,10 @@ qos_queue_profile_show_running_config(void)
         struct ovsrec_q_profile_entry *default_profile_entry =
                 default_profile_row->value_q_profile_entries[i];
 
-        struct ovsrec_q_profile_entry *applied_profile_entry =
+        struct ovsrec_q_profile_entry *profile_entry =
                 qos_get_queue_profile_entry_row(
-                        applied_profile_row, default_queue_num);
-        if (applied_profile_entry == NULL) {
+                        profile_row, default_queue_num);
+        if (profile_entry == NULL) {
             /* If the applied profile does not contain a queue_num from the */
             /* default profile, then a difference was found and the loop */
             /* can be terminated. */
@@ -1344,58 +1380,47 @@ qos_queue_profile_show_running_config(void)
         snprintf_local_priorities(default_buffer,
                 sizeof(default_buffer), default_profile_entry);
         snprintf_local_priorities(applied_buffer,
-                sizeof(applied_buffer), applied_profile_entry);
+                sizeof(applied_buffer), profile_entry);
         if (strncmp(applied_buffer, default_buffer,
                 sizeof(applied_buffer)) != 0) {
             differs_from_default = true;
         }
 
         /* Compare description. */
-        if (applied_profile_entry->description != NULL &&
-                strncmp(applied_profile_entry->description,
+        if (profile_entry->description != NULL &&
+                strncmp(profile_entry->description,
                         default_profile_entry->description,
                         QOS_CLI_STRING_BUFFER_SIZE) != 0) {
             differs_from_default = true;
         }
     }
 
-    /* Show the command if it differs from the default. */
-    if (differs_from_default) {
-        /* Show profile name. */
-        vty_out(vty, "qos queue-profile %s%s", applied_profile_row->name,
-                VTY_NEWLINE);
+    return differs_from_default;
+}
 
-        int i;
-        for (i = 0; i < applied_profile_row->n_q_profile_entries; i++) {
-            int64_t queue_num =
-                    applied_profile_row->key_q_profile_entries[i];
-            struct ovsrec_q_profile_entry *applied_profile_entry =
-                    applied_profile_row->value_q_profile_entries[i];
-
-            /* Show local-priorities. */
-            char applied_buffer[QOS_CLI_STRING_BUFFER_SIZE];
-            applied_buffer[0] = '\0';
-            snprintf_local_priorities(applied_buffer,
-                    sizeof(applied_buffer), applied_profile_entry);
-            if (applied_buffer != NULL &&
-                    strncmp(applied_buffer, "",
-                            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-                vty_out(vty, "    map queue %" PRId64 " local-priority %s%s",
-                        queue_num, applied_buffer, VTY_NEWLINE);
+/**
+ * Shows the running config for the profile.
+ */
+void
+qos_queue_profile_show_running_config(void)
+{
+    const struct ovsrec_q_profile *profile_row;
+    OVSREC_Q_PROFILE_FOR_EACH(profile_row, idl) {
+        if (strncmp(profile_row->name, QOS_FACTORY_DEFAULT_NAME,
+                QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+            /* Never print factory default profile since it never changes. */
+        } else if (strncmp(profile_row->name, QOS_DEFAULT_NAME,
+                QOS_CLI_STRING_BUFFER_SIZE) == 0) {
+            /* Print the default profile if different from factory default. */
+            if (differs_from_factory_default(
+                    (struct ovsrec_q_profile *) profile_row)) {
+                print_profile((struct ovsrec_q_profile *) profile_row);
             }
-
-            /* Show description. */
-            if (applied_profile_entry->description != NULL &&
-                    strncmp(applied_profile_entry->description, "",
-                            QOS_CLI_STRING_BUFFER_SIZE) != 0) {
-                vty_out(vty, "    name queue %" PRId64 " %s%s",
-                        queue_num, applied_profile_entry->description,
-                        VTY_NEWLINE);
-            }
+        } else {
+            /* Always print non-default profiles. */
+            print_profile((struct ovsrec_q_profile *) profile_row);
         }
     }
-
-    return differs_from_default;
 }
 
 /**
