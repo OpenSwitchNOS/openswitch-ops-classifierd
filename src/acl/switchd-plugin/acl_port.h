@@ -19,8 +19,26 @@
 
 #include "hmap.h"
 #include "uuid.h"
+#include "acl.h"
 #include "reconfigure-blocks.h"
-#include "acl_port_binding_helper.h"
+#include "acl_db_util.h"
+
+/*************************************************************
+ * acl_port_map structures
+ *
+ * This is stored in an arrary inside acl_port.
+ *************************************************************/
+struct acl_port_map {
+    /* points back to my parent */
+    struct acl_port *parent;
+
+    /* Reference the meta-data about this acl_port_map: */
+    /*    type, dir, ovsdb_colgrpdef */
+    struct acl_db_util *acl_db;
+
+    struct acl  *hw_acl; /* No ownership. Just borrowing pointer */
+    struct ovs_list acl_node; /* For linking into hw_acl's acl_port_maps list. */
+};
 
 /*************************************************************
  * acl_port structures
@@ -50,7 +68,7 @@ struct acl_port {
 
     /* Hold all of my p2acl records internally, no need to
        allocate them separately. */
-    struct p2acl p2acls[NUM_P2ACL_COLGRPS];
+    struct acl_port_map port_map[NUM_ACL_CFG_TYPES];
 
     const struct ovsrec_port *ovsdb_row;
     unsigned int       delete_seqno; /* mark/sweep to identify deleted */

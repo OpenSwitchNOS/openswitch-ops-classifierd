@@ -43,7 +43,7 @@ struct acl {
     unsigned int       delete_seqno; /* mark/sweep to identify deleted */
 
     /* members represending my cached PI state */
-    struct ovs_list p2acls;    /* List of struct p2acls. */
+    struct ovs_list acl_port_map;    /* List of struct p2acls. */
     struct ops_cls_list *want_pi; /* temporary until Change system in place */
 };
 

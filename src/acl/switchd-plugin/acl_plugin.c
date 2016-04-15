@@ -19,7 +19,6 @@
 #include "plugin-extensions.h"
 #include "acl.h"
 #include "acl_plugin.h"
-#include "acl_port_bindings.h"
 #include "acl_port.h"
 #include "vswitch-idl.h"
 
@@ -57,9 +56,6 @@ int init (int phase_id)
     register_reconfigure_callback(&acl_callback_port_update,
                                   BLK_VRF_PORT_UPDATE, NO_PRIORITY);
 
-    /* Initialize P2ACL column groups */
-    p2acl_colgroup_init();
-
     return 0;
 }
 
@@ -92,6 +88,9 @@ acl_callback_bridge_init(struct blk_params *blk_params)
     ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_external_ids);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_cur_aces);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_status);
+
+    /* Initialize ACL DB Util array */
+    acl_db_util_init();
 
     /* Find and initialize the asic plugin */
     acl_ofproto_init();

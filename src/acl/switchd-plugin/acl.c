@@ -24,7 +24,6 @@
 #include "ops-cls-asic-plugin.h"
 #include "acl_parse.h"
 #include "acl_ofproto.h"
-#include "acl_port_bindings.h"
 #include "reconfigure-blocks.h"
 #include "acl_plugin.h"
 
@@ -285,7 +284,7 @@ acl_new(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
     acl->ovsdb_row = ovsdb_row;
     acl->delete_seqno = seqno;
 
-    list_init(&acl->p2acls);
+    list_init(&acl->acl_port_map);
     /* acl->want_pi already NULL from xzalloc */
 
     /* link myself into all the lists/maps I'm supposed to be in */
@@ -305,7 +304,7 @@ acl_delete(struct acl* acl)
      * acl_ports (and their contained p2acl records) before we
      * teardown the ACL records.
      */
-    ovs_assert(list_is_empty(&acl->p2acls));
+    ovs_assert(list_is_empty(&acl->acl_port_map));
 
     hmap_remove(&all_acls_by_uuid, &acl->all_node_uuid);
 
@@ -380,7 +379,7 @@ acl_update_internal(struct acl* acl)
         acl->want_pi = list;
     }
 
-    if (!list_is_empty(&acl->p2acls)) {
+    if (!list_is_empty(&acl->acl_port_map)) {
         /* Make the call down to the PD layer so it can change the
          * application of this ACL on all related ports.
          */
