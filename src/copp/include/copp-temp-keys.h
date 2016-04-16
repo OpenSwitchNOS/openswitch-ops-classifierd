@@ -59,6 +59,29 @@ const char *const temp_copp_keys[COPP_NUM_CLASSES] = {
     [COPP_UNKNOWN_IP_UNICAST] = "temp_copp_unknown_ip_unicast"
 };
 
+
+enum copp_totals {
+    COPP_STATS_TOTAL_PKTS_PASSED = 0,
+    COPP_STATS_TOTAL_BYTES_PASSED,
+    COPP_STATS_TOTAL_PKTS_DROPPED,
+    COPP_STATS_TOTAL_BYTES_DROPPED,
+    /***/
+    COPP_STATS_TOTAL_MAX
+};
+
+#define COPP_NUM_TOTALS COPP_STATS_TOTAL_MAX
+const char *const temp_copp_totals_keys[COPP_STATS_TOTAL_MAX] = {
+    [COPP_STATS_TOTAL_PKTS_PASSED] =        "temp_total_pkts_passed",
+    [COPP_STATS_TOTAL_BYTES_PASSED] =       "temp_total_bytes_passed",
+    [COPP_STATS_TOTAL_PKTS_DROPPED] =       "temp_total_pkts_dropped",
+    [COPP_STATS_TOTAL_BYTES_DROPPED] =      "temp_total_bytes_dropped"
+};
+
+#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_PASSED temp_copp_totals_keys[COPP_STATS_TOTAL_PKTS_PASSED]
+#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_PASSED temp_copp_totals_keys[COPP_STATS_TOTAL_BYTES_PASSED]
+#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_DROPPED temp_copp_totals_keys[COPP_STATS_TOTAL_PKTS_DROPPED]
+#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_DROPPED temp_copp_totals_keys[COPP_STATS_TOTAL_BYTES_DROPPED]
+
 #define TEMP_COPP_STATS_BUF_FMT "%lu,%lu,%lu,%lu,%lu,%lu,%lu "
 #define TEMP_COPP_STATS_VARS(h, c)         \
         h.rate, h.burst, h.local_priority,  \
