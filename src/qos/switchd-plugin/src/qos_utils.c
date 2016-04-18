@@ -34,6 +34,10 @@
 VLOG_DEFINE_THIS_MODULE(qos_utils);
 
 
+/* First time, must set global QoS parameters before anything else happens. */
+static bool firstTimeInitialization = true;
+
+
 /**
  * Configure QOS maps & profiles for a particular bridge.
  */
@@ -49,26 +53,36 @@ void qos_configure(struct ofproto *ofproto,
 
 /**
  * bridge_reconfigure BLK_INIT_RECONFIGURE callback handler
+ *
+ * called at the start of bridge_reconfigure, before anything has been
+ * added, deleted or updated.
+ *
+ * First time only -- set global trust & profiles, so they exist prior
+ * to any port being configured.
  */
-void qos_callback_reconfigure_init(struct blk_params *blk_params)
+void qos_callback_init_reconfigure(struct blk_params *blk_params)
 {
 
-    /* check for global qos-trust change. */
+    /* Check for global qos-trust change. */
     qos_configure_trust(blk_params->idl, blk_params->idl_seqno);
 
-    /* do the global profiles */
-    qos_configure(blk_params->ofproto, blk_params->idl, blk_params->idl_seqno);
+    if (firstTimeInitialization) {
+        /* do the global profiles */
+        qos_configure(blk_params->ofproto, blk_params->idl, blk_params->idl_seqno);
 
-    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d opfproto@ %p",
-             __FUNCTION__,
-             blk_params, blk_params->idl, blk_params->idl_seqno, blk_params->ofproto);
+        VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d ofproto@ %p",
+                 __FUNCTION__,
+                 blk_params, blk_params->idl, blk_params->idl_seqno, blk_params->ofproto);
+
+        firstTimeInitialization = false;
+    }
 }
 
 /**
- * bridge_reconfigure BLK_BR_xxx and BLK_VRF_xxx callback handler
+ * check all ports in a bridge or VRF, configuring trust and/or profiles
+ * as needed.
  *
- * handles all Bridge- and VRF- post add/delete reconfigure-type callbacks
- * from bridge_reconfigure.
+ * handles all Bridge- and VRF- reconfigure-type callbacks
  */
 void qos_callback_reconfigure(struct blk_params *blk_params, struct hmap *ports)
 {
@@ -76,7 +90,9 @@ void qos_callback_reconfigure(struct blk_params *blk_params, struct hmap *ports)
 
     /* loop through all ports */
     HMAP_FOR_EACH(port, hmap_node, ports) {
+#ifdef DEBUG
         VLOG_DBG("%s: port %s", __FUNCTION__, port->cfg->name);
+#endif
 
         qos_trust_send_change(blk_params->ofproto,
                               port, port->cfg,
@@ -89,37 +105,113 @@ void qos_callback_reconfigure(struct blk_params *blk_params, struct hmap *ports)
 }
 
 /**
- * bridge_reconfigure BLK_BR_RECONFIGURE_PORTS callback
+ * bridge_reconfigure BLK_BR_PORT_UPDATE callback
  *
- * handles all Bridge post add/delete reconfigure event
+ * called after port_configure on a single bridge port
  */
-void qos_callback_reconfigure_bridge(struct blk_params *blk_params)
+void
+qos_callback_bridge_port_update(struct blk_params *blk_params)
 {
-    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d opfproto@ %p bridge@ %p",
+    VLOG_INFO("%s: params@ %p idl@ %p  seqno=%d ofproto@ %p br@ %p port@ %p (%s)",
+              __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
+              blk_params->ofproto, blk_params->br,
+              blk_params->port, blk_params->port->name);
+    qos_trust_send_change(blk_params->ofproto,
+                          blk_params->port, blk_params->port->cfg,
+                          blk_params->idl_seqno);
+}
+
+/**
+ * bridge_reconfigure BLK_VRF_PORT_UPDATE callback
+ *
+ * called after port_configure on a single VRF port
+ */
+void
+qos_callback_vrf_port_update(struct blk_params *blk_params)
+{
+    VLOG_INFO("%s: params@ %p idl@ %p  seqno=%d ofproto@ %p vrf@ %p port@ %p (%s)",
+              __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
+              blk_params->ofproto, blk_params->vrf,
+              blk_params->port, blk_params->port->name);
+    qos_trust_send_change(blk_params->ofproto,
+                          blk_params->port, blk_params->port->cfg,
+                          blk_params->idl_seqno);
+}
+
+/**
+ * bridge_reconfigure BLK_BR_FEATURE_RECONFIG callback
+ *
+ * called after everything for a bridge has been add/deleted/updated
+ */
+void
+qos_callback_bridge_feature_reconfig(struct blk_params *blk_params)
+{
+    /* Look for global QoS changes only after all ports on the bridge
+     * have been reconfigured.
+     *
+     * First time only, these checks were done in the init_reconfigure callback,
+     * so skip them here.
+     */
+    if ( ! firstTimeInitialization) {
+        /* do the global profiles */
+        qos_configure(blk_params->ofproto, blk_params->idl, blk_params->idl_seqno);
+
+#ifdef DEBUG
+        VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d ofproto@ %p",
+                 __FUNCTION__,
+                 blk_params, blk_params->idl, blk_params->idl_seqno, blk_params->ofproto);
+#endif
+
+    }
+
+#ifdef DEBUG
+    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d ofproto@ %p vrf@ %p ports@ %p",
              __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
-             blk_params->ofproto, blk_params->br);
+             blk_params->ofproto, blk_params->br, &blk_params->br->ports);
+#endif
 
     qos_callback_reconfigure(blk_params, &blk_params->br->ports);
 }
 
 /**
- * bridge_reconfigure BLK_VRF_RECONFIGURE_PORTS callback
+ * bridge_reconfigure BLK_RECONFIGURE_NEIGHBORS callback
  *
- * handles all VRF post add/delete reconfigure event
+ * called after everything for a VRF has been add/deleted/updated
  */
-void qos_callback_reconfigure_vrf(struct blk_params *blk_params)
+void
+qos_callback_reconfigure_neighbors(struct blk_params *blk_params)
 {
-    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d opfproto@ %p vrf@ %p",
-             __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
-             blk_params->ofproto, blk_params->vrf);
 
+    /* Look for global QoS changes only after all ports on the bridge
+     * have been reconfigured.
+     *
+     * First time only, global profile checks were done in the
+     * init_reconfigure callback, so skip them here.
+     */
+    if ( ! firstTimeInitialization) {
+        /* do the global profiles */
+        qos_configure(blk_params->ofproto, blk_params->idl, blk_params->idl_seqno);
+
+#ifdef DEBUG
+        VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d ofproto@ %p",
+                 __FUNCTION__,
+                 blk_params, blk_params->idl, blk_params->idl_seqno, blk_params->ofproto);
+#endif
+
+    }
+
+#ifdef DEBUG
+    VLOG_DBG("%s: params@ %p idl@ %p  seqno=%d ofproto@ %p vrf@ %p ports@ %p",
+             __FUNCTION__, blk_params, blk_params->idl, blk_params->idl_seqno,
+             blk_params->ofproto, blk_params->vrf, &blk_params->vrf->up->ports);
+#endif
     qos_callback_reconfigure(blk_params, &blk_params->vrf->up->ports);
 }
 
 /**
  * bridge_reconfigure BLK_BRIDGE_INIT callback handler
  */
-void qos_callback_init(struct blk_params *blk_params)
+void qos_callback_bridge_init(struct blk_params *blk_params)
 {
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_qos_status);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_system_col_qos_status);
