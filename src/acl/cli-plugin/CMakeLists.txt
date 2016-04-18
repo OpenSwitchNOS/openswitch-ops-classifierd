@@ -40,10 +40,12 @@ include_directories (${CMAKE_INCL_DIR}
                      ${PROJECT_SOURCE_DIR}
                      ${OVSCOMMON_INCLUDE_DIRS}
                      ${OPSCLI_INCLUDE_DIRS}
+                     ${ACL_SOURCE_DIR}/include/
                     )
 
 # CLI library source files
 set (SOURCES_CLI
+                 ${ACL_SOURCE_DIR}/util/acl_parse.c
                  ${PROJECT_SOURCE_DIR}/access_list_vty.c
     )
 
