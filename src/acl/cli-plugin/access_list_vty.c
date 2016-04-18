@@ -35,6 +35,7 @@
 #include <libaudit.h>
 #include <openvswitch/vlog.h>
 #include <smap.h>
+#include <hmap.h>
 #include <json.h>
 #include <dynamic-string.h>
 
@@ -870,21 +871,42 @@ cli_create_acl_if_needed(const char *acl_type, const char *acl_name)
 
     /* Create */
     if (!acl_row) {
-        VLOG_DBG("Creating ACL type=%s name=%s", acl_type, acl_name);
+      const char* max_acls;
+      int64_t max_acls_int;
 
-        /* Create, populate new ACL table row */
-        acl_row = ovsrec_acl_insert(transaction);
-        ovsrec_acl_set_list_type(acl_row, acl_type);
-        ovsrec_acl_set_name(acl_row, acl_name);
+      /* Get max ACLs from system table, other config */
+      max_acls = smap_get(&ovs->other_config, "max_acls");
 
-        /* Update System (parent) table */
-        acl_info = xmalloc(sizeof *ovs->acls * (ovs->n_acls + 1));
-        for (i = 0; i < ovs->n_acls; i++) {
-            acl_info[i] = ovs->acls[i];
-        }
-        acl_info[i] = acl_row;
-        ovsrec_system_set_acls(ovs, (struct ovsrec_acl **) acl_info, i + 1);
-        free(acl_info);
+      if (NULL != max_acls) {
+          max_acls_int = strtol(max_acls, NULL, 0);
+      } else {
+          cli_do_config_abort(transaction);
+          VLOG_ERR("Unable to acquire ACL hardware limits.");
+          return CMD_OVSDB_FAILURE;
+      }
+
+      /* Abort if hardware limit is reached */
+      if (ovs->n_acls >= max_acls_int) {
+          vty_out(vty, "%% Unable to create ACL. "
+                  "The maximum allowed number of ACLs has been reached%s", VTY_NEWLINE);
+          cli_do_config_abort(transaction);
+          return CMD_SUCCESS;
+      }
+      VLOG_DBG("Creating ACL type=%s name=%s", acl_type, acl_name);
+
+      /* Create, populate new ACL table row */
+      acl_row = ovsrec_acl_insert(transaction);
+      ovsrec_acl_set_list_type(acl_row, acl_type);
+      ovsrec_acl_set_name(acl_row, acl_name);
+
+      /* Update System (parent) table */
+      acl_info = xmalloc(sizeof *ovs->acls * (ovs->n_acls + 1));
+      for (i = 0; i < ovs->n_acls; i++) {
+          acl_info[i] = ovs->acls[i];
+      }
+      acl_info[i] = acl_row;
+      ovsrec_system_set_acls(ovs, (struct ovsrec_acl **) acl_info, i + 1);
+      free(acl_info);
     }
     /* Update */
     else {
@@ -1097,7 +1119,55 @@ cli_create_update_ace (const char *acl_type,
             ovsrec_acl_entry_set_comment(ace_row, old_ace_row->comment);
         }
     } else {
-        VLOG_DBG("Creating ACE seq=%" PRId64, ace_sequence_number);
+      const struct ovsrec_system *ovs;
+
+      /* Get System table */
+      ovs = ovsrec_system_first(idl);
+
+      if (!ovs) {
+          cli_do_config_abort(transaction);
+          assert(0);
+          return CMD_OVSDB_FAILURE;
+      }
+      const char* max_aces;
+      const char* max_aces_per_acl;
+      int64_t max_aces_int, max_aces_per_acl_int;
+      const struct ovsdb_idl_row *ace_header;
+      size_t ace_entries;
+
+      /* Get max ACEs and ACEs per acl from system table, other config */
+      max_aces = smap_get(&ovs->other_config, "max_aces");
+      max_aces_per_acl = smap_get(&ovs->other_config, "max_aces_per_acl");
+
+      if ((NULL != max_aces) && (NULL != max_aces_per_acl)) {
+          max_aces_int = strtol(max_aces, NULL, 0);
+          max_aces_per_acl_int = strtol(max_aces_per_acl, NULL, 0);
+      } else {
+          cli_do_config_abort(transaction);
+          VLOG_ERR("Unable to acquire ACE hardware limits.");
+          return CMD_OVSDB_FAILURE;
+      }
+
+      /* Get number of ACEs from table header */
+      ace_header = &ace_row->header_;
+      ace_entries = hmap_count(&ace_header->table->rows);
+
+      /* Updating an ACE always (except comments) creates a new row in ACE table.
+       * n_cfg_aces doesn't increment until finish updating ACL table later.
+       * Abort if hardware limits are reached */
+      if (ace_entries > max_aces_int) {
+          vty_out(vty, "%% Unable to create ACL entry. "
+                  "The maximum allowed number of ACEs has been reached%s", VTY_NEWLINE);
+          cli_do_config_abort(transaction);
+          return CMD_SUCCESS;
+      } else if (acl_row->n_cfg_aces >= max_aces_per_acl_int) {
+          vty_out(vty, "%% Unable to create ACL entry. "
+                  "The maximum allowed number of ACEs per acl has been reached%s", VTY_NEWLINE);
+          cli_do_config_abort(transaction);
+          return CMD_SUCCESS;
+      } else {
+          VLOG_DBG("Creating ACE seq=%" PRId64, ace_sequence_number);
+      }
     }
 
     /* Set any updated columns */
