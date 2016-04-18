@@ -100,11 +100,16 @@ qos_trust_send_change(struct ofproto *ofproto,
     if (send_trust_change ||
         OVSREC_IDL_IS_ROW_MODIFIED(port_cfg, idl_seqno)) {
 
-        VLOG_DBG("%s: port %s TRUST change", __FUNCTION__, port_cfg->name);
-        ofproto_set_port_qos_cfg(ofproto,
-                                 aux,
-                                 global_qos_trust,
-                                 &port_cfg->qos_config,
-                                 &port_cfg->other_config);
+        /* Make sure this port has interfaces that are 'system' type.
+           QoS should not affect other types. */
+        if ( ! strcmp(port_cfg->interfaces[0]->type,
+                      OVSREC_INTERFACE_TYPE_SYSTEM)) {
+            VLOG_DBG("%s: port %s TRUST change", __FUNCTION__, port_cfg->name);
+            ofproto_set_port_qos_cfg(ofproto,
+                                     aux,
+                                     global_qos_trust,
+                                     &port_cfg->qos_config,
+                                     &port_cfg->other_config);
+        }
     }
 }
