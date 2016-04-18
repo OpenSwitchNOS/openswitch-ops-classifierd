@@ -35,6 +35,7 @@
 #include <libaudit.h>
 #include <openvswitch/vlog.h>
 #include <smap.h>
+#include <hmap.h>
 #include <json.h>
 #include <dynamic-string.h>
 
@@ -576,6 +577,68 @@ ace_entry_config_to_string(const int64_t sequence_num,
 }
 
 /**
+ * Check ACL entry capacity for any given ACL and in database table
+ *
+ * @param acl_row Pointer to ACL row
+ * @param ace_row Pointer to ACE row
+ *
+ * @retval CMD_SUCCESS           on success
+ * @retval CMD_OVSDB_FAILURE     on database/transaction failure
+ * @retval CMD_ERR_NOTHING_TODO  on ACE capacity failure
+ */
+static int
+check_ace_capacity (const struct ovsrec_acl *acl_row,
+                    const struct ovsrec_acl_entry *ace_row)
+{
+    const struct ovsrec_system *ovs;
+    const char* max_aces_str;
+    const char* max_aces_per_acl_str;
+    int64_t max_aces, max_aces_per_acl;
+    const struct ovsdb_idl_row *ace_header;
+    size_t ace_entries;
+
+    /* Get System table */
+    ovs = ovsrec_system_first(idl);
+
+    if (!ovs) {
+        VLOG_INFO("Unable to acquire system table.");
+        assert(0);
+        return CMD_OVSDB_FAILURE;
+    }
+
+    /* Get max ACEs and max ACEs per acl from system table, other config */
+    max_aces_str = smap_get(&ovs->other_config, "max_aces");
+    max_aces_per_acl_str = smap_get(&ovs->other_config, "max_aces_per_acl");
+
+    if (max_aces_str && max_aces_per_acl_str) {
+        max_aces = strtol(max_aces_str, NULL, 0);
+        max_aces_per_acl = strtol(max_aces_per_acl_str, NULL, 0);
+    } else {
+        VLOG_ERR("Unable to acquire ACE hardware limits.");
+        return CMD_OVSDB_FAILURE;
+    }
+
+    /* Get number of ACEs in database from table header */
+    ace_header = &ace_row->header_;
+    ace_entries = hmap_count(&ace_header->table->rows);
+
+    /* Updating an ACE always (except comments) creates a new row in ACE table.
+     * n_cfg_aces doesn't increment until finish updating ACL table.
+     * Abort if ACEs limits are reached */
+    if (ace_entries > max_aces) {
+        vty_out(vty, "%% Unable to create ACL entry. "
+                "The maximum allowed number of ACL entries has been reached%s", VTY_NEWLINE);
+        return CMD_ERR_NOTHING_TODO;
+    } else if (acl_row->n_cfg_aces >= max_aces_per_acl) {
+        vty_out(vty, "%% Unable to create ACL entry. "
+                "The maximum allowed number of entries per acl has been reached%s", VTY_NEWLINE);
+        return CMD_ERR_NOTHING_TODO;
+    } else {
+        return CMD_SUCCESS;
+    }
+}
+
+/**
  * Print an ACL's configuration as if it were entered into the CLI
  *
  * @param acl_row Pointer to ACL row
@@ -870,21 +933,42 @@ cli_create_acl_if_needed(const char *acl_type, const char *acl_name)
 
     /* Create */
     if (!acl_row) {
-        VLOG_DBG("Creating ACL type=%s name=%s", acl_type, acl_name);
+      const char* max_acls_str;
+      int64_t max_acls;
 
-        /* Create, populate new ACL table row */
-        acl_row = ovsrec_acl_insert(transaction);
-        ovsrec_acl_set_list_type(acl_row, acl_type);
-        ovsrec_acl_set_name(acl_row, acl_name);
+      /* Get max ACLs from system table, other config */
+      max_acls_str = smap_get(&ovs->other_config, "max_acls");
 
-        /* Update System (parent) table */
-        acl_info = xmalloc(sizeof *ovs->acls * (ovs->n_acls + 1));
-        for (i = 0; i < ovs->n_acls; i++) {
-            acl_info[i] = ovs->acls[i];
-        }
-        acl_info[i] = acl_row;
-        ovsrec_system_set_acls(ovs, (struct ovsrec_acl **) acl_info, i + 1);
-        free(acl_info);
+      if (max_acls_str) {
+          max_acls = strtol(max_acls_str, NULL, 0);
+      } else {
+          cli_do_config_abort(transaction);
+          VLOG_ERR("Unable to acquire ACL hardware limits.");
+          return CMD_OVSDB_FAILURE;
+      }
+
+      /* Abort if hardware limit is reached */
+      if (ovs->n_acls >= max_acls) {
+          vty_out(vty, "%% Unable to create ACL. "
+                  "The maximum allowed number of ACLs has been reached%s", VTY_NEWLINE);
+          cli_do_config_abort(transaction);
+          return CMD_SUCCESS;
+      }
+      VLOG_DBG("Creating ACL type=%s name=%s", acl_type, acl_name);
+
+      /* Create, populate new ACL table row */
+      acl_row = ovsrec_acl_insert(transaction);
+      ovsrec_acl_set_list_type(acl_row, acl_type);
+      ovsrec_acl_set_name(acl_row, acl_name);
+
+      /* Update System (parent) table */
+      acl_info = xmalloc(sizeof *ovs->acls * (ovs->n_acls + 1));
+      for (i = 0; i < ovs->n_acls; i++) {
+          acl_info[i] = ovs->acls[i];
+      }
+      acl_info[i] = acl_row;
+      ovsrec_system_set_acls(ovs, (struct ovsrec_acl **) acl_info, i + 1);
+      free(acl_info);
     }
     /* Update */
     else {
@@ -1097,6 +1181,13 @@ cli_create_update_ace (const char *acl_type,
             ovsrec_acl_entry_set_comment(ace_row, old_ace_row->comment);
         }
     } else {
+        int result;
+        /* Check ACEs capacity */
+        result = check_ace_capacity(acl_row, ace_row);
+        if (CMD_SUCCESS != result) {
+          cli_do_config_abort(transaction);
+          return result;
+        }
         VLOG_DBG("Creating ACE seq=%" PRId64, ace_sequence_number);
     }
 
