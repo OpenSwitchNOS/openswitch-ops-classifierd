@@ -19,7 +19,7 @@
 
 #include <stdlib.h>
 #include <ctype.h>
-#include "acl.h"
+#include "ops-cls-asic-plugin.h"
 
 #define ACL_PROTOCOL_ICMP    1
 #define ACL_PROTOCOL_IGMP    2
@@ -52,5 +52,32 @@ bool acl_parse_l4_operator(const char *in_op,
                            enum ops_cls_list_entry_flags flag,
                            uint32_t *flags,
                            enum ops_cls_L4_operator *op);
+
+/**
+ * Get numeric IP protocol number from an all-lowercase string
+ *
+ * @param  in_proto String as provided by user interface (e.g. CLI)
+ *
+ * @return          Numeric protocol number or 255 on error
+ */
+uint8_t protocol_get_number_from_name(const char *in_proto);
+
+/**
+ * Determine if a protocol string is numeric or not
+ *
+ * @param  in_proto String as provided by user interface (e.g. CLI)
+ *
+ * @return          true if string is numeric, false otherwise
+ */
+bool protocol_is_number(const char *in_proto);
+
+/**
+ * Get all-lowercase string token for a given IP protocol number
+ *
+ * @param  proto_number Numeric IP protocol number
+ *
+ * @return              String protocol name (may be numeric if no name)
+ */
+const char * protocol_get_name_from_number(uint8_t proto_number);
 
 #endif  /* __SWITCHD__PLUGIN__ACL_PARSE_H__ */

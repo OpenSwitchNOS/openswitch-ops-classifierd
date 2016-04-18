@@ -42,6 +42,7 @@
 #include <ovsdb-idl.h>
 #include <openswitch-idl.h>
 
+#include "acl_parse.h"
 #include "access_list_vty.h"
 
 /** Create logging module */
@@ -322,115 +323,6 @@ get_vlan_by_id_str(const char *id_str)
     }
 
     return NULL;
-}
-
-/** @todo get protocol parsing into util directory */
-#define ACL_PROTOCOL_ICMP    1
-#define ACL_PROTOCOL_IGMP    2
-#define ACL_PROTOCOL_TCP     6
-#define ACL_PROTOCOL_UDP     17
-#define ACL_PROTOCOL_GRE     47
-#define ACL_PROTOCOL_ESP     50
-#define ACL_PROTOCOL_AH      51
-#define ACL_PROTOCOL_ICMPV6  58
-#define ACL_PROTOCOL_PIM     103
-#define ACL_PROTOCOL_SCTP    132
-#define ACL_PROTOCOL_INVALID 255
-
-static const char * const protocol_names[] = {
-       "0", "icmp", "igmp",    "3",    "4",    "5",  "tcp",    "7",
-       "8",    "9",   "10",   "11",   "12",   "13",   "14",   "15",
-      "16",  "udp",   "18",   "19",   "20",   "21",   "22",   "23",
-      "24",   "25",   "26",   "27",   "28",   "29",   "30",   "31",
-      "32",   "33",   "34",   "35",   "36",   "37",   "38",   "39",
-      "40",   "41",   "42",   "43",   "44",   "45",   "46",  "gre",
-      "48",   "49",  "esp",   "ah",   "52",   "53",   "54",   "55",
-      "56",   "57",   "58",   "59",   "60",   "61",   "62",   "63",
-      "64",   "65",   "66",   "67",   "68",   "69",   "70",   "71",
-      "72",   "73",   "74",   "75",   "76",   "77",   "78",   "79",
-      "80",   "81",   "82",   "83",   "84",   "85",   "86",   "87",
-      "88",   "89",   "90",   "91",   "92",   "93",   "94",   "95",
-      "96",   "97",   "98",   "99",  "100",  "101",  "102",  "pim",
-     "104",  "105",  "106",  "107",  "108",  "109",  "110",  "111",
-     "112",  "113",  "114",  "115",  "116",  "117",  "118",  "119",
-     "120",  "121",  "122",  "123",  "124",  "125",  "126",  "127",
-     "128",  "129",  "130",  "131", "sctp",  "133",  "134",  "135",
-     "136",  "137",  "138",  "139",  "140",  "141",  "142",  "143",
-     "144",  "145",  "146",  "147",  "148",  "149",  "150",  "151",
-     "152",  "153",  "154",  "155",  "156",  "157",  "158",  "159",
-     "160",  "161",  "162",  "163",  "164",  "165",  "166",  "167",
-     "168",  "169",  "170",  "171",  "172",  "173",  "174",  "175",
-     "176",  "177",  "178",  "179",  "180",  "181",  "182",  "183",
-     "184",  "185",  "186",  "187",  "188",  "189",  "190",  "191",
-     "192",  "193",  "194",  "195",  "196",  "197",  "198",  "199",
-     "200",  "201",  "202",  "203",  "204",  "205",  "206",  "207",
-     "208",  "209",  "210",  "211",  "212",  "213",  "214",  "215",
-     "216",  "217",  "218",  "219",  "220",  "221",  "222",  "223",
-     "224",  "225",  "226",  "227",  "228",  "229",  "230",  "231",
-     "232",  "233",  "234",  "235",  "236",  "237",  "238",  "239",
-     "240",  "241",  "242",  "243",  "244",  "245",  "246",  "247",
-     "248",  "249",  "250",  "251",  "252",  "253",  "254",  "255"
-};
-
-static uint8_t
-protocol_get_number_from_name(const char *in_proto)
-{
-    uint8_t protocol = ACL_PROTOCOL_INVALID;
-
-    if (!in_proto) {
-        VLOG_DBG("Null protocol string specified");
-        return protocol;
-    }
-
-    if (!strcmp(in_proto, "ah")) {
-        protocol = ACL_PROTOCOL_AH;
-    } else if (!strcmp(in_proto, "esp")) {
-        protocol = ACL_PROTOCOL_ESP;
-    } else if (!strcmp(in_proto, "icmp")) {
-        protocol = ACL_PROTOCOL_ICMP;
-    } else if (!strcmp (in_proto, "icmpv6")) {
-        protocol = ACL_PROTOCOL_ICMPV6;
-    } else if (!strcmp (in_proto, "igmp")) {
-        protocol = ACL_PROTOCOL_IGMP;
-    } else if (!strcmp (in_proto, "pim")) {
-        protocol = ACL_PROTOCOL_PIM;
-    } else  if (!strcmp (in_proto, "sctp")) {
-        protocol = ACL_PROTOCOL_SCTP;
-    } else if (!strcmp (in_proto, "tcp")) {
-        protocol = ACL_PROTOCOL_TCP;
-    } else if (!strcmp (in_proto, "udp")) {
-        protocol = ACL_PROTOCOL_UDP;
-    } else {
-        VLOG_DBG("Invalid protocol specified %s", in_proto);
-        protocol = ACL_PROTOCOL_INVALID;
-    }
-
-    return protocol;
-}
-
-static bool
-protocol_is_number(const char *in_proto)
-{
-    /* Null check. May not be necessary here */
-    if (!*in_proto) {
-        return false;
-    }
-
-    /* Check if every character in the string is a digit */
-    while (*in_proto) {
-        if (!isdigit(*in_proto)) {
-            return false;
-        }
-        ++in_proto;
-    }
-
-    return true;
-}
-
-static const char *
-protocol_get_name_from_number(uint8_t proto_number)
-{
-    return protocol_names[proto_number];
 }
 
 /* = Audit Logging = */
