@@ -90,7 +90,7 @@ extern struct ovsdb_idl *idl;
 #define ACL_ALL_STR "All access-lists\n"
 
 /* Command strings (cmdstr) and Help strings (helpstr) used in vtysh DEFUNs */
-#define ACE_SEQ_CMDSTR "<1-" ACL_NUM_TO_STR(ACE_SEQ_MAX) ">"
+#define ACE_SEQ_CMDSTR "<1-" ACL_NUM_TO_STR(ACE_SEQ_MAX) "> "
 #define ACE_SEQ_HELPSTR "Access control entry (ACE) sequence number\n"
 #define ACE_ACTION_CMDSTR "(deny | permit) "
 #define ACE_ACTION_HELPSTR "Deny packets matching this ACE\n" \
@@ -3422,6 +3422,7 @@ DEFUN (cli_no_access_list_entry_comment,
        , /* end of cmdstr, comment to avoid accidental comma loss */
 
        /* helpstr, newline delimited */
+       NO_STR
        ACE_SEQ_HELPSTR
        ACE_COMMENT_HELPSTR
       )
