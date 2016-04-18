@@ -48,20 +48,28 @@ int init(int phase_id)
     int ret = 0;
 
     VLOG_INFO("[%s] Registering BLK_BRIDGE_INIT", QOS_PLUGIN_NAME);
-    register_reconfigure_callback(&qos_callback_init,
+    register_reconfigure_callback(&qos_callback_bridge_init,
                                   BLK_BRIDGE_INIT, NO_PRIORITY);
 
     VLOG_INFO("[%s] Registering in BLK_INIT_RECONFIGURE", QOS_PLUGIN_NAME);
-    register_reconfigure_callback(&qos_callback_reconfigure_init,
+    register_reconfigure_callback(&qos_callback_init_reconfigure,
                                   BLK_INIT_RECONFIGURE, NO_PRIORITY);
 
-    VLOG_INFO("[%s] Registering in BLK_BR_RECONFIGURE_PORTS", QOS_PLUGIN_NAME);
-    register_reconfigure_callback(&qos_callback_reconfigure_bridge,
-                                  BLK_BR_RECONFIGURE_PORTS, NO_PRIORITY);
+    VLOG_INFO("[%s] Registering in BLK_BR_PORT_UPDATE", QOS_PLUGIN_NAME);
+    register_reconfigure_callback(&qos_callback_bridge_port_update,
+                                  BLK_BR_PORT_UPDATE, NO_PRIORITY);
 
-    VLOG_INFO("[%s] Registering in BLK_VRF_RECONFIGURE_PORTS", QOS_PLUGIN_NAME);
-    register_reconfigure_callback(&qos_callback_reconfigure_vrf,
-                                  BLK_VRF_RECONFIGURE_PORTS, NO_PRIORITY);
+    VLOG_INFO("[%s] Registering in BLK_VRF_PORT_UPDATE", QOS_PLUGIN_NAME);
+    register_reconfigure_callback(&qos_callback_vrf_port_update,
+                                  BLK_VRF_PORT_UPDATE, NO_PRIORITY);
+
+    VLOG_INFO("[%s] Registering in BLK_BR_FEATURE_RECONFIG", QOS_PLUGIN_NAME);
+    register_reconfigure_callback(&qos_callback_bridge_feature_reconfig,
+                                  BLK_BR_FEATURE_RECONFIG, NO_PRIORITY);
+
+    VLOG_INFO("[%s] Registering in BLK_RECONFIGURE_NEIGHBORS", QOS_PLUGIN_NAME);
+    register_reconfigure_callback(&qos_callback_reconfigure_neighbors,
+                                  BLK_RECONFIGURE_NEIGHBORS, NO_PRIORITY);
 
     for (int blk_id = 0; blk_id < (int)MAX_STATS_BLOCKS_NUM; blk_id++) {
         switch (blk_id) {
