@@ -25,6 +25,7 @@
 #include "acl_parse.h"
 #include "acl_ofproto.h"
 #include "reconfigure-blocks.h"
+#include "run-blocks.h"
 #include "acl_plugin.h"
 #include "ops_cls_status_msgs.h"
 
@@ -54,30 +55,6 @@ VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
 #define ACL_CFG_STATE_REJECTED      "rejected"
 #define ACL_CFG_STATE_IN_PROGRESS   "in_progress"
 #define ACL_CFG_STATE_CANCELLED     "cancelled"
-
-struct db_ace {
-    uint32_t sequence_number;
-    struct ovsrec_acl_entry *acl_entry;
-};
-
-static int
-sort_compare_aces(size_t a, size_t b, void *aces_)
-{
-    const struct db_ace *aces = aces_;
-    uint32_t a_seq = aces[a].sequence_number;
-    uint32_t b_seq = aces[b].sequence_number;
-
-    return (a_seq < b_seq) ? -1 : (a_seq > b_seq);
-}
-
-static void
-sort_swap_aces(size_t a, size_t b, void *ptrs_)
-{
-    struct db_ace *ptrs = ptrs_;
-    struct db_ace tmp = ptrs[a];
-    ptrs[a] = ptrs[b];
-    ptrs[b] = tmp;
-}
 
 static bool
 populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
@@ -188,45 +165,21 @@ ops_cls_list_new_from_acl(struct acl *acl)
     list->list_name = xstrdup(acl->name);
     list->list_type = acl->type;
 
-    /* make a sorted copy of the ace strings from OVSDB */
-    size_t n_aces = acl_row->n_cfg_aces;
-    size_t n_sorted_aces = 0;
-    struct db_ace *sorted_aces = NULL;
-    if (n_aces > 0) {
-        sorted_aces = xmalloc(n_aces * sizeof sorted_aces[0]);
-
-        while (n_sorted_aces < n_aces) {
-            /* TODO: Deal with comment ACE's
-             *
-             if (node->value.is_comment) {
-                continue;
-             }
-            */
-            sorted_aces[n_sorted_aces].sequence_number = acl_row->key_cfg_aces[n_sorted_aces];
-            sorted_aces[n_sorted_aces].acl_entry = acl_row->value_cfg_aces[n_sorted_aces];
-            ++n_sorted_aces;
-        }
-        if (n_sorted_aces > 0) {
-            sort(n_sorted_aces, &sort_compare_aces, &sort_swap_aces,
-                 sorted_aces);
-        }
-    }
-
-    /* allocate our PI entries and convert from json */
-    list->num_entries = n_sorted_aces + 1; /* +1 for implicit deny all */
+    /* allocate PI entries */
+    list->num_entries = acl_row->n_cfg_aces + 1; /* +1 for implicit deny all */
     list->entries = xzalloc(list->num_entries * sizeof *list->entries);
-    for (int i = 0; i < n_sorted_aces; ++i) {
-        const struct db_ace *dbace = &sorted_aces[i];
+    for (int i = 0; i < acl_row->n_cfg_aces; ++i) {
         struct ops_cls_list_entry *entry = &list->entries[i];
 
-        if (!populate_entry_from_acl_entry(entry, dbace->acl_entry)) {
+        if (!populate_entry_from_acl_entry(entry,
+                                           acl_row->value_cfg_aces[i])) {
             /* VLOG_ERR already emitted */
             valid = false;
         }
     }
 
     /* add implicit deny all to end */
-    list->entries[n_sorted_aces].entry_actions.action_flags =
+    list->entries[acl_row->n_cfg_aces].entry_actions.action_flags =
         OPS_CLS_ACTION_DENY;
 
     if (!valid) {
@@ -234,7 +187,6 @@ ops_cls_list_new_from_acl(struct acl *acl)
         list = NULL;
     }
 
-    free(sorted_aces);
     return list;
 }
 
@@ -270,12 +222,12 @@ acl_type_from_string(const char *str)
 }
 
 /************************************************************
- * acl_new() and acl_delete() are low-level routines that deal with PI
+ * acl_create() and acl_delete() are low-level routines that deal with PI
  * acl data structures. They take care off all the memorary
  * management, hmap memberships, etc. They DO NOT make any PD calls.
  ************************************************************/
 static struct acl*
-acl_new(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
+acl_create(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
 {
     struct acl *acl = xzalloc(sizeof *acl);
     acl->uuid = ovsdb_row->header_.uuid;
@@ -360,16 +312,39 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
     ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_MSG, details); */
 }
 
+/**
+ * Update the in_progress column of a given acl row. This function is called
+ * from the run blocks when it is determined that ACL feature plugin needs
+ * to wait before writing ACL to hardware. This situation happens when
+ * cfg_aces != in_progress_aces and cfg_aces != cur_aces and
+ * in_progress_aces != 0
+ *
+ * @param[in] acl_row - Pointer to ovsdb acl record
+ */
 static void
-acl_update_internal(struct acl* acl)
+acl_update_in_progress_column(const struct ovsrec_acl *acl_row)
+{
+    /* Copy the cfg column contents into in_progress column */
+    for (int i = 0; i < acl_row->n_cfg_aces; i++) {
+        acl_row->key_in_progress_aces[i] = acl_row->key_cfg_aces[i];
+        acl_row->value_in_progress_aces[i] = acl_row->value_cfg_aces[i];
+    }
+
+    /* Set the acl cfg status to In progress */
+    acl_set_cfg_status(acl_row, ACL_CFG_STATE_IN_PROGRESS, OPS_CLS_STATUS_SUCCESS, NULL);
+}
+
+static void
+acl_cfg_update(struct acl* acl)
 {
     /* Always translate/validate user input, so we can fail early
      * on unsupported values */
-
     char details[256];
     char status_str[OPS_CLS_STATUS_MSG_MAX_LEN] = {0};
     unsigned int sequence_number = 0;
     struct ops_cls_list *list = ops_cls_list_new_from_acl(acl);
+
+    VLOG_DBG("ACL %s changed", acl->name);
     if (!list) {
         sprintf(details, "ACL %s -- unable to translate from ovsdb",
                 acl->name);
@@ -436,26 +411,6 @@ acl_update_internal(struct acl* acl)
  * acl_cfg_create(), acl_cfg_update(), acl_delete() are
  * the PI acl CRUD routines.
  ************************************************************/
-static struct acl*
-acl_cfg_create(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
-{
-    VLOG_DBG("ACL %s created", ovsdb_row->name);
-
-    struct acl *acl = acl_new(ovsdb_row, seqno);
-
-    /* TODO: Remove temporary processing of ACL:C like an ACL:U */
-    acl_update_internal(acl);
-
-    return acl;
-}
-
-static void
-acl_cfg_update(struct acl* acl)
-{
-    VLOG_DBG("ACL %s changed", acl->name);
-    acl_update_internal(acl);
-}
-
 static void
 acl_cfg_delete(struct acl* acl)
 {
@@ -468,53 +423,72 @@ acl_cfg_delete(struct acl* acl)
     acl_delete(acl);
 }
 
+/**
+ * Checks if there are changes in the ACL table
+ *
+ * @param[in] idl       - Pointer to the ovsdb idl
+ * @param[in] idl_seqno - Current idl sequence number
+ * @param[in] acl_row   - Pointer to the first row in ACL table
+ * @param[out] acls_created - Set to true if any ACL was created
+ * @param[out] acls_updated - Set to true if any ACL was updated
+ * @param[out] acls_deleted - Set to true if any ACL was deleted
+ */
+static void
+acl_is_table_changed(struct ovsdb_idl *idl, unsigned int idl_seqno,
+                     const struct ovsrec_acl *acl_row, bool *acls_created,
+                     bool *acls_updated, bool *acls_deleted)
+{
+    bool have_acls = !hmap_is_empty(&all_acls_by_uuid);
+
+    if (acl_row) {
+        /* Quick check for ACL table changes */
+        *acls_created = OVSREC_IDL_ANY_TABLE_ROWS_INSERTED(acl_row, idl_seqno);
+        *acls_updated = OVSREC_IDL_ANY_TABLE_ROWS_MODIFIED(acl_row, idl_seqno);
+
+        /* We only care about acls_deleted if we already have some acls. */
+        *acls_deleted = have_acls &&
+            OVSREC_IDL_ANY_TABLE_ROWS_DELETED(acl_row, idl_seqno);
+    } else {
+        /* There are no ACL rows in OVSDB. */
+        *acls_created = false;
+        *acls_updated = false;
+        *acls_deleted = have_acls;
+    }
+}
+
 /************************************************************
  * Top level routine to check if ACLs need to reconfigure
  ************************************************************/
 void
-acl_reconfigure_init(struct blk_params *blk_params)
+acl_callback_reconfigure_init(struct blk_params *blk_params)
 {
-    /* Quick check for ACL table changes */
     bool acls_created;
     bool acls_updated;
     bool acls_deleted;
     struct ovsdb_idl *idl;
     unsigned int idl_seqno;
-    bool have_acls = !hmap_is_empty(&all_acls_by_uuid);
-
-    VLOG_INFO("[%s] - acl_reconfigure_init called", ACL_PLUGIN_NAME);
 
     /* Get idl and idl_seqno to work with */
     idl = blk_params->idl;
     idl_seqno = blk_params->idl_seqno;
 
+    /* Get the first row from ACL table */
     const struct ovsrec_acl *acl_row = ovsrec_acl_first(idl);
-    if (acl_row) {
-        acls_created = OVSREC_IDL_ANY_TABLE_ROWS_INSERTED(acl_row, idl_seqno);
-        acls_updated = OVSREC_IDL_ANY_TABLE_ROWS_MODIFIED(acl_row, idl_seqno);
+    acl_is_table_changed(idl, idl_seqno, acl_row, &acls_created, &acls_updated,
+                         &acls_deleted);
 
-        /* We only care about acls_deleted if we already have some acls. */
-        acls_deleted = have_acls &&
-            OVSREC_IDL_ANY_TABLE_ROWS_DELETED(acl_row, idl_seqno);
-    } else {
-        /* There are no ACL rows in OVSDB. */
-        acls_created = false;
-        acls_updated = false;
-        acls_deleted = have_acls;
-    }
-
-    /* Check if we need to process any ACL:[CU]
-     *   - ACL:C will show up as acls_created
-     *   - ACL:U might not exist outside ACE:[CD]. Can an ACL's name or type
-     *     be changed?
-     * We also have to traverse if acls_deleted in order to mark/sweep.
+    /* If a row is inserted, a new ACL is created. ACEs will be updated
+     * only if cfg_aces == in_progress_aces.
      */
-    if (acls_created || acls_updated || acls_deleted) {
+     if (acls_created || acls_updated || acls_deleted) {
         const struct ovsrec_acl *acl_row_next;
         OVSREC_ACL_FOR_EACH_SAFE(acl_row, acl_row_next, idl) {
             struct acl *acl = acl_lookup_by_uuid(&acl_row->header_.uuid);
             if (!acl) {
-                acl = acl_cfg_create(acl_row, idl_seqno);
+                /* Create an ACL. There should be zero ACEs in this ACL.
+                 * The only exception is the init time and is handled
+                 * separately */
+                 acl = acl_create(acl_row, idl_seqno);
             } else {
                 /* Always update these, even if nothing else has changed,
                  * The ovsdb_row may have changed out from under us.
@@ -523,13 +497,32 @@ acl_reconfigure_init(struct blk_params *blk_params)
                 acl->ovsdb_row = acl_row;
                 acl->delete_seqno = idl_seqno;
 
-                /* Check if this is an ACL:[CU] */
+                /* Check if this is an ACL:[CU]. Normally, this case would
+                 * just be a ACL:[U]. However, there is a case of OVSDB
+                 * reconnected that can result in a ACL:[C].
+                 * @TODO: check what action needs to be taken on a ACL:[C]
+                 */
                 bool row_changed =
                     (OVSREC_IDL_IS_ROW_MODIFIED(acl_row, idl_seqno) ||
                      OVSREC_IDL_IS_ROW_INSERTED(acl_row, idl_seqno));
 
+                bool push_config = true;
                 if (row_changed) {
-                    acl_cfg_update(acl);
+                    /* Update ACL config. Program hardware only if cfg_aces ==
+                     * in_progress_aces
+                     */
+                    if (acl_row->n_cfg_aces == acl_row->n_in_progress_aces) {
+                        for (int i = 0; i < acl_row->n_cfg_aces; i++) {
+                            if (acl_row->value_cfg_aces[i] !=
+                                acl_row->value_in_progress_aces[i]) {
+                                push_config = false;
+                                break;
+                            }
+                        }
+                        if (push_config) {
+                            acl_cfg_update(acl);
+                        }
+                    }
                 }
             }
         }
@@ -545,6 +538,53 @@ acl_reconfigure_init(struct blk_params *blk_params)
                 /* TODO: After we use Change objects, move the
                  *       ACL:D handling to before ACL:[CU] */
                 acl_cfg_delete(acl);
+            }
+        }
+    }
+}
+
+void
+acl_callback_run_complete(struct run_blk_params *blk_params)
+{
+    bool acls_created;
+    bool acls_updated;
+    bool acls_deleted;
+    struct ovsdb_idl_txn *txn;
+    bool in_progress_update_required = false;
+
+    /* Get the first row from ACL table */
+    const struct ovsrec_acl *acl_row = ovsrec_acl_first(blk_params->idl);
+    acl_is_table_changed(blk_params->idl, blk_params->idl_seqno, acl_row,
+                         &acls_created, &acls_updated, &acls_deleted);
+    if (acls_created || acls_updated || acls_deleted) {
+        const struct ovsrec_acl *acl_row_next;
+        OVSREC_ACL_FOR_EACH_SAFE(acl_row, acl_row_next, blk_params->idl) {
+            if (OVSREC_IDL_IS_ROW_MODIFIED(acl_row, blk_params->idl_seqno) ||
+                OVSREC_IDL_IS_ROW_INSERTED(acl_row, blk_params->idl_seqno)) {
+                if (acl_row->n_in_progress_aces == 0 ||
+                    acl_row->n_cfg_aces != acl_row->n_in_progress_aces) {
+                    if (acl_row->n_cfg_aces == acl_row->n_cur_aces) {
+                        for (int i = 0; i < acl_row->n_cfg_aces; i++) {
+                            if (acl_row->key_cfg_aces[i]   !=
+                                acl_row->key_cur_aces[i]   ||
+                                acl_row->value_cfg_aces[i] !=
+                                acl_row->value_cfg_aces[i]) {
+                                in_progress_update_required = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        in_progress_update_required = true;
+                    }
+                    if (in_progress_update_required) {
+                        struct acl *acl = acl_lookup_by_uuid(
+                                                 &acl_row->header_.uuid);
+                        txn = ovsdb_idl_txn_create(blk_params->idl);
+                        acl_update_in_progress_column(acl->ovsdb_row);
+                        ovsdb_idl_txn_commit(txn);
+                        ovsdb_idl_txn_destroy(txn);
+                    }
+                }
             }
         }
     }

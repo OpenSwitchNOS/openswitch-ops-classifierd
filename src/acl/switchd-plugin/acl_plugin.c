@@ -36,7 +36,8 @@ int init (int phase_id)
     register_reconfigure_callback(&acl_callback_bridge_init, BLK_BRIDGE_INIT,
                                   NO_PRIORITY);
     VLOG_INFO("[%s] - Registering BLK_INIT_RECONFIGURE", ACL_PLUGIN_NAME);
-    register_reconfigure_callback(&acl_reconfigure_init, BLK_INIT_RECONFIGURE,
+    register_reconfigure_callback(&acl_callback_reconfigure_init,
+                                  BLK_INIT_RECONFIGURE,
                                   NO_PRIORITY);
     VLOG_INFO("[%s] - Registering BLK_BR_DELETE_PORTS", ACL_PLUGIN_NAME);
     register_reconfigure_callback(&acl_callback_port_delete,
@@ -57,6 +58,10 @@ int init (int phase_id)
     register_reconfigure_callback(&acl_callback_port_update,
                                   BLK_VRF_PORT_UPDATE, NO_PRIORITY);
 
+    VLOG_INFO("[%s] - Registering BLK_RUN_COMPLETE", ACL_PLUGIN_NAME);
+    register_run_callback(&acl_callback_run_complete, BLK_RUN_COMPLETE,
+                          NO_PRIORITY);
+
     return 0;
 }
 
@@ -74,7 +79,7 @@ int wait(void)
 
 int destroy(void)
 {
-    unregister_plugin_extension("ACL_PLUGIN");
+    unregister_plugin_extension(ACL_PLUGIN_NAME);
     VLOG_DBG("ACL_PLUGIN was destroyed");
     return 0;
 }

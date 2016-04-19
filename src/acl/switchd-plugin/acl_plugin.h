@@ -18,6 +18,7 @@
 #define __ACL_PLUGIN_H_  1
 
 #include "reconfigure-blocks.h"
+#include "run-blocks.h"
 
 
 #define ACL_PLUGIN_NAME "acl"  /**< ACL feature plugin name */
@@ -33,10 +34,29 @@
 void acl_callback_bridge_init(struct blk_params *blk_params);
 
 /**
+ * Bridge reconfigure callback for BRIDGE_RECONFIGURE_INIT block.
+ * This function checks for any modifications to ACL table on each
+ * bridge reconfigure. If there are modifications, relevant changes
+ * are made to PI data structures and ASIC layer is programmed if
+ * necessary
+ *
+ * @param[in] blk_params - Pointer to block parameter structure
+ */
+void acl_callback_reconfigure_init(struct blk_params *blk_params);
+
+/**
  * Initialize ofproto layer for ACL feature plugin. This function
  * finds the relevant OPS_CLS plugin extension so the feature plugin
  * can make calls into the asic plugin when required.
  */
 void acl_ofproto_init();
+
+/**
+ * Bridge run callback. This function updates the in_progress column of an ACL
+ * if needed.
+ *
+ * @param[in] blk_params - Pointer top the block parameter structure
+ */
+void acl_callback_run_complete(struct run_blk_params *blk_params);
 
 #endif
