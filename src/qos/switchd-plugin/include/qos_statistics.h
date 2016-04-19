@@ -15,15 +15,21 @@
  *
  ***************************************************************************/
 
-#ifndef _QOS_MAP_H_
-#define _QOS_MAP_H_
+#ifndef _QOS_STATISTICS_H_
+#define _QOS_STATISTICS_H_
 
-#include "vswitch-idl.h"
-#include "ofproto/ofproto-provider.h"
+#include "stats-blocks.h"
 
-void qos_configure_global_cos_map(struct ofproto *,
-                                  struct ovsdb_idl *, unsigned int);
-void qos_configure_global_dscp_map(struct ofproto *,
-                                   struct ovsdb_idl *, unsigned int);
+#include "netdev.h"
 
-#endif /* _QOS_MAP_H_ */
+void populate_bridge_queue_stats_callback (unsigned int queue_id,
+                                           struct netdev_queue_stats* stats,
+                                           void *aux);
+void qos_callback_statistics_netdev(struct stats_blk_params *, enum stats_block_id);
+void qos_callback_statistics_create_netdev(struct stats_blk_params *sblk,
+                                           enum stats_block_id blk_id);
+#ifdef QOS_STATS_DEBUG
+void qos_callback_statistics_default(struct stats_blk_params *, enum stats_block_id);
+#endif
+
+#endif /* _QOS_STATISTICS_H_ */
