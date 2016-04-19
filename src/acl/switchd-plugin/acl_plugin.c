@@ -56,6 +56,10 @@ int init (int phase_id)
     register_reconfigure_callback(&acl_callback_port_update,
                                   BLK_VRF_PORT_UPDATE, NO_PRIORITY);
 
+    VLOG_INFO("[%s] - Registering BLK_RUN_COMPLETE", ACL_PLUGIN_NAME);
+    register_run_callback(&acl_callback_run_complete, BLK_RUN_COMPLETE,
+                          NO_PRIORITY);
+
     return 0;
 }
 

@@ -18,6 +18,7 @@
 #define __ACL_PLUGIN_H_  1
 
 #include "reconfigure-blocks.h"
+#include "run-blocks.h"
 
 
 #define ACL_PLUGIN_NAME "acl"  /**< ACL feature plugin name */
@@ -38,5 +39,13 @@ void acl_callback_bridge_init(struct blk_params *blk_params);
  * can make calls into the asic plugin when required.
  */
 void acl_ofproto_init();
+
+/**
+ * Bridge run callback. This function updates the in_progress column of an ACL
+ * if needed.
+ *
+ * @param[in] blk_params - Pointer top the block parameter structure
+ */
+void acl_callback_run_complete(struct run_blk_params *blk_params);
 
 #endif
