@@ -1,0 +1,26 @@
+Adding exceptions
+When a commands fails (the shells gets output in a non-show command) the library will try to determine the failure to raise a typed exception. To do so, it has to know what kind of errors the command may show. For example:
+# asd aaa
+% Unknown command
+In the above scenario, we can identify this error using a regular expression that will match the unknown command output. To specify a new typed exception edit the file tools/vtysh_meta.py and modify the VTYSH_EXCEPTIONS_SPEC dictionary mapping the name of the new exception and a list of regular expressions for that error that will be used to try to identify the output of a command:
+), (
+    'IncompleteCommandException',
+    [
+        'Command incomplete',
+    ]
+)
+
+To add a new command to the library, a developer needs to:
+1.  Find if the context for the command is already defined on the dictionary.
+2.  If it is not defined, it has to be added.
+3.  Define the new command inside commands on the correct context.
+4.  Execute the generator script. To do this:
+i.  Go to the topology_lib_vtysh root folder.
+ii. Run tox to validate the script and prepare the py34 environment.
+iii.Run source .tox/py34/bin/activate.
+iv. Run ./tools/updatelib.
+v.  Run deactivate.
+
+Scapy library functions are in https://github.com/HPENetworking/topology_lib_scapy.git.
+
+requirements.txt has details of the working topology.
