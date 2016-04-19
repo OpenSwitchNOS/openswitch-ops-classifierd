@@ -999,7 +999,7 @@ cli_create_update_ace (const char *acl_type,
         }
     }
     if (ace_ip_protocol) {
-        if (protocol_is_number(ace_ip_protocol)) {
+        if (str_is_numeric(ace_ip_protocol)) {
             protocol_num = strtoll(ace_ip_protocol, NULL, 0);
         } else {
             protocol_num = protocol_get_number_from_name(ace_ip_protocol);
@@ -1007,8 +1007,10 @@ cli_create_update_ace (const char *acl_type,
         ovsrec_acl_entry_set_protocol(ace_row, &protocol_num, 1);
     }
     if (ace_source_ip_address) {
-        /** @todo conversion into A.B.C.D/W.X.Y.Z */
-        ovsrec_acl_entry_set_src_ip(ace_row, ace_source_ip_address);
+        /* IPv4 address, '/', netmask, NULL */
+        char normalized_str[INET_ADDRSTRLEN*2];
+        acl_ipv4_address_user_to_normalized(ace_source_ip_address, normalized_str);
+        ovsrec_acl_entry_set_src_ip(ace_row, normalized_str);
     }
     if (ace_source_port_operator) {
         if (!strcmp(ace_source_port_operator, "eq")) {
@@ -1054,8 +1056,10 @@ cli_create_update_ace (const char *acl_type,
         }
     }
     if (ace_destination_ip_address) {
-        /** @todo conversion into A.B.C.D/W.X.Y.Z */
-        ovsrec_acl_entry_set_dst_ip(ace_row, ace_destination_ip_address);
+        /* IPv4 address, '/', netmask, NULL */
+        char normalized_str[INET_ADDRSTRLEN*2];
+        acl_ipv4_address_user_to_normalized(ace_destination_ip_address, normalized_str);
+        ovsrec_acl_entry_set_dst_ip(ace_row, normalized_str);
     }
     if (ace_destination_port_operator) {
         if (!strcmp(ace_destination_port_operator, "eq")) {

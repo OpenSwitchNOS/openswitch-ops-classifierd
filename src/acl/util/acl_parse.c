@@ -62,19 +62,19 @@ protocol_get_name_from_number(uint8_t proto_number)
 }
 
 bool
-protocol_is_number(const char *in_proto)
+str_is_numeric(const char *in_str)
 {
     /* Null check. May not be necessary here */
-    if (!*in_proto) {
+    if (!*in_str) {
         return false;
     }
 
     /* Check if every character in the string is a digit */
-    while (*in_proto) {
-        if (!isdigit(*in_proto)) {
+    while (*in_str) {
+        if (!isdigit(*in_str)) {
             return false;
         }
-        ++in_proto;
+        ++in_str;
     }
 
     return true;
@@ -138,6 +138,70 @@ ipv4_mask_create(uint8_t prefix_len)
      *  1 -> 0b10000000 00000000 00000000 00000000
      */
     return prefix_len ? htonl(~((0x1u << (32 - prefix_len)) - 1)) : 0;
+}
+
+bool
+acl_ipv4_address_user_to_normalized(const char *user_str, char *normalized_str)
+{
+    char addr_str[INET_ADDRSTRLEN*2];
+    char *slash_ptr;
+    char *mask_substr = NULL;
+    struct in_addr v4_addr;
+    struct in_addr v4_mask;
+    int addr_str_len;
+    uint8_t prefix_len;
+
+    if (!strcmp(user_str, "any")) {
+        return NULL;
+    }
+
+    /* Get a copy of the string we can do destructive things to */
+    memcpy(addr_str, user_str, INET_ADDRSTRLEN*2);
+
+    /* Find the slash character (if any) */
+    slash_ptr = strchr(addr_str, '/');
+    if (slash_ptr) {
+        slash_ptr[0] = '\0';
+        mask_substr = &slash_ptr[1];
+    }
+    /* Normalize via standard library calls */
+    if (!inet_pton(AF_INET, addr_str, &v4_addr)) {
+        VLOG_ERR("Invalid IPv4 address string %s", addr_str);
+        return false;
+    }
+    if (!inet_ntop(AF_INET, &v4_addr, normalized_str, INET_ADDRSTRLEN)) {
+        VLOG_ERR("Invalid IPv4 address value %s", addr_str);
+        return false;
+    }
+    /* Process subnet mask (either prefix length or dotted-decimal notation) */
+    if (mask_substr) {
+        /* Prefix length */
+        if (str_is_numeric(mask_substr)) {
+            prefix_len = strtoul(mask_substr, NULL, 0);
+            if (prefix_len > 32) {
+                VLOG_ERR("Invalid IPv4 prefix length %d", prefix_len);
+                return false;
+            }
+            /* Set the mask based on the prefix_len */
+            v4_mask.s_addr = ipv4_mask_create(prefix_len);
+        /* Dotted-decimal */
+        } else {
+            /* Normalize via standard library call */
+            if (!inet_pton(AF_INET, mask_substr, &v4_mask)) {
+                VLOG_ERR("Invalid IPv4 dotted-decimal mask %s", mask_substr);
+                return false;
+            }
+        }
+        /* Add '/' after address and append dotted-decimal netmask */
+        addr_str_len = strlen(normalized_str);
+        normalized_str[addr_str_len] = '/';
+        /* Normalize via standard library call */
+        if (!inet_ntop(AF_INET, &v4_mask, &normalized_str[addr_str_len+1], INET_ADDRSTRLEN)) {
+            VLOG_ERR("Invalid IPv4 mask %s", mask_substr);
+            return false;
+        }
+    }
+    return true;
 }
 
 bool
@@ -212,7 +276,7 @@ acl_parse_protocol(const char *in_proto,
         *flags |= flag;
 
         /* Check if the protocol is a number */
-        if (protocol_is_number(in_proto)) {
+        if (str_is_numeric(in_proto)) {
             *proto = strtoul(in_proto, NULL, 10);
         } else {
             /* Protocol is a name. Map it to the correct protocol number */

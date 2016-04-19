@@ -63,13 +63,13 @@ bool acl_parse_l4_operator(const char *in_op,
 uint8_t protocol_get_number_from_name(const char *in_proto);
 
 /**
- * Determine if a protocol string is numeric or not
+ * Determine if a string is numeric or not
  *
- * @param  in_proto String as provided by user interface (e.g. CLI)
+ * @param  in_str  String to test for numeric contents
  *
- * @return          true if string is numeric, false otherwise
+ * @return         true if string is numeric, false otherwise
  */
-bool protocol_is_number(const char *in_proto);
+bool str_is_numeric(const char *in_str);
 
 /**
  * Get all-lowercase string token for a given IP protocol number
@@ -79,5 +79,16 @@ bool protocol_is_number(const char *in_proto);
  * @return              String protocol name (may be numeric if no name)
  */
 const char * protocol_get_name_from_number(uint8_t proto_number);
+
+/**
+ * Normalize user-input (e.g. "any", "A.B.C.D", "A.B.C.D/M", "A.B.C.D/W.X.Y.Z")
+ * string into database-format string (always "A.B.C.D/W.X.Y.Z")
+ *
+ * @param  user_str       User-input string formatted as accepted by CLI
+ * @param  normalized_str Database string formatted as stored internally
+ *
+ * @return                true on success, false on failure
+ */
+bool acl_ipv4_address_user_to_normalized(const char *user_str, char *normalized_str);
 
 #endif  /* __SWITCHD__PLUGIN__ACL_PARSE_H__ */
