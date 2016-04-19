@@ -51,19 +51,19 @@ static void token_print(int i, char * token)
             vty_out(vty, "\t  %s    %11s\n", "burst size (pkts):", token);
             break;
         case 3:
-            vty_out(vty, "\t  %s    %14s\n\n", "local_priority:", token);
+            vty_out(vty, "\t  %s    %14s\n\n", "local priority:", token);
             break;
         case 4:
-            vty_out(vty, "\t  %s    %14s\t", "packets_passed:", token);
+            vty_out(vty, "\t  %s    %14s\t", "packets passed:", token);
             break;
         case 5:
-            vty_out(vty, "   %s    %14s\n", "bytes_passed:", token);
+            vty_out(vty, "   %s    %13s\n", "bytes passed:", token);
             break;
         case 6:
-            vty_out(vty, "\t  %s    %13s\t", "packets_dropped:", token);
+            vty_out(vty, "\t  %s    %13s\t", "packets dropped:", token);
             break;
         case 7:
-            vty_out(vty, "   %s    %13s\n\n\n", "bytes_dropped:", token);
+            vty_out(vty, "   %s    %13s\n\n\n", "bytes dropped:", token);
             break;
         default:
             printf("ERROR");
