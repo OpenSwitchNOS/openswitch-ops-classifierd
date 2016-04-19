@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __SWITCHD__PLUGIN__ACL_PARSE_H__
-#define __SWITCHD__PLUGIN__ACL_PARSE_H__ 1
+#ifndef __OPS_CLS_ACL_PARSE_H__
+#define __OPS_CLS_ACL_PARSE_H__ 1
 
 #include <stdlib.h>
 #include <ctype.h>
@@ -33,7 +33,6 @@
 #define ACL_PROTOCOL_SCTP    132
 #define ACL_PROTOCOL_INVALID 255
 
-in_addr_t ipv4_mask_create(uint8_t prefix_len);
 bool acl_parse_ipv4_address(const char *in_address,
                             enum ops_cls_list_entry_flags flag,
                             uint32_t *flags,
@@ -54,22 +53,22 @@ bool acl_parse_l4_operator(const char *in_op,
                            enum ops_cls_L4_operator *op);
 
 /**
+ * Determine if a string is numeric or not
+ *
+ * @param  in_str  String to test for numeric contents
+ *
+ * @return         true if string is numeric, false otherwise
+ */
+bool acl_parse_str_is_numeric(const char *in_str);
+
+/**
  * Get numeric IP protocol number from an all-lowercase string
  *
  * @param  in_proto String as provided by user interface (e.g. CLI)
  *
  * @return          Numeric protocol number or 255 on error
  */
-uint8_t protocol_get_number_from_name(const char *in_proto);
-
-/**
- * Determine if a protocol string is numeric or not
- *
- * @param  in_proto String as provided by user interface (e.g. CLI)
- *
- * @return          true if string is numeric, false otherwise
- */
-bool protocol_is_number(const char *in_proto);
+uint8_t acl_parse_protocol_get_number_from_name(const char *in_proto);
 
 /**
  * Get all-lowercase string token for a given IP protocol number
@@ -78,6 +77,30 @@ bool protocol_is_number(const char *in_proto);
  *
  * @return              String protocol name (may be numeric if no name)
  */
-const char * protocol_get_name_from_number(uint8_t proto_number);
+const char *acl_parse_protocol_get_name_from_number(uint8_t proto_number);
 
-#endif  /* __SWITCHD__PLUGIN__ACL_PARSE_H__ */
+/**
+ * Translate a user-input string into a database-format string
+ *
+ * @param[in]  user_str       User string formatted "any", "A.B.C.D",
+ *                            "A.B.C.D/M", "A.B.C.D/W.X.Y.Z".
+ * @param[out] normalized_str Database string formatted "A.B.C.D/W.X.Y.Z".
+ *                            Must be allocated with length INET_ADDRSTRLEN*2.
+ *
+ * @return                    true on success, false on failure
+ */
+bool acl_ipv4_address_user_to_normalized(const char *user_str, char *normalized_str);
+
+/**
+ * Translate a database-format string into a user-input string
+ *
+ * @param[in]  normalized_str Database string formatted "A.B.C.D/W.X.Y.Z".
+ * @param[out] user_str       User string formatted "any", "A.B.C.D",
+ *                            "A.B.C.D/M", "A.B.C.D/W.X.Y.Z".
+ *                            Must be allocated with length INET_ADDRSTRLEN*2.
+ *
+ * @return                    true on success, false on failure
+ */
+bool acl_ipv4_address_normalized_to_user(const char *normalized_str, char *user_str);
+
+#endif  /* __OPS_CLS_ACL_PARSE_H__ */

@@ -19,6 +19,49 @@
 
 VLOG_DEFINE_THIS_MODULE(acl_parse);
 
+static in_addr_t
+ipv4_mask_create(uint8_t prefix_len)
+{
+    /* bit twiddling ideas from:
+     * http://stackoverflow.com/questions/20263860/ipv4-prefix-length-to-netmask
+     *
+     *          1 << (32 - prefix_len)
+     * 32 -> 0b00000000 00000000 00000000 00000001
+     * 24 -> 0b00000000 00000000 00000001 00000000
+     *  1 -> 0b10000000 00000000 00000000 00000000
+     *
+     *          (1 << (32 - prefix_len)) - 1
+     * 32 -> 0b00000000 00000000 00000000 00000000
+     * 24 -> 0b00000000 00000000 00000000 11111111
+     *  1 -> 0b01111111 11111111 11111111 11111111
+     *
+     *        ~((1 << (32 - prefix_len)) - 1)
+     * 32 -> 0b11111111 11111111 11111111 11111111
+     * 24 -> 0b11111111 11111111 11111111 00000000
+     *  1 -> 0b10000000 00000000 00000000 00000000
+     */
+    return prefix_len ? htonl(~((0x1u << (32 - prefix_len)) - 1)) : 0;
+}
+
+bool
+acl_parse_str_is_numeric(const char *in_str)
+{
+    /* Null check. May not be necessary here */
+    if (!*in_str) {
+        return false;
+    }
+
+    /* Check if every character in the string is a digit */
+    while (*in_str) {
+        if (!isdigit(*in_str)) {
+            return false;
+        }
+        ++in_str;
+    }
+
+    return true;
+}
+
 /** Static map of protocols whose string names are supported */
 static const char * const protocol_names[] = {
        "0", "icmp", "igmp",    "3",    "4",    "5",  "tcp",    "7",
@@ -55,33 +98,8 @@ static const char * const protocol_names[] = {
      "248",  "249",  "250",  "251",  "252",  "253",  "254",  "255"
 };
 
-const char *
-protocol_get_name_from_number(uint8_t proto_number)
-{
-    return protocol_names[proto_number];
-}
-
-bool
-protocol_is_number(const char *in_proto)
-{
-    /* Null check. May not be necessary here */
-    if (!*in_proto) {
-        return false;
-    }
-
-    /* Check if every character in the string is a digit */
-    while (*in_proto) {
-        if (!isdigit(*in_proto)) {
-            return false;
-        }
-        ++in_proto;
-    }
-
-    return true;
-}
-
 uint8_t
-protocol_get_number_from_name(const char *in_proto)
+acl_parse_protocol_get_number_from_name(const char *in_proto)
 {
     uint8_t protocol = ACL_PROTOCOL_INVALID;
 
@@ -116,85 +134,133 @@ protocol_get_number_from_name(const char *in_proto)
     return protocol;
 }
 
-in_addr_t
-ipv4_mask_create(uint8_t prefix_len)
+const char *
+acl_parse_protocol_get_name_from_number(uint8_t proto_number)
 {
-    /* bit twiddling ideas from:
-     * http://stackoverflow.com/questions/20263860/ipv4-prefix-length-to-netmask
-     *
-     *          1 << (32 - prefix_len)
-     * 32 -> 0b00000000 00000000 00000000 00000001
-     * 24 -> 0b00000000 00000000 00000001 00000000
-     *  1 -> 0b10000000 00000000 00000000 00000000
-     *
-     *          (1 << (32 - prefix_len)) - 1
-     * 32 -> 0b00000000 00000000 00000000 00000000
-     * 24 -> 0b00000000 00000000 00000000 11111111
-     *  1 -> 0b01111111 11111111 11111111 11111111
-     *
-     *        ~((1 << (32 - prefix_len)) - 1)
-     * 32 -> 0b11111111 11111111 11111111 11111111
-     * 24 -> 0b11111111 11111111 11111111 00000000
-     *  1 -> 0b10000000 00000000 00000000 00000000
-     */
-    return prefix_len ? htonl(~((0x1u << (32 - prefix_len)) - 1)) : 0;
+    return protocol_names[proto_number];
+}
+
+bool
+acl_ipv4_address_user_to_normalized(const char *user_str, char *normalized_str)
+{
+    char *slash_ptr;
+    char *mask_substr = NULL;
+    struct in_addr v4_mask;
+    uint8_t prefix_len;
+
+    /* Special case of "any" can return early */
+    if (!strcmp(user_str, "any")) {
+        strcpy(normalized_str, "0.0.0.0/0.0.0.0");
+        return true;
+    }
+
+    /* Find the slash character (if any) in input */
+    slash_ptr = strchr(user_str, '/');
+    /* If no mask is given, set host mask (/32) */
+    if (!slash_ptr) {
+        strcpy(normalized_str, user_str);
+        strcat(normalized_str, "/255.255.255.255");
+        return true;
+    }
+
+    mask_substr = &slash_ptr[1];
+
+    /* Check if mask is in prefix-length notation */
+    if (acl_parse_str_is_numeric(mask_substr)) {
+        prefix_len = strtoul(mask_substr, NULL, 0);
+        if (prefix_len > 32) {
+            VLOG_ERR("Invalid IPv4 prefix length %d", prefix_len);
+            return false;
+        }
+        /* Calculate the mask using the prefix length */
+        v4_mask.s_addr = ipv4_mask_create(prefix_len);
+        /* Copy the address as-is */
+        strncpy(normalized_str, user_str, slash_ptr - user_str);
+        /* Add '/' after address */
+        normalized_str[slash_ptr - user_str] = '/';
+        /* Convert calculated mask back into string format */
+        if (!inet_ntop(AF_INET, &v4_mask, &normalized_str[slash_ptr - user_str + 1], INET_ADDRSTRLEN)) {
+            VLOG_ERR("Invalid IPv4 mask value %s", mask_substr);
+            return false;
+        }
+        return true;
+    }
+
+    /* For dotted-decimal mask, just copy the whole string as-is */
+    strcpy(normalized_str, user_str);
+    return true;
+}
+
+bool
+acl_ipv4_address_normalized_to_user(const char *normalized_str, char *user_str)
+{
+    char *slash_ptr;
+    char *mask_substr = NULL;
+
+    /* Special case of "any" can return early */
+    if (!strcmp(normalized_str, "0.0.0.0/0.0.0.0")) {
+        strcpy(user_str, "any");
+        return true;
+    }
+
+    /* Find the slash character (if any) in input */
+    slash_ptr = strchr(normalized_str, '/');
+    if (!slash_ptr) {
+        VLOG_ERR("Invalid IPv4 address string %s: expectd 'A.B.C.D/W.X.Y.Z'", normalized_str);
+        return false;
+    }
+
+    mask_substr = &slash_ptr[1];
+
+    /* Check to see if we have a host mask (/32) */
+    if (!strcmp(mask_substr, "255.255.255.255")) {
+        strncpy(user_str, normalized_str, slash_ptr - normalized_str);
+        return true;
+    }
+
+    /** @todo check for ability to show in prefix-length notation (e.g. /24) */
+
+    /* Otherwise just copy the whole string as-is */
+    strcpy(user_str, normalized_str);
+    return true;
 }
 
 bool
 acl_parse_ipv4_address(const char *in_address,
-                   enum ops_cls_list_entry_flags flag,
-                   uint32_t *flags,
-                   struct in_addr *v4_addr,
-                   struct in_addr *v4_mask,
-                   enum ops_cls_addr_family *family)
+                       enum ops_cls_list_entry_flags flag,
+                       uint32_t *flags,
+                       struct in_addr *v4_addr,
+                       struct in_addr *v4_mask,
+                       enum ops_cls_addr_family *family)
 {
-    /* TODO: support more formats
-     *   - For now only support x.x.x.x and x.x.x.x/d
-     */
-    if (!strcmp(in_address, "any")) {
-        /* we leave zero'd fields alone for "any" */
+    char tmp_str[INET_ADDRSTRLEN*2]; /* Fits address, '/', mask, and NULL */
+    char *slash_ptr;
+    char *mask_substr = NULL;
+
+    *flags |= flag;
+    *family = OPS_CLS_AF_INET;
+
+    /* Get a copy of the string we can do destructive things to */
+    strncpy(tmp_str, in_address, INET_ADDRSTRLEN*2);
+
+    /* Find the slash character (if any) in input */
+    slash_ptr = strchr(tmp_str, '/');
+    if (slash_ptr) {
+        slash_ptr[0] = '\0'; /* Replace slash with NULL to split strings */
+        mask_substr = &slash_ptr[1]; /* Point to mask string for parsing */
     } else {
-        *flags |= flag;
-        *family = OPS_CLS_AF_INET;
+        VLOG_ERR("Invalid IPv4 address string %s: expectd 'A.B.C.D/W.X.Y.Z'", tmp_str);
+        return false;
+    }
 
-        /* see if we have the 10.0.0.1/24 format */
-        char *copy_address = NULL;
-        const char *hstr;
-        char *pstr = strchr(in_address, '/');
-        const uint8_t max_prefix_len = 32;
-        int prefix_len;
-        if (pstr) {
-            /* make a copy we can munge */
-            copy_address = xstrdup(in_address);
-            pstr = copy_address + (pstr - in_address);
-            hstr = copy_address;
+    if (!inet_pton(AF_INET, tmp_str, v4_addr)) {
+        VLOG_ERR("Invalid IPv4 address %s in DB", tmp_str);
+        return false;
+    }
 
-            *pstr++ = '\0'; /* overwrite '/' to terminate hstr */
-            prefix_len = atoi(pstr);
-            if (prefix_len > max_prefix_len) {
-                VLOG_ERR("Bad prefixlen %d > %d", prefix_len, max_prefix_len);
-                free(copy_address);
-                return false;
-            }
-        } else {
-            /* plain hostname, just work off original in_address */
-            hstr = in_address;
-
-            prefix_len = max_prefix_len;
-        }
-
-        /* Set the mask based on the prefix_len */
-        v4_mask->s_addr = ipv4_mask_create(prefix_len);
-
-        /* parse the actual address part */
-        if (inet_pton(AF_INET, hstr, v4_addr) == 0) {
-            VLOG_ERR("Invalid ip address %s", in_address);
-            free(copy_address);
-            return false;
-        }
-
-        free(copy_address);
-
+    if (!inet_pton(AF_INET, mask_substr, v4_mask)) {
+        VLOG_ERR("Invalid IPv4 mask %s in DB", mask_substr);
+        return false;
     }
 
     return true;
@@ -212,11 +278,11 @@ acl_parse_protocol(const char *in_proto,
         *flags |= flag;
 
         /* Check if the protocol is a number */
-        if (protocol_is_number(in_proto)) {
+        if (acl_parse_str_is_numeric(in_proto)) {
             *proto = strtoul(in_proto, NULL, 10);
         } else {
             /* Protocol is a name. Map it to the correct protocol number */
-            *proto = protocol_get_number_from_name(in_proto);
+            *proto = acl_parse_protocol_get_number_from_name(in_proto);
             if (*proto == ACL_PROTOCOL_INVALID)
             {
                 VLOG_ERR("Invalid protocol %s", in_proto);
