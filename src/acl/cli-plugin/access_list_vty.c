@@ -384,13 +384,15 @@ acl_audit_log(char *aubuf, int command_result)
  *
  * @param dstring      Pointer to initialized dynamic string
  * @param address_str  Pointer to IP address string
- *
- * @todo conversion from A.B.C.D/W.X.Y.Z into "any", host, and prefix
  */
 static void
 ace_entry_ip_address_config_to_ds(struct ds *dstring, char *address_str)
 {
-    ds_put_format(dstring, "%s ", address_str);
+    char user_str[INET_ADDRSTRLEN*2];
+    if(acl_ipv4_address_normalized_to_user(address_str, user_str))
+    {
+        ds_put_format(dstring, "%s ", user_str);
+    }
 }
 
 /**
@@ -438,7 +440,7 @@ ace_entry_config_to_string(const int64_t sequence_num,
     ds_put_format(&dstring, "%" PRId64 " ", sequence_num);
     ds_put_format(&dstring, "%s ", ace_row->action);
     if (ace_row->n_protocol != 0) {
-        ds_put_format(&dstring, "%s ", protocol_get_name_from_number(ace_row->protocol[0]));
+        ds_put_format(&dstring, "%s ", acl_parse_protocol_get_name_from_number(ace_row->protocol[0]));
     }
     if (ace_row->src_ip) {
         ace_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
@@ -544,18 +546,18 @@ print_acl_horizontal_rule(void)
  * Print human-readable IP Address string
  *
  * The database stores only in dotted-slash notation, but this should be
- * translated to other CLI-style keywords/formats to readability.
+ * translated to other CLI-style keywords/formats to improve readability.
  *
  * @param format       Format string (e.g. "%s" for simple usage)
  * @param address_str  Pointer to IP address string
- *
- * @todo conversion from A.B.C.D/W.X.Y.Z into "any", host, and prefix
  */
 static void
 print_ace_pretty_ip_address(const char *format, char *address_str)
 {
-    if (address_str) {
-        vty_out(vty, format, address_str);
+    char user_str[INET_ADDRSTRLEN*2];
+    if (acl_ipv4_address_normalized_to_user(address_str, user_str))
+    {
+        vty_out(vty, format, user_str);
     }
 }
 
@@ -622,7 +624,7 @@ print_acl_tabular(const struct ovsrec_acl *acl_row)
             vty_out(vty, "%-31s ", "");
         }
         if (acl_row->value_cfg_aces[i]->n_protocol != 0) {
-            vty_out(vty, "%s ", protocol_get_name_from_number(acl_row->value_cfg_aces[i]->protocol[0]));
+            vty_out(vty, "%s ", acl_parse_protocol_get_name_from_number(acl_row->value_cfg_aces[i]->protocol[0]));
         } else {
             vty_out(vty, "%s ", "");
         }
@@ -916,6 +918,7 @@ cli_create_update_ace (const char *acl_type,
     const struct ovsrec_acl_entry *old_ace_row, *ace_row;
     int64_t ace_sequence_number;
     int64_t protocol_num, min_num, max_num;
+    char addr_str[INET_ADDRSTRLEN*2];
     bool flag;
 
     VLOG_DBG("Create/Update");
@@ -999,16 +1002,21 @@ cli_create_update_ace (const char *acl_type,
         }
     }
     if (ace_ip_protocol) {
-        if (protocol_is_number(ace_ip_protocol)) {
+        if (acl_parse_str_is_numeric(ace_ip_protocol)) {
             protocol_num = strtoll(ace_ip_protocol, NULL, 0);
         } else {
-            protocol_num = protocol_get_number_from_name(ace_ip_protocol);
+            protocol_num = acl_parse_protocol_get_number_from_name(ace_ip_protocol);
         }
         ovsrec_acl_entry_set_protocol(ace_row, &protocol_num, 1);
     }
     if (ace_source_ip_address) {
-        /** @todo conversion into A.B.C.D/W.X.Y.Z */
-        ovsrec_acl_entry_set_src_ip(ace_row, ace_source_ip_address);
+        if (acl_ipv4_address_user_to_normalized(ace_source_ip_address, addr_str)) {
+            ovsrec_acl_entry_set_src_ip(ace_row, addr_str);
+        } else {
+            vty_out(vty, "%% Invalid source IP address%s", VTY_NEWLINE);
+            cli_do_config_abort(transaction);
+            return CMD_ERR_NOTHING_TODO;
+        }
     }
     if (ace_source_port_operator) {
         if (!strcmp(ace_source_port_operator, "eq")) {
@@ -1054,8 +1062,13 @@ cli_create_update_ace (const char *acl_type,
         }
     }
     if (ace_destination_ip_address) {
-        /** @todo conversion into A.B.C.D/W.X.Y.Z */
-        ovsrec_acl_entry_set_dst_ip(ace_row, ace_destination_ip_address);
+        if (acl_ipv4_address_user_to_normalized(ace_destination_ip_address, addr_str)) {
+            ovsrec_acl_entry_set_dst_ip(ace_row, addr_str);
+        } else {
+            vty_out(vty, "%% Invalid destination IP address%s", VTY_NEWLINE);
+            cli_do_config_abort(transaction);
+            return CMD_ERR_NOTHING_TODO;
+        }
     }
     if (ace_destination_port_operator) {
         if (!strcmp(ace_destination_port_operator, "eq")) {
