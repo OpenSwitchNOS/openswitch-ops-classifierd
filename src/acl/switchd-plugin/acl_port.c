@@ -312,10 +312,9 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                 method_called,
                                 OPS_CLS_STATUS_MSG_FEATURE_ACL_STR,
                                 OPS_CLS_STATUS_MSG_IFACE_PORT_STR,
-                                acl_port_map->parent->name,
                                 acl_port_map->parent->port->name,
                                 sequence_number,
-                                status.entry_id,OPS_CLS_STATUS_MSG_MAX_LEN,
+                                OPS_CLS_STATUS_MSG_MAX_LEN,
                                 status_str);
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s failed",
                  acl_port_map->parent->port->name,
@@ -555,6 +554,7 @@ acl_port_new(struct port *port, unsigned int seqno,
         acl_port_map_construct(&acl_port->port_map[i], acl_port, i);
     }
 
+    acl_port->port = port;
     acl_port->interface_flags |= interface_flags;
     acl_port->ovsdb_row = port->cfg;
     acl_port->delete_seqno = seqno;
