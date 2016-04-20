@@ -29,13 +29,7 @@
 #include "copp-temp-keys.h"
 
 
-/* FIXME: currently, a bug exists with registering callbacks at NO_PRIORITY...
-   only the first caller can succeed. we anticipate that bug being fixed
-   *very* soon. and this next line should get cleaned up
-
 #define COPP_PLUGIN_PRIORITY NO_PRIORITY
-*/
-#define COPP_PLUGIN_PRIORITY 1000
 
 
 VLOG_DEFINE_THIS_MODULE(stats_copp_plugin);
