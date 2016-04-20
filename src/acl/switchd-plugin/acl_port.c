@@ -77,6 +77,8 @@ acl_port_map_set_hw_acl(struct acl_port_map *acl_port_map, struct acl *acl)
         if (acl_port_map->hw_acl) {
             /* remove myself from the old one */
             list_remove(&acl_port_map->acl_node);
+            /* Reset myself */
+            list_init(&acl_port_map->acl_node);
         }
         acl_port_map->hw_acl = acl;
         if (acl_port_map->hw_acl) {
@@ -623,9 +625,6 @@ acl_port_cfg_delete(struct acl_port* acl_port, struct port *port,
     for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
         acl_port_map_cfg_delete(&acl_port->port_map[i], port, ofproto);
     }
-
-    /* There's nothing to log to OVSDB for an PORT:D */
-    acl_port_delete(acl_port);
 }
 
 void acl_callback_port_delete(struct blk_params *blk_params)
@@ -656,6 +655,7 @@ void acl_callback_port_delete(struct blk_params *blk_params)
             acl_port = port_lookup(&del_port->cfg->header_.uuid);
             if (acl_port) {
                 acl_port_cfg_delete(acl_port, del_port, blk_params->ofproto);
+                acl_port_delete(acl_port);
             }
         }
     }
