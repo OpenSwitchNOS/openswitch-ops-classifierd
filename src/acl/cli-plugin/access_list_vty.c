@@ -139,7 +139,7 @@ extern struct ovsdb_idl *idl;
                                    "Layer 4 destination minimum port\n" \
                                    "Layer 4 destination maximum port\n"
 #define ACE_ADDITIONAL_OPTIONS_CMDSTR "{ log | count }"
-#define ACE_ADDITIONAL_OPTIONS_HELPSTR "Log packets matching this entry\n" \
+#define ACE_ADDITIONAL_OPTIONS_HELPSTR "Log packets matching this entry (will also enable 'count')\n" \
                                        "Count packets matching this entry\n"
 #define ACE_COMMENT_CMDSTR "(comment) "
 #define ACE_COMMENT_HELPSTR "Set a text comment for a new or existing ACE\n"
@@ -462,8 +462,8 @@ ace_entry_config_to_string(const int64_t sequence_num,
     }
     if (ace_row->log) {
         ds_put_format(&dstring, "log ");
-    }
-    if (ace_row->count) {
+    /* Log implies count, only print count if not logging */
+    } else if (ace_row->count) {
         ds_put_format(&dstring, "count ");
     }
     return ds_steal_cstr(&dstring);
@@ -1116,6 +1116,8 @@ cli_create_update_ace (const char *acl_type,
     if (ace_log_enabled) {
         flag = true;
         ovsrec_acl_entry_set_log(ace_row, &flag, 1);
+        /* Enabling log implies enabling hit counts */
+        ovsrec_acl_entry_set_count(ace_row, &flag, 1);
     }
     if (ace_count_enabled) {
         flag = true;
