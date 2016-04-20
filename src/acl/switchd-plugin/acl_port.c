@@ -47,13 +47,14 @@ VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_port);
  *****************************************************************************/
 static void
 ops_cls_interface_info_construct(struct ops_cls_interface_info *interface_info,
-                                 const struct acl_port *acl_port OVS_UNUSED,
+                                 const struct acl_port *acl_port,
                                  const struct port* port OVS_UNUSED)
 {
     memset(interface_info, 0, sizeof *interface_info);
 
     /* TODO: handle more interface types when we know how to */
     interface_info->interface = OPS_CLS_INTERFACE_PORT;
+    interface_info->flags |= acl_port->interface_flags;
 }
 
 /******************************************************************************
@@ -247,7 +248,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
             /* Nothing to update in PD for this ACL_PORT_MAP */
         } else if (!acl_port_map->hw_acl) {
             VLOG_DBG("ACL_PORT_MAP %s:%s:%s applying %s",
-                     acl_port_map->parent->name,
+                     acl_port_map->parent->port->name,
                      ops_cls_type_strings[acl_port_map->acl_db->type],
                      ops_cls_direction_strings[acl_port_map->acl_db->direction],
                      acl->name);
@@ -260,7 +261,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
             method_called = OPS_CLS_STATUS_MSG_OP_APPLY_STR;
         } else {
             VLOG_DBG("ACL_PORT_MAP %s:%s:%s replacing %s with %s",
-                     acl_port_map->parent->name,
+                     acl_port_map->parent->port->name,
                      ops_cls_type_strings[acl_port_map->acl_db->type],
                      ops_cls_direction_strings[acl_port_map->acl_db->direction],
                      acl_port_map->hw_acl->name,
@@ -278,7 +279,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
 
     if (method_called == NULL) {
         sprintf(details, "ACL_PORT_MAP %s:%s:%s no PD call needed",
-                 acl_port_map->parent->name,
+                 acl_port_map->parent->port->name,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
                  ops_cls_direction_strings[acl_port_map->acl_db->direction]);
         VLOG_DBG(details);
@@ -288,7 +289,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
     } else if (rc == 0) {
         /* success */
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s succeeded",
-                 acl_port_map->parent->name,
+                 acl_port_map->parent->port->name,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
                  ops_cls_direction_strings[acl_port_map->acl_db->direction],
                  method_called);
@@ -312,11 +313,12 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                 OPS_CLS_STATUS_MSG_FEATURE_ACL_STR,
                                 OPS_CLS_STATUS_MSG_IFACE_PORT_STR,
                                 acl_port_map->parent->name,
+                                acl_port_map->parent->port->name,
                                 sequence_number,
-                                OPS_CLS_STATUS_MSG_MAX_LEN,
+                                status.entry_id,OPS_CLS_STATUS_MSG_MAX_LEN,
                                 status_str);
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s failed",
-                 acl_port_map->parent->name,
+                 acl_port_map->parent->port->name,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
                  ops_cls_direction_strings[acl_port_map->acl_db->direction],
                  method_called);
@@ -340,7 +342,7 @@ acl_port_map_unapply_internal(struct acl_port_map* acl_port_map,
                               struct port *port, struct ofproto *ofproto)
 {
     VLOG_DBG("ACL_PORT_MAP %s:%s:%s unapply",
-             acl_port_map->parent->name,
+             acl_port_map->parent->port->name,
              ops_cls_type_strings[acl_port_map->acl_db->type],
              ops_cls_direction_strings[acl_port_map->acl_db->direction]);
 
@@ -360,7 +362,7 @@ acl_port_map_unapply_internal(struct acl_port_map* acl_port_map,
                                          acl_port_map->acl_db->direction,
                                          &status);
     VLOG_DBG("ACL_PORT_MAP %s:%s:%s -- PD remove %s",
-             acl_port_map->parent->name,
+             acl_port_map->parent->port->name,
              ops_cls_type_strings[acl_port_map->acl_db->type],
              ops_cls_direction_strings[acl_port_map->acl_db->direction],
              rc==0 ? "succeeded" : "failed");
@@ -388,7 +390,7 @@ acl_port_map_cfg_create(struct acl_port_map *acl_port_map, struct port *port,
                         struct ofproto *ofproto)
 {
     VLOG_DBG("ACL_PORT_MAP %s:%s:%s - containing port row created",
-             acl_port_map->parent->name,
+             acl_port_map->parent->port->name,
              ops_cls_type_strings[acl_port_map->acl_db->type],
              ops_cls_direction_strings[acl_port_map->acl_db->direction]);
 
@@ -413,7 +415,7 @@ acl_port_map_cfg_update(struct acl_port_map* acl_port_map, struct port *port,
                         struct ofproto *ofproto)
 {
     VLOG_DBG("ACL_PORT_MAP %s:%s:%s - containing port row updated",
-             acl_port_map->parent->name,
+             acl_port_map->parent->port->name,
              ops_cls_type_strings[acl_port_map->acl_db->type],
              ops_cls_direction_strings[acl_port_map->acl_db->direction]);
 
@@ -434,7 +436,7 @@ acl_port_map_cfg_delete(struct acl_port_map* acl_port_map, struct port *port,
                         struct ofproto *ofproto)
 {
     VLOG_DBG("ACL_PORT_MAP %s:%s:%s deleted",
-             acl_port_map->parent->name,
+             acl_port_map->parent->port->name,
              ops_cls_type_strings[acl_port_map->acl_db->type],
              ops_cls_direction_strings[acl_port_map->acl_db->direction]);
 
@@ -442,7 +444,7 @@ acl_port_map_cfg_delete(struct acl_port_map* acl_port_map, struct port *port,
         acl_port_map_unapply_internal(acl_port_map, port, ofproto);
     } else {
         VLOG_DBG("ACL_PORT_MAP %s:%s:%s no PD call needed",
-                 acl_port_map->parent->name,
+                 acl_port_map->parent->port->name,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
                  ops_cls_direction_strings[acl_port_map->acl_db->direction]);
     }
@@ -466,14 +468,14 @@ static void
 acl_port_map_unapply_for_acl_cfg_delete(struct acl_port_map* acl_port_map)
 {
     VLOG_DBG("ACL_PORT_MAP %s:%s:%s upapply for ACL delete",
-             acl_port_map->parent->name,
+             acl_port_map->parent->port->name,
              ops_cls_type_strings[acl_port_map->acl_db->type],
              ops_cls_direction_strings[acl_port_map->acl_db->direction]);
 
-/*    struct port *port = global_port_lookup(acl_port_map->parent->name);
+/*    struct port *port = global_port_lookup(acl_port_map->parent->port->name);
     if (!port) {
         VLOG_ERR("INTERNAL ERROR: PORT %s not found. Unable to unapply acl_port_map",
-                 acl_port_map->parent->name);
+                 acl_port_map->parent->port->name);
         return;
     }
 
@@ -514,6 +516,20 @@ port_lookup(const struct uuid* uuid)
     return NULL;
 }
 
+struct acl_port *
+port_lookup_by_name (const char *name)
+{
+    struct acl_port *port, *next_port;
+
+    /* Walk all ports to find a match */
+    HMAP_FOR_EACH_SAFE(port, next_port, all_node_uuid, &all_ports) {
+        if (!strcmp(port->port->name, name)) {
+            return port;
+        }
+    }
+    return NULL;
+}
+
 /**************************************************************************//**
  * This function creates an acl_port when the port is seen for the first time
  * by ACL feature plugin. This function sets up all possible acl-port
@@ -521,27 +537,30 @@ port_lookup(const struct uuid* uuid)
  * Also, it adds thew newly created acl_port into all_ports hashmap for
  * quick lookup.
  *
- * @param[in] ovsdb_row  - Pointer to the ovsdb port row
+ * @param[in] port       - Pointer to @see struct port
  * @param[in] seqno      - idl_seqno of the current idl batch
+ * @param[in] interface_flags - Interface flags to specify the type of port
  *
  * @returns Pointer to acl_port
  *****************************************************************************/
 static struct acl_port*
-acl_port_new(const struct ovsrec_port *ovsdb_row, unsigned int seqno)
+acl_port_new(struct port *port, unsigned int seqno,
+             unsigned int interface_flags)
 {
-    struct acl_port *port = xzalloc(sizeof *port);
-    port->uuid = ovsdb_row->header_.uuid;
-    port->name = xstrdup(ovsdb_row->name); /* we can outlive ovsdb_row */
+    struct acl_port *acl_port = xzalloc(sizeof *acl_port);
+    acl_port->uuid = port->cfg->header_.uuid;
 
     /* setup my port_map to know about me and which colgrp they represent */
     for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
-        acl_port_map_construct(&port->port_map[i], port, i);
+        acl_port_map_construct(&acl_port->port_map[i], acl_port, i);
     }
 
-    port->ovsdb_row = ovsdb_row;
-    port->delete_seqno = seqno;
-    hmap_insert(&all_ports, &port->all_node_uuid, uuid_hash(&port->uuid));
-    return port;
+    acl_port->interface_flags |= interface_flags;
+    acl_port->ovsdb_row = port->cfg;
+    acl_port->delete_seqno = seqno;
+    hmap_insert(&all_ports, &acl_port->all_node_uuid,
+                uuid_hash(&acl_port->uuid));
+    return acl_port;
 }
 
 /**************************************************************************//**
@@ -555,7 +574,7 @@ acl_port_delete(struct acl_port* acl_port)
 {
     if (acl_port) {
         hmap_remove(&all_ports, &acl_port->all_node_uuid);
-        free(CONST_CAST(char *, acl_port->name));
+        free(CONST_CAST(char *, acl_port->port->name));
 
         /* cleanup my port_map */
         for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
@@ -579,10 +598,11 @@ acl_port_delete(struct acl_port* acl_port)
  *****************************************************************************/
 static struct acl_port*
 acl_port_cfg_create(struct port *port, unsigned int seqno,
-                    struct ofproto *ofproto)
+                    struct ofproto *ofproto, unsigned int interface_flags)
 {
     VLOG_DBG("PORT %s created", port->cfg->name);
-    struct acl_port *acl_port = acl_port_new(port->cfg, seqno);
+    struct acl_port *acl_port = acl_port_new(port, seqno,
+                                             interface_flags);
 
     for (int i = 0; i < NUM_ACL_CFG_TYPES; ++i) {
         acl_port_map_cfg_create(&acl_port->port_map[i], port, ofproto);
@@ -603,7 +623,7 @@ static void
 acl_port_cfg_update(struct acl_port *acl_port, struct port *port,
                     struct ofproto *ofproto)
 {
-    VLOG_DBG("PORT %s changed", acl_port->name);
+    VLOG_DBG("PORT %s changed", acl_port->port->name);
     /* TODO: rework this when we have the full
        Change/Transaction structure */
     /* Defer PD update to P2ACL structs */
@@ -702,20 +722,25 @@ void
 acl_callback_port_update(struct blk_params *blk_params)
 {
     struct acl_port *acl_port;
+    unsigned int interface_flags = 0;
 
     VLOG_DBG("Port Update called for %s\n", blk_params->port->name);
 
+    if (blk_params->vrf) {
+        interface_flags |= OPS_CLS_INTERFACE_L3ONLY;
+    }
     acl_port = port_lookup(&blk_params->port->cfg->header_.uuid);
     if (!acl_port) {
         /* Create and apply if ACL is configured on the port.*/
         if (blk_params->port->cfg->aclv4_in_cfg) {
             acl_port_cfg_create(blk_params->port, blk_params->idl_seqno,
-                                blk_params->ofproto);
+                                blk_params->ofproto, interface_flags);
         } else {
             /* We still create a port entry. However, it will not be programmed
              * until we have an ACL applied to it
              */
-             acl_port_new(blk_params->port->cfg, blk_params->idl_seqno);
+             acl_port_new(blk_params->port, blk_params->idl_seqno,
+                          interface_flags);
         }
     }
 }
