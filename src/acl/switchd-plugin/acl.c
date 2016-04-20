@@ -413,7 +413,8 @@ acl_update_internal(struct acl* acl)
                                     OPS_CLS_STATUS_MSG_FEATURE_ACL_STR,
                                     OPS_CLS_STATUS_MSG_IFACE_PORT_STR,
                                     netdev_get_name(status.port->netdev),
-                                    status.entry_id,
+                                    acl->ovsdb_row->
+                                        key_in_progress_aces[status.entry_id],
                                     OPS_CLS_STATUS_MSG_MAX_LEN,status_str);
             acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_REJECTED,
                                status.status_code, status_str);
