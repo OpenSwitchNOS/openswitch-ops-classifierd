@@ -555,6 +555,7 @@ acl_port_new(struct port *port, unsigned int seqno,
         acl_port_map_construct(&acl_port->port_map[i], acl_port, i);
     }
 
+    acl_port->port = port;
     acl_port->interface_flags |= interface_flags;
     acl_port->ovsdb_row = port->cfg;
     acl_port->delete_seqno = seqno;
