@@ -24,7 +24,6 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wall -Werror")
 
 # Rules to locate needed libraries
 include(FindPkgConfig)
-pkg_check_modules(CONFIG_YAML REQUIRED ops-config-yaml)
 pkg_check_modules(OVSCOMMON REQUIRED libovscommon)
 pkg_check_modules(OVSDB REQUIRED libovsdb)
 
@@ -34,6 +33,8 @@ include_directories (${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/${INCL_DIR}
 
 # Sources to build ops-classifierd
 set (SOURCES ${SRC_DIR}/ops-classifierd.c)
+
+set (HEADERS ${CMAKE_SOURCE_DIR}/${INCL_DIR}/ops-cls-asic-plugin.h)
 
 # Rules to build ops-classifierd
 add_executable (${CLASSIFIERD} ${SOURCES})
@@ -46,5 +47,6 @@ target_link_libraries (${CLASSIFIERD}
 install(TARGETS ${CLASSIFIERD}
         RUNTIME DESTINATION bin)
 
+install (FILES ${HEADERS} DESTINATION include)
 # Build sub-features
 add_subdirectory(src)
