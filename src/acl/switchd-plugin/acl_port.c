@@ -211,6 +211,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
     char details[256];
     /* status_str used to store status description in db */
     char status_str[OPS_CLS_STATUS_MSG_MAX_LEN] = {0};
+    unsigned int sequence_number = 0;
 
     struct acl* acl;
     /* TODO: Start looking at want_version too.
@@ -302,15 +303,17 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
     } else {
         /* failure */
 
-        /* @todo entry_id needs to be converted to sequence no here
-         * but that infra structure is not ready yet.
-         */
+        /* convert entry_id to sequence_number */
+        if(status.entry_id < acl->ovsdb_row->n_cur_aces) {
+            sequence_number = acl->ovsdb_row->key_cur_aces[status.entry_id];
+        }
         ops_cls_status_msgs_get(status.status_code,
                                 method_called,
                                 OPS_CLS_STATUS_MSG_FEATURE_ACL_STR,
                                 OPS_CLS_STATUS_MSG_IFACE_PORT_STR,
                                 acl_port_map->parent->name,
-                                status.entry_id,OPS_CLS_STATUS_MSG_MAX_LEN,
+                                sequence_number,
+                                OPS_CLS_STATUS_MSG_MAX_LEN,
                                 status_str);
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s failed",
                  acl_port_map->parent->name,
