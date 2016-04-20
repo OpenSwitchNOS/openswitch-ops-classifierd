@@ -19,17 +19,30 @@
 #define _MIRROR_CLI_H_
 
 #define MAX_MIRROR_SESSION_NAME_LEN 64
-#define MIRROR_STR           "mirror"
-#define MIRROR_SESSION_STR   "mirror_session"
-#define MIRROR_SESSION_NAME_STR "mirror_session_name"
-#define DST_STR              "destination"
-#define IFACE_STR            "interface"
-#define IFACE_NAME_STR       "interface_name"
-#define SRC_STR              "source"
-#define SRC_DIR_TX           "tx"
-#define SRC_DIR_RX           "rx"
-#define SRC_DIR_BOTH         "both"
-#define SHUT_STR             "shutdown"
+#define MAX_BR_OR_VRF_NAME_LEN strlen(DEFAULT_BRIDGE_NAME)
+#define MAX_SRC_DIR_LEN      4
+
+#define SRC_DIR_TX                  "tx"
+#define SRC_DIR_RX                  "rx"
+#define SRC_DIR_BOTH                "both"
+
+#define SHOW_HELPSTR                "Show"
+#define MIRROR_HELPSTR              "Configure Mirroring\n"
+#define MIRROR_SESSION_HELPSTR      "Create a Mirror Session\n"
+#define MIRROR_SESSION_NAME_HELPSTR "Mirror Session Name\n"
+#define DST_HELPSTR                 "Mirror destination interface\n"
+#define IFACE_HELPSTR               "System Interface\n"
+#define IFACE_NAME_HELPSTR          "Interface's Name\n"
+#define SRC_HELPSTR                 "A source of traffic to mirror\n"
+#define SRC_DIR_TX_HELPSTR          "A source of transmit-only traffic\n"
+#define SRC_DIR_RX_HELPSTR          "A source of receive-only traffic\n"
+#define SRC_DIR_BOTH_HELPSTR        "A source of transmit & receive traffic\n"
+#define SHUT_HELPSTR                "Mirror shutdown\n"
+#define NO_HELPSTR                  "Undo an operation\n"
+
+#define MIRROR_CONFIG_OPERATION_STATE "operation_state"
+#define MIRROR_CONFIG_STATE_ACTIVE    "active"
+#define MIRROR_CONFIG_STATE_SHUTDOWN  "shutdown"
 
 vtysh_ret_val cli_show_mirror_running_config_callback(void*);
 void mirror_pre_init(void);
