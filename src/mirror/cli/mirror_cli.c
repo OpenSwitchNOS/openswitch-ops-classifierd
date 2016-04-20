@@ -812,52 +812,20 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
 
    if (delete) {
 
-      if ((rc == CMD_SUCCESS)                                      &&
+      if ((rc == CMD_SUCCESS) &&
           /* remove interface src/rx on null (both) or 'rx' */
           ((direction == NULL) || (strncmp(direction, SRC_DIR_RX,
-                                          MAX_SRC_DIR_LEN) == 0))  &&
+                                          MAX_SRC_DIR_LEN) == 0)) &&
            (is_port_in_src_set(mirror, port_row))) {
-
-#ifdef MIRROR_NO_SOURCE_SHUTDOWN
-         /* if the mirror is active and this is the last source port,
-          * shutdown mirror first */
-         if (
-              /* mirror is currently active */
-             ((mirror->active != NULL) && (*mirror->active == true)) &&
-              /* already no dst/tx member source ports */
-             (mirror->n_select_dst_port == 0) &&
-              /* this is the last src/rx source port */
-             ((mirror->n_select_src_port - 1) == 0)) {
-
-            bool active = 0;
-            ovsrec_mirror_set_active (mirror, &active, 1);
-         }
-#endif
 
          rc = update_src_port (mirror, port_row, true);
       }
 
-      if ((rc == CMD_SUCCESS)                                      &&
+      if ((rc == CMD_SUCCESS) &&
           /* remove interface dst/tx on null (both) or 'tx' */
           ((direction == NULL) || (strncmp(direction, SRC_DIR_TX,
-                                          MAX_SRC_DIR_LEN) == 0))  &&
+                                          MAX_SRC_DIR_LEN) == 0)) &&
            (is_port_in_dst_set(mirror, port_row))) {
-
-#ifdef MIRROR_NO_SOURCE_SHUTDOWN
-         /* if the mirror is active and this is the last source port,
-          * shutdown mirror first */
-         if (
-              /* mirror is currently active */
-             ((mirror->active != NULL) && (*mirror->active == true)) &&
-              /* already no src/rx member source ports */
-             (mirror->n_select_src_port == 0) &&
-              /* this is the last dst/tx source port */
-             ((mirror->n_select_dst_port - 1) == 0)) {
-
-            bool active = 0;
-            ovsrec_mirror_set_active (mirror, &active, 1);
-         }
-#endif
 
          rc = update_dst_port (mirror, port_row, true);
       }
@@ -1025,9 +993,9 @@ output_iface_exec(const char* iface_name, bool delete)
       }
 
       ovsrec_mirror_set_output_port(mirror, NULL);
-      vty_out (vty, "Destination interface removed, session %s shutdown%s",
-                                                               mirror->name,
-                                                                VTY_NEWLINE);
+      vty_out (vty, "Destination interface removed, mirror session %s shutdown%s",
+                                                                  mirror->name,
+                                                                   VTY_NEWLINE);
 
    } else {
 
@@ -1076,14 +1044,6 @@ is_mirror_config_adequate(const struct ovsrec_mirror* mirror)
       vty_out (vty, "No mirror destination interface configured%s", VTY_NEWLINE);
       return false;
    }
-
-#ifdef MIRROR_NO_SOURCE_SHUTDOWN
-   if ((mirror->n_select_src_port == 0) &&
-       (mirror->n_select_dst_port == 0)) {
-      vty_out (vty, "No mirror source interface(s) configured%s", VTY_NEWLINE);
-      return false;
-   }
-#endif
 
    return true;
 }
