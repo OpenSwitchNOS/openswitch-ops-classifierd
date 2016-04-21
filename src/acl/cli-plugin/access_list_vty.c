@@ -157,6 +157,10 @@ extern struct ovsdb_idl *idl;
  * @param  acl_name ACL name string
  *
  * @return          Pointer to ovsrec_acl structure object
+ *
+ * @todo This is not a very performant way to get a row by index columns.
+ *       Initially it was the only way to do so; replace with something
+ *       more efficient.
  */
 static inline const struct ovsrec_acl *
 get_acl_by_type_name(const char *acl_type, const char *acl_name)
@@ -181,7 +185,7 @@ get_acl_by_type_name(const char *acl_type, const char *acl_name)
  *
  * @return                 Pointer to ovsrec_acl_entry structure object
  *
- * @todo this would be nice to have generated as part of IDL
+ * @todo This could/should be generated as part of IDL.
  */
 static inline const struct ovsrec_acl_entry*
 ovsrec_acl_cfg_aces_getvalue(const struct ovsrec_acl *acl_row,
@@ -204,7 +208,7 @@ ovsrec_acl_cfg_aces_getvalue(const struct ovsrec_acl *acl_row,
  *
  * @return                 Hit count for ACE, 0 on failure
  *
- * @todo this would be nice to have generated as part of IDL
+ * @todo This could/should be generated as part of IDL.
  */
 static inline const int64_t
 ovsrec_port_aclv4_in_statistics_getvalue(const struct ovsrec_port *port_row,
@@ -227,7 +231,7 @@ ovsrec_port_aclv4_in_statistics_getvalue(const struct ovsrec_port *port_row,
  *
  * @return                 Hit count for ACE, 0 on failure
  *
- * @todo this would be nice to have generated as part of IDL
+ * @todo This could/should be generated as part of IDL.
  */
 static inline const int64_t
 ovsrec_vlan_aclv4_in_statistics_getvalue(const struct ovsrec_vlan *vlan_row,
@@ -250,7 +254,9 @@ ovsrec_vlan_aclv4_in_statistics_getvalue(const struct ovsrec_vlan *vlan_row,
  * @param key     numeric key (entry sequence number)
  * @param value   ACL Entry row pointer
  *
- * @todo Work-around for https://tree.taiga.io/project/openswitch/issue/750
+ * @todo Work-around for https://tree.taiga.io/project/openswitch/issue/750 .
+ *       Remove and replace calls with ovsrec_acl_update_cfg_aces_setkey()
+ *       once issue is resolved.
  */
 static inline void
 ovsrec_acl_update_cfg_aces_setkey_safe(const struct ovsrec_acl *acl_row,
@@ -289,6 +295,10 @@ ovsrec_acl_update_cfg_aces_setkey_safe(const struct ovsrec_acl *acl_row,
  * @param  name     Port name string
  *
  * @return          Pointer to ovsrec_port structure object
+ *
+ * @todo This is not a very performant way to get a row by indexed columns.
+ *       Initially it was the only way to do so; replace with something
+ *       more efficient.
  */
 static inline const struct ovsrec_port *
 get_port_by_name(const char *name)
@@ -310,6 +320,10 @@ get_port_by_name(const char *name)
  * @param  id_str   VLAN ID string
  *
  * @return          Pointer to ovsrec_vlan structure object
+ *
+ * @todo This is not a very performant way to get a row by indexed columns.
+ *       Initially it was the only way to do so; replace with something
+ *       more efficient.
  */
 static inline const struct ovsrec_vlan *
 get_vlan_by_id_str(const char *id_str)
@@ -386,7 +400,7 @@ acl_audit_log(char *aubuf, int command_result)
  * @param address_str  Pointer to IP address string
  */
 static void
-ace_entry_ip_address_config_to_ds(struct ds *dstring, char *address_str)
+acl_entry_ip_address_config_to_ds(struct ds *dstring, char *address_str)
 {
     char user_str[INET_ADDRSTRLEN*2];
     if(acl_ipv4_address_normalized_to_user(address_str, user_str))
@@ -404,7 +418,7 @@ ace_entry_ip_address_config_to_ds(struct ds *dstring, char *address_str)
  * @param reverse  Whether range is reversed
  */
 static void
-ace_entry_l4_port_config_to_ds(struct ds *dstring,
+acl_entry_l4_port_config_to_ds(struct ds *dstring,
                                int64_t min, int64_t max, bool reverse)
 {
     if (min == max) {
@@ -431,7 +445,7 @@ ace_entry_l4_port_config_to_ds(struct ds *dstring,
  * @return              ACL Entry string, caller-freed, not newline-terminated
  */
 static char *
-ace_entry_config_to_string(const int64_t sequence_num,
+acl_entry_config_to_string(const int64_t sequence_num,
                            const struct ovsrec_acl_entry *ace_row)
 {
     struct ds dstring;
@@ -443,19 +457,19 @@ ace_entry_config_to_string(const int64_t sequence_num,
         ds_put_format(&dstring, "%s ", acl_parse_protocol_get_name_from_number(ace_row->protocol[0]));
     }
     if (ace_row->src_ip) {
-        ace_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
+        acl_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
     }
     if (ace_row->n_src_l4_port_min && ace_row->n_src_l4_port_max) {
-        ace_entry_l4_port_config_to_ds(&dstring,
+        acl_entry_l4_port_config_to_ds(&dstring,
                                        ace_row->src_l4_port_min[0],
                                        ace_row->src_l4_port_max[0],
                                        ace_row->n_src_l4_port_range_reverse);
     }
     if (ace_row->dst_ip) {
-        ace_entry_ip_address_config_to_ds(&dstring, ace_row->dst_ip);
+        acl_entry_ip_address_config_to_ds(&dstring, ace_row->dst_ip);
     }
     if (ace_row->n_dst_l4_port_min && ace_row->n_dst_l4_port_max) {
-        ace_entry_l4_port_config_to_ds(&dstring,
+        acl_entry_l4_port_config_to_ds(&dstring,
                                        ace_row->dst_l4_port_min[0],
                                        ace_row->dst_l4_port_max[0],
                                        ace_row->n_dst_l4_port_range_reverse);
@@ -502,7 +516,7 @@ print_acl_config(const struct ovsrec_acl *acl_row)
                     VTY_NEWLINE);
         }
         if (acl_row->value_cfg_aces[i]->action) {
-            ace_str = ace_entry_config_to_string(acl_row->key_cfg_aces[i],
+            ace_str = acl_entry_config_to_string(acl_row->key_cfg_aces[i],
                                                  acl_row->value_cfg_aces[i]);
             vty_out(vty, "    %s%s", ace_str, VTY_NEWLINE);
             free(ace_str);
@@ -1650,7 +1664,7 @@ print_port_aclv4_in_statistics(const struct ovsrec_port *port_row)
             } else {
                 vty_out(vty, "%20s", "-");
             }
-            ace_str = ace_entry_config_to_string(port_row->aclv4_in_cfg->key_cfg_aces[i],
+            ace_str = acl_entry_config_to_string(port_row->aclv4_in_cfg->key_cfg_aces[i],
                                                  port_row->aclv4_in_cfg->value_cfg_aces[i]);
             vty_out(vty, "  %s%s", ace_str, VTY_NEWLINE);
             free(ace_str);
@@ -1692,7 +1706,7 @@ print_vlan_aclv4_in_statistics(const struct ovsrec_vlan *vlan_row)
             } else {
                 vty_out(vty, "%20s", "-");
             }
-            ace_str = ace_entry_config_to_string(vlan_row->aclv4_in_cfg->key_cfg_aces[i],
+            ace_str = acl_entry_config_to_string(vlan_row->aclv4_in_cfg->key_cfg_aces[i],
                                                  vlan_row->aclv4_in_cfg->value_cfg_aces[i]);
             vty_out(vty, "  %s%s", ace_str, VTY_NEWLINE);
             free(ace_str);
@@ -3979,7 +3993,7 @@ show_run_access_list_callback(void *p_private)
                                           acl_row->value_cfg_aces[i]->comment);
                 }
                 if (acl_row->value_cfg_aces[i]->action) {
-                    ace_str = ace_entry_config_to_string(acl_row->key_cfg_aces[i],
+                    ace_str = acl_entry_config_to_string(acl_row->key_cfg_aces[i],
                                                          acl_row->value_cfg_aces[i]);
                     vtysh_ovsdb_cli_print(p_msg, "    %s", ace_str);
                     free(ace_str);

@@ -33,32 +33,6 @@
 #ifndef _ACCESS_LIST_VTY_H
 #define _ACCESS_LIST_VTY_H
 
-/** @todo remote these once update for new schema */
-/* ACL Entry (ACE) key indices */
-#ifndef ACE_KEY_
-#define ACE_KEY_
-#define ACE_KEY_ACTION                    0
-#define ACE_KEY_IP_PROTOCOL               1
-#define ACE_KEY_SOURCE_IP_ADDRESS         2
-#define ACE_KEY_SOURCE_PORT_OPERATOR      3
-#define ACE_KEY_SOURCE_PORT               4
-#define ACE_KEY_SOURCE_PORT_MAX           5
-#define ACE_KEY_DESTINATION_IP_ADDRESS    6
-#define ACE_KEY_DESTINATION_PORT_OPERATOR 7
-#define ACE_KEY_DESTINATION_PORT          8
-#define ACE_KEY_DESTINATION_PORT_MAX      9
-#define ACE_KEY_LOG                      10
-#define ACE_KEY_COUNT                    11
-#define ACE_KEY_COMMENT                  12
-/* 1. New ACE keys go here ^ with incremented values
- * 2. Bump ACE_KEY_N_ to be new key's value + 1
- * 3. Add string name to ace_key_names below
- */
-#define ACE_KEY_N_                       13 /**< For sizing arrays, loops */
-#define ACE_KEY_MIN_                      0 /**< For checking bounds */
-#define ACE_KEY_MAX_         ACE_KEY_N_ - 1 /**< For checking bounds */
-#endif
-
 /** Standard CLI entry point for first stage of initalization */
 void cli_pre_init(void);
 
