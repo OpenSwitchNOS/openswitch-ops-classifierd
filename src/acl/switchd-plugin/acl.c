@@ -322,7 +322,7 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
 {
     struct smap cfg_status;
     char code_str[10];
-    //char version[25];
+    char version[25];
 
     smap_clone(&cfg_status, &row->status);
 
@@ -335,13 +335,8 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
 
     /* Add values to the smap */
     smap_add(&cfg_status, ACL_CFG_STATUS_STR, state);
-    /*
-     * TODO: Uncomment this code when UI fills the version field
-     *
-     * sprintf(version, "%" PRId64"", row->cfg_version);
-     * smap_add(&cfg_status, ACL_CFG_STATUS_VERSION,
-     *          version);
-     */
+    sprintf(version, "%" PRId64"", row->cfg_version);
+    smap_add(&cfg_status, ACL_CFG_STATUS_VERSION, version);
     smap_add(&cfg_status, ACL_CFG_STATUS_STATE, state);
     sprintf(code_str, "%u", code);
     smap_add(&cfg_status, ACL_CFG_STATUS_CODE, code_str);
