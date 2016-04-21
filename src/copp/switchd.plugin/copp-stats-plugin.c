@@ -25,7 +25,6 @@
 #include "plugin-extensions.h"
 #include "copp-asic-provider.h"
 #include "vswitch-idl.h"
-#include "system-stats.h"
 #include "copp-temp-keys.h"
 
 
@@ -168,8 +167,9 @@ copp_stats_brinit_cb(struct blk_params* cblk) {
  * its view of each one of them. We build up an smap of all the answers. Then
  * we tack on some totals rows into the smap. Then publish it.
  *
- * If a PD layer returns an error for any call, we publish -1s into the DB for
- * that row and send a WARN log (only on the first call).
+ * If a PD layer returns an error for any call, we do not publish any data into
+ * the DB (even deleting the row if necessary) and send a WARN log the first
+ * time we encounter that error.
  *
  * It's aslo fair for an PD layer to tell us -1, which we will faithfully
  * publish to the DB without logging anything.
@@ -225,18 +225,24 @@ copp_stats_cb(struct stats_blk_params *sblk, enum stats_block_id blk_id) {
     smap_init(&copp_smap);
 
     for (class=0; class < COPP_NUM_CLASSES; class++) {
+
+        if (g_copp_stats_log_info[class].no_supp == true)
+            continue;
+
         /* collect from asic */
         rc = asic_intf->copp_stats_get(0, class, &copp_stats);
         if (rc) {
-            copp_stats.bytes_passed =
-            copp_stats.bytes_dropped =
-            copp_stats.packets_passed =
-            copp_stats.packets_dropped = -1;
-
             switch(rc) {
                 case EOPNOTSUPP :
                     if (g_copp_stats_log_info[class].no_supp == false ) {
                         VLOG_WARN("copp_stats_get for class %d returned %d %s", class, rc, strerror(rc));
+
+                        /* The first time we encounter NOTSUPP, we remove this row from the smap.
+                         * Doing it once the first time, will be a percistent decision and this
+                         * row will never get published.
+                         * Most likely, this row never made it into smap anyway and smap_removing it is
+                         * a null-op.
+                         */
                         g_copp_stats_log_info[class].no_supp = true;
                     }
                     break;
@@ -250,45 +256,51 @@ copp_stats_cb(struct stats_blk_params *sblk, enum stats_block_id blk_id) {
                     VLOG_WARN("copp_stats_get for class %d returned unrecognized %d %s", class, rc, strerror(rc));
             }
 
-
-        }
-
-        /* keep running track of totals */
-        if (!rc) {
-            g_copp_stasts_totals[COPP_STATS_TOTAL_BYTES_DROPPED] += copp_stats.bytes_dropped;
-            g_copp_stasts_totals[COPP_STATS_TOTAL_BYTES_PASSED] +=  copp_stats.bytes_passed;
-            g_copp_stasts_totals[COPP_STATS_TOTAL_PKTS_DROPPED] += copp_stats.packets_dropped;
-            g_copp_stasts_totals[COPP_STATS_TOTAL_PKTS_PASSED] += copp_stats.packets_passed;
+            /* give up on both stats and status for this class */
+            continue;
         }
 
         rc = asic_intf->copp_hw_status_get(0, class, &hw_status);
         if (rc) {
             hw_status.rate =
             hw_status.burst =
-            hw_status.local_priority = -1;
+            hw_status.local_priority = ULLONG_MAX;
             switch(rc) {
                 case EOPNOTSUPP:
                     if (g_copp_status_log_info[class].no_supp == false ) {
+                        /* It would be very strange to arrive here. asic must have given us stats and then
+                         * subsequently claimed that it was not supported to have configured collecing those
+                         * stats. Could happen on first pass I suppose.
+                         */
                         VLOG_WARN("copp_hw_status_get for class %d returned %d %s", class, rc, strerror(rc));
                         g_copp_status_log_info[class].no_supp = true;
+
+                        /* give up on both stats and status for this class */
+                        smap_remove(&copp_smap, temp_copp_keys[class]);
+                        continue;
                     }
                     break;
                 case ENOSPC:
                     if (g_copp_status_log_info[class].no_spc== false ) {
                         VLOG_WARN("copp_hw_status_get for class %d returned %d %s", class, rc, strerror(rc));
                         g_copp_status_log_info[class].no_spc= true;
+                        /* ok to publish class into db row in this case */
                     }
                     break;
                 case EIO:
                     if (g_copp_status_log_info[class].io == false ) {
                         VLOG_WARN("copp_hw_status_get for class %d returned %d %s", class, rc, strerror(rc));
                         g_copp_status_log_info[class].io = true;
+                        /* ok to publish class into db row in this case */
                     }
                     break;
                 case EINVAL:
                     if (g_copp_status_log_info[class].inval == false ) {
                         VLOG_WARN("copp_hw_status_get for class %d returned %d %s", class, rc, strerror(rc));
                         g_copp_status_log_info[class].inval= true;
+                        /* give up on both stats and status for this class */
+                        smap_remove(&copp_smap, temp_copp_keys[class]);
+                        continue;
                     }
                     break;
                 default:
@@ -309,7 +321,17 @@ copp_stats_cb(struct stats_blk_params *sblk, enum stats_block_id blk_id) {
         }
 
         /* Looks good.  Publish to db */
-        smap_replace(&copp_smap, temp_copp_keys[class], stats_buf);
+        smap_add(&copp_smap, temp_copp_keys[class], stats_buf);
+
+        /* keep running track of totals */
+        if ( copp_stats.bytes_dropped != UINT64_MAX )
+            g_copp_stasts_totals[COPP_STATS_TOTAL_BYTES_DROPPED] += copp_stats.bytes_dropped;
+        if ( copp_stats.bytes_passed != UINT64_MAX )
+            g_copp_stasts_totals[COPP_STATS_TOTAL_BYTES_PASSED] +=  copp_stats.bytes_passed;
+        if ( copp_stats.packets_dropped != UINT64_MAX )
+            g_copp_stasts_totals[COPP_STATS_TOTAL_PKTS_DROPPED] += copp_stats.packets_dropped;
+        if ( copp_stats.packets_passed != UINT64_MAX )
+            g_copp_stasts_totals[COPP_STATS_TOTAL_PKTS_PASSED] += copp_stats.packets_passed;
 
     }
 

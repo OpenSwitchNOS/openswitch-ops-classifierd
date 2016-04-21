@@ -29,6 +29,7 @@ extern "C" {
 #endif
 
 #include "copp-asic-provider.h"
+#include "openswitch-idl.h"
 
 /*
  * Use designated initializer to pre-fill an array of pointer to key names
@@ -68,16 +69,12 @@ enum copp_totals {
 
 #define COPP_NUM_TOTALS COPP_STATS_TOTAL_MAX
 const char *const temp_copp_totals_keys[COPP_STATS_TOTAL_MAX] = {
-    [COPP_STATS_TOTAL_PKTS_PASSED] =        "temp_total_pkts_passed",
-    [COPP_STATS_TOTAL_BYTES_PASSED] =       "temp_total_bytes_passed",
-    [COPP_STATS_TOTAL_PKTS_DROPPED] =       "temp_total_pkts_dropped",
-    [COPP_STATS_TOTAL_BYTES_DROPPED] =      "temp_total_bytes_dropped"
+    [COPP_STATS_TOTAL_PKTS_PASSED] =        SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_PASSED,
+    [COPP_STATS_TOTAL_BYTES_PASSED] =       SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_PASSED,
+    [COPP_STATS_TOTAL_PKTS_DROPPED] =       SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_DROPPED,
+    [COPP_STATS_TOTAL_BYTES_DROPPED] =      SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_DROPPED
 };
 
-#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_PASSED temp_copp_totals_keys[COPP_STATS_TOTAL_PKTS_PASSED]
-#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_PASSED temp_copp_totals_keys[COPP_STATS_TOTAL_BYTES_PASSED]
-#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_DROPPED temp_copp_totals_keys[COPP_STATS_TOTAL_PKTS_DROPPED]
-#define SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_DROPPED temp_copp_totals_keys[COPP_STATS_TOTAL_BYTES_DROPPED]
 
 #define TEMP_COPP_STATS_BUF_FMT "%lu,%lu,%lu,%lu,%lu,%lu,%lu "
 #define TEMP_COPP_STATS_VARS(h, c)         \
