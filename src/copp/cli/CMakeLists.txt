@@ -36,8 +36,8 @@ pkg_check_modules(OPSCLI REQUIRED ops-cli)
 include_directories (${INCL_DIR}
                      ${PROJECT_SOURCE_DIR}
                      ${OVSCOMMON_INCLUDE_DIRS}
-		     ${OPSCLI_INCLUDE_DIRS}
-		    )
+                     ${OPSCLI_INCLUDE_DIRS}
+                    )
 
 # CLI libraries source files
 set (SOURCES_CLI copp_vty.c

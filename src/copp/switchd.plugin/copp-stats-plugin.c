@@ -37,9 +37,6 @@ VLOG_DEFINE_THIS_MODULE(stats_copp_plugin);
 struct plugin_extension_interface g_copp_asic_plugin;
 static bool g_copp_initialized;
 
-/* use copp_totals to index this array */
-static uint64_t g_copp_stasts_totals[COPP_STATS_TOTAL_MAX] = {0,0,0,0};
-
 typedef struct copp_stats_errors_logged {
    bool no_supp     : 1;
    bool inval       : 1;
@@ -110,10 +107,6 @@ void init(void) {
         return;
     }
 
-    /* initialize global vars */
-    for (i=0; i < COPP_STATS_TOTAL_MAX; i++) {
-        g_copp_stasts_totals[i] =0;
-    }
     for (i=0; i < COPP_NUM_CLASSES; i++) {
         g_copp_stats_log_info[i].no_supp = false;
         g_copp_stats_log_info[i].inval= false;
@@ -197,6 +190,8 @@ copp_stats_cb(struct stats_blk_params *sblk, enum stats_block_id blk_id) {
     struct copp_hw_status  hw_status;
     const struct ovsrec_open_vswitch *cfg;
     struct smap copp_smap;
+    uint64_t copp_stats_totals[COPP_STATS_TOTAL_MAX] = {0,0,0,0};
+
 #define NUM_STATS_PER_CLASS 7
 #define NUM_CHARS_UINT_64 21
 #define NUM_COMMAS_AND_SUCH 8
@@ -325,20 +320,20 @@ copp_stats_cb(struct stats_blk_params *sblk, enum stats_block_id blk_id) {
 
         /* keep running track of totals */
         if ( copp_stats.bytes_dropped != UINT64_MAX )
-            g_copp_stasts_totals[COPP_STATS_TOTAL_BYTES_DROPPED] += copp_stats.bytes_dropped;
+            copp_stats_totals[COPP_STATS_TOTAL_BYTES_DROPPED] += copp_stats.bytes_dropped;
         if ( copp_stats.bytes_passed != UINT64_MAX )
-            g_copp_stasts_totals[COPP_STATS_TOTAL_BYTES_PASSED] +=  copp_stats.bytes_passed;
+            copp_stats_totals[COPP_STATS_TOTAL_BYTES_PASSED] +=  copp_stats.bytes_passed;
         if ( copp_stats.packets_dropped != UINT64_MAX )
-            g_copp_stasts_totals[COPP_STATS_TOTAL_PKTS_DROPPED] += copp_stats.packets_dropped;
+            copp_stats_totals[COPP_STATS_TOTAL_PKTS_DROPPED] += copp_stats.packets_dropped;
         if ( copp_stats.packets_passed != UINT64_MAX )
-            g_copp_stasts_totals[COPP_STATS_TOTAL_PKTS_PASSED] += copp_stats.packets_passed;
+            copp_stats_totals[COPP_STATS_TOTAL_PKTS_PASSED] += copp_stats.packets_passed;
 
     }
 
     for (int tots=0; tots<COPP_STATS_TOTAL_MAX; tots++) {
 
         len = snprintf(stats_buf, STATS_BUF_SIZE,
-            "%lu", g_copp_stasts_totals[tots]);
+            "%lu", copp_stats_totals[tots]);
         if (len < 0) {
             VLOG_WARN("could not convert totals to string. Not reporting total[%d]", tots);
             goto out;

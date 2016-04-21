@@ -389,6 +389,7 @@ DEFUN ( vtysh_show_copp_generic_statistics,
 }
 
 extern struct ovsdb_idl *idl;
+
 /*================================================================================================*/
 
 /* Initialize ops-copp cli node.
