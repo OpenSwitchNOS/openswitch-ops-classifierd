@@ -43,6 +43,12 @@ extern struct ovsdb_idl *idl;
 /* This function prints the different tokens */
 static void token_print(int i, char * token)
 {
+
+    /* print blanks for the UNSUPPORTED/INVALID indicator */
+    if (!strncmp(token, COPP_MAX_STRING, 20)) {
+        token = " ";
+    }
+
     switch (i) {
         case 1:
             vty_out(vty, "\t  %s    %18s\n", "rate (pps):", token);
@@ -234,19 +240,19 @@ vtysh_ovsdb_show_copp_generic_statistics()
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_PASSED);
-    vty_out(vty, "\t  %s    %8s\t", "total_packets_passed:", ((buf) ? buf : COPP_ZERO_STRING));
+    vty_out(vty, "\t  %s    %8s\t", "total packets passed:", ((buf) ? buf : COPP_ZERO_STRING));
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_PASSED);
-    vty_out(vty, "   %s    %8s\n", "total_bytes_passed:", ((buf) ? buf : COPP_ZERO_STRING));
+    vty_out(vty, "   %s    %8s\n", "total bytes passed:", ((buf) ? buf : COPP_ZERO_STRING));
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_DROPPED);
-    vty_out(vty, "\t  %s    %7s\t", "total_packets_dropped:", ((buf) ? buf : COPP_ZERO_STRING));
+    vty_out(vty, "\t  %s    %7s\t", "total packets dropped:", ((buf) ? buf : COPP_ZERO_STRING));
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_DROPPED);
-    vty_out(vty, "   %s    %7s\n\n\n", "total_bytes_dropped:", ((buf) ? buf : COPP_ZERO_STRING));
+    vty_out(vty, "   %s    %7s\n\n\n", "total bytes dropped:", ((buf) ? buf : COPP_ZERO_STRING));
 
     /* Obtain the protocol stats one by one and print them.. */
     buf = smap_get(&ovs_system->copp_statistics, temp_copp_keys[COPP_BGP]);
