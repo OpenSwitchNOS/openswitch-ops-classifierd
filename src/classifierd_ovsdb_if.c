@@ -210,30 +210,32 @@ classifierd_reconfigure(void)
 
     /* get first port row from IDL cache */
     port_row = ovsrec_port_first(idl);
-
-    /* if port table is not changed then do not go ahead */
-    if ( (!OVSREC_IDL_ANY_TABLE_ROWS_MODIFIED(port_row, idl_seqno)) &&
-            (!OVSREC_IDL_ANY_TABLE_ROWS_INSERTED(port_row, idl_seqno)) &&
-            (!OVSREC_IDL_ANY_TABLE_ROWS_DELETED(port_row, idl_seqno)) ) {
-        VLOG_DBG("%s: not a port row change\n",__FUNCTION__);
-    } else {
-        /* Perform ports reconfigure event for ACL */
-        rc = acl_ports_reconfigure(idl,idl_seqno);
+    if(port_row) {
+        /* if port table is not changed then do not go ahead */
+        if ( (!OVSREC_IDL_ANY_TABLE_ROWS_MODIFIED(port_row, idl_seqno)) &&
+                (!OVSREC_IDL_ANY_TABLE_ROWS_INSERTED(port_row, idl_seqno)) &&
+                (!OVSREC_IDL_ANY_TABLE_ROWS_DELETED(port_row, idl_seqno)) ) {
+            VLOG_DBG("%s: not a port row change\n",__FUNCTION__);
+        } else {
+            /* Perform ports reconfigure event for ACL */
+            rc = acl_ports_reconfigure(idl,idl_seqno);
+        }
     }
 
 
 
     /* get first acl row from IDL cache */
     acl_row = ovsrec_acl_first(idl);
-
-    /* if port table is not changed then do not go ahead */
-    if ( (!OVSREC_IDL_ANY_TABLE_ROWS_MODIFIED(acl_row, idl_seqno)) &&
-            (!OVSREC_IDL_ANY_TABLE_ROWS_INSERTED(acl_row, idl_seqno)) &&
-            (!OVSREC_IDL_ANY_TABLE_ROWS_DELETED(acl_row, idl_seqno)) ) {
-        VLOG_DBG("%s: not a acl row change\n",__FUNCTION__);
-    } else {
-        /* Perform acl_list_reconfigure event for ACL */
-        rc = acl_reconfigure(idl,idl_seqno);
+    if(acl_row) {
+        /* if port table is not changed then do not go ahead */
+        if ( (!OVSREC_IDL_ANY_TABLE_ROWS_MODIFIED(acl_row, idl_seqno)) &&
+                (!OVSREC_IDL_ANY_TABLE_ROWS_INSERTED(acl_row, idl_seqno)) &&
+                (!OVSREC_IDL_ANY_TABLE_ROWS_DELETED(acl_row, idl_seqno)) ) {
+            VLOG_DBG("%s: not a acl row change\n",__FUNCTION__);
+        } else {
+            /* Perform acl_list_reconfigure event for ACL */
+            rc = acl_reconfigure(idl,idl_seqno);
+        }
     }
 
 
