@@ -1365,6 +1365,10 @@ cli_print_applied_acls (const char *interface_type,
                     VTY_NEWLINE);
         }
     } else if (!strcmp(interface_type, "vlan")) {
+        /** @todo Remove once classifier feature plug-in supports VLAN apply. */
+        vty_out(vty, "%% warning: VLAN ACLs presently unsupported by classifier feature plug-in%s", VTY_NEWLINE);
+        VLOG_WARN("VLAN ACLs presently unsupported by classifier feature plug-in");
+
         const struct ovsrec_vlan *vlan_row;
 
         /* Get VLAN row */
@@ -1471,6 +1475,11 @@ cli_apply_acl (const char *interface_type,
         }
 
     } else if (!strcmp(interface_type, "vlan")) {
+
+        /** @todo Remove once classifier feature plug-in supports VLAN apply. */
+        vty_out(vty, "%% warning: VLAN ACLs presently unsupported by classifier feature plug-in%s", VTY_NEWLINE);
+        VLOG_WARN("VLAN ACLs presently unsupported by classifier feature plug-in");
+
         const struct ovsrec_vlan *vlan_row;
         /* Get VLAN row */
         vlan_row = get_vlan_by_id_str(interface_id);
@@ -1584,6 +1593,11 @@ cli_unapply_acl (const char *interface_type,
         }
 
     } else if (!strcmp(interface_type, "vlan")) {
+
+        /** @todo Remove once classifier feature plug-in supports VLAN apply. */
+        vty_out(vty, "%% warning: VLAN ACLs presently unsupported by classifier feature plug-in%s", VTY_NEWLINE);
+        VLOG_WARN("VLAN ACLs presently unsupported by classifier feature plug-in");
+
         const struct ovsrec_vlan *vlan_row;
         /* Get VLAN row */
         vlan_row = get_vlan_by_id_str(interface_id);
@@ -1778,6 +1792,10 @@ cli_print_acl_statistics (const char *acl_type,
         }
     /* VLAN */
     } else if (interface_type && !strcmp(interface_type, "vlan")) {
+        /** @todo Remove once classifier feature plug-in supports VLAN apply. */
+        vty_out(vty, "%% warning: VLAN ACLs presently unsupported by classifier feature plug-in%s", VTY_NEWLINE);
+        VLOG_WARN("VLAN ACLs presently unsupported by classifier feature plug-in");
+
         /* Get VLAN row */
         vlan_row = get_vlan_by_id_str(interface_id);
         if (!vlan_row) {
@@ -1879,6 +1897,10 @@ cli_clear_acl_statistics (const char *acl_type,
             }
         /* VLAN */
         } else if (!strcmp(interface_type, "vlan")) {
+            /** @todo Remove once classifier feature plug-in supports VLAN apply. */
+            vty_out(vty, "%% warning: VLAN ACLs presently unsupported by classifier feature plug-in%s", VTY_NEWLINE);
+            VLOG_WARN("VLAN ACLs presently unsupported by classifier feature plug-in");
+
             /* Get VLAN row */
             vlan_row = get_vlan_by_id_str(interface_id);
             if (!vlan_row) {
