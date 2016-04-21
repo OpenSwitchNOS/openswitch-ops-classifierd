@@ -29,6 +29,7 @@ extern "C" {
 #endif
 
 #include "copp-asic-provider.h"
+#include "openswitch-idl.h"
 
 /*
  * Use designated initializer to pre-fill an array of pointer to key names

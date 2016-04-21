@@ -25,8 +25,15 @@
                         "icmpv4-multidest|icmpv6-unicast|icmpv6-multicast|" \
                         "dhcpv4|dhcpv6|acl-logging|sflow|unknown-ip|unclassified)"
 
+#define COPP_MAX_STRING "18446744073709551615"
 #define COPP_ZERO_STRING          "0"
-#define COPP_DEFAULT_STATS_STRING "0,0,0,0,0,0,0"
+#define COPP_DEFAULT_STATS_STRING COPP_MAX_STRING "," \
+                                  COPP_MAX_STRING "," \
+                                  COPP_MAX_STRING "," \
+                                  COPP_MAX_STRING "," \
+                                  COPP_MAX_STRING "," \
+                                  COPP_MAX_STRING "," \
+                                  COPP_MAX_STRING
 
 #define COPP_STATS_PROTOCOL_MAX_LENGTH     12
 
