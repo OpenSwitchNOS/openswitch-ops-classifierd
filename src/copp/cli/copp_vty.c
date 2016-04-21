@@ -234,15 +234,15 @@ vtysh_ovsdb_show_copp_generic_statistics()
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_PASSED);
-    vty_out(vty, "\t  %s    %8s\t", "total_packets_passed:", ((buf) ? buf : COPP_ZERO_STRING));
+    vty_out(vty, "\t  %s    %8s\t", "total packets passed:", ((buf) ? buf : COPP_ZERO_STRING));
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_PASSED);
-    vty_out(vty, "   %s    %8s\n", "total_bytes_passed:", ((buf) ? buf : COPP_ZERO_STRING));
+    vty_out(vty, "   %s    %8s\n", "total bytes_passed:", ((buf) ? buf : COPP_ZERO_STRING));
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_PKTS_DROPPED);
-    vty_out(vty, "\t  %s    %7s\t", "total_packets_dropped:", ((buf) ? buf : COPP_ZERO_STRING));
+    vty_out(vty, "\t  %s    %7s\t", "total packets_dropped:", ((buf) ? buf : COPP_ZERO_STRING));
 
     buf = smap_get(&ovs_system->copp_statistics,
                    SYSTEM_COPP_STATISTICS_MAP_TOTAL_BYTES_DROPPED);
