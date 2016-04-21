@@ -22,6 +22,7 @@
 #include "acl_port.h"
 #include "vswitch-idl.h"
 #include "ops_cls_status_msgs.h"
+#include "stats-blocks.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin);
 
@@ -56,6 +57,12 @@ int init (int phase_id)
     VLOG_INFO("[%s] - Registering BLK_VRF_PORT_UPDATE", ACL_PLUGIN_NAME);
     register_reconfigure_callback(&acl_callback_port_update,
                                   BLK_VRF_PORT_UPDATE, NO_PRIORITY);
+    VLOG_INFO("[%s] - Registering STATS_PER_BRIDGE_PORT", ACL_PLUGIN_NAME);
+    register_stats_callback(&acl_callback_port_stats_get,
+                            STATS_PER_BRIDGE_PORT, NO_PRIORITY);
+    VLOG_INFO("[%s] - Registering STATS_PER_VRF_PORT", ACL_PLUGIN_NAME);
+    register_stats_callback(&acl_callback_port_stats_get,
+                            STATS_PER_VRF_PORT, NO_PRIORITY);
 
     return 0;
 }

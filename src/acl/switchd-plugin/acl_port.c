@@ -20,6 +20,7 @@
 #include "vswitch-idl.h"
 #include "openvswitch/vlog.h"
 #include "reconfigure-blocks.h"
+#include "stats-blocks.h"
 #include "acl_plugin.h"
 #include "acl_ofproto.h"
 #include "ops_cls_status_msgs.h"
@@ -455,6 +456,59 @@ acl_port_map_cfg_delete(struct acl_port_map* acl_port_map, struct port *port,
        by the acl_port structure. */
 }
 
+static void
+acl_port_map_stats_get(struct acl_port_map *acl_port_map,
+                       struct ofproto *ofproto)
+{
+    struct ops_cls_interface_info interface_info;
+    struct ops_cls_statistics *statistics;
+    struct ops_cls_pd_list_status status;
+    int num_entries;
+    int rc;
+
+    /* Check if there is an ACL applied to this port map */
+    if (!acl_port_map->hw_acl) {
+        VLOG_DBG("No ACL applied for port %s, type %u, direction %u\n",
+                 acl_port_map->parent->port->name, acl_port_map->acl_db->type,
+                 acl_port_map->acl_db->direction);
+        return;
+    }
+
+    /* Construct the interface info */
+    ops_cls_interface_info_construct(&interface_info, acl_port_map->parent,
+                                     acl_port_map->parent->port);
+    /* Initialize statistics structure */
+    num_entries = acl_port_map->hw_acl->ovsdb_row->n_cur_aces;
+    statistics = xzalloc(num_entries *
+                         sizeof(struct ops_cls_statistics));
+
+    /* Get stats from ASIC layer */
+    rc = call_ofproto_ops_cls_statistics_get(acl_port_map->hw_acl,
+                                            acl_port_map->parent->port,
+                                            ofproto,
+                                            &interface_info,
+                                            acl_port_map->acl_db->direction,
+                                            statistics,
+                                            num_entries,
+                                            &status);
+    if (rc == 0) {
+        /* Upload stats to ovsdb */
+        /* 1. Find the number of  entries that have stats enabled by
+              checking stats_enabled.
+           2. Allocate 2 (key and value for stats)arrays of int64_t for the
+              size you found in 1.
+           3. Run a loop for n_cur_aces and walk through statistics array.
+              If stats_enabled, then copy the key_cfg_aces[i] into
+              key_aclv4_in_statistics[i] and statistics[i].hitcounts into
+              value_aclv4_instatistics[i]
+           4. Call ovsrec_port_set_aclv4_in_statistics(
+                                       acl_port_map->parent->ovsdb_row, key_aclv4_in_statistics[i], value_aclv4_instatistics[i], num_stats);
+                                       */
+    } else {
+        /* Error handling */
+    }
+}
+
 /** TODO: Enable this block after list delete is implemented */
 #if 0
 /**************************************************************************//**
@@ -742,5 +796,31 @@ acl_callback_port_update(struct blk_params *blk_params)
              acl_port_new(blk_params->port, blk_params->idl_seqno,
                           interface_flags);
         }
+    }
+}
+
+void
+acl_callback_port_stats_get(struct stats_blk_params *sblk,
+                            enum stats_block_id blk_id)
+{
+    struct bridge *br;
+    struct acl_port *acl_port;
+
+    /* Get the bridge to work with */
+    if (blk_id == STATS_PER_BRIDGE_PORT) {
+        br = sblk->br;
+    } else {
+        br = sblk->vrf->up;
+    }
+
+    /* Get the ACL port based on given port */
+    acl_port = port_lookup(&sblk->port->cfg->header_.uuid);
+    if (!acl_port) {
+        VLOG_DBG("Stats get not needed for port %s\n", sblk->port->name);
+        return;
+    }
+    /* Get statistics for this port if needed */
+    for (int i = 0; i < NUM_ACL_CFG_TYPES; i++) {
+        acl_port_map_stats_get(&acl_port->port_map[i], br->ofproto);
     }
 }
