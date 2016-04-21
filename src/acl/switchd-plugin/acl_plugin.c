@@ -23,6 +23,7 @@
 #include "acl_port.h"
 #include "vswitch-idl.h"
 #include "ops_cls_status_msgs.h"
+#include "stats-blocks.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin);
 
@@ -57,6 +58,12 @@ int init (int phase_id)
     VLOG_INFO("[%s] - Registering BLK_VRF_PORT_UPDATE", ACL_PLUGIN_NAME);
     register_reconfigure_callback(&acl_callback_port_update,
                                   BLK_VRF_PORT_UPDATE, NO_PRIORITY);
+    VLOG_INFO("[%s] - Registering STATS_PER_BRIDGE_PORT", ACL_PLUGIN_NAME);
+    register_stats_callback(&acl_callback_port_stats_get,
+                            STATS_PER_BRIDGE_PORT, NO_PRIORITY);
+    VLOG_INFO("[%s] - Registering STATS_PER_VRF_PORT", ACL_PLUGIN_NAME);
+    register_stats_callback(&acl_callback_port_stats_get,
+                            STATS_PER_VRF_PORT, NO_PRIORITY);
 
     VLOG_INFO("[%s] - Registering BLK_RUN_COMPLETE", ACL_PLUGIN_NAME);
     register_run_callback(&acl_log_run, BLK_RUN_COMPLETE, NO_PRIORITY);
@@ -95,6 +102,7 @@ acl_callback_bridge_init(struct blk_params *blk_params)
     /* Add omit alerts for ACL and port tables */
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_applied);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_status);
+    ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_statistics);
     ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_other_config);
     ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_external_ids);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_cur_aces);

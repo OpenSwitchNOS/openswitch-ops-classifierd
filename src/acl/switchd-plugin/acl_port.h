@@ -21,6 +21,7 @@
 #include "uuid.h"
 #include "acl.h"
 #include "reconfigure-blocks.h"
+#include "stats-blocks.h"
 #include "acl_db_util.h"
 
 /*************************************************************
@@ -117,5 +118,16 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params);
  * @param[in] blk_params - Pointer to the block parameters structure
  *****************************************************************************/
 void acl_callback_port_update(struct blk_params *blk_params);
+
+/**************************************************************************//**
+ * Statistics callback for every port in the bridge or vrf.
+ * This function gets statistics for each port that has ACL applied
+ * whenever @see run_stats_update() is called from switchd
+ *
+ * @param[in] sblk - Pointer to the stats block parameters structure
+ * @param[in] blk_id - Stats block id to identify the operation
+ *****************************************************************************/
+void acl_callback_port_stats_get(struct stats_blk_params *sblk,
+                                 enum stats_block_id blk_id);
 
 #endif  /* __SWITCHD__PLUGIN__ACL_PORT_H__ */
