@@ -38,6 +38,8 @@ include_directories (${CMAKE_INCL_DIR}
                      ${PROJECT_SOURCE_DIR}
                      ${OVSCOMMON_INCLUDE_DIRS}
                      ${OPSCLI_INCLUDE_DIRS}
+                     ${OPS_CLS_INCLUDE_DIR}
+                     ${CLS_INCLUDE_DIR}
                      ${ACL_INCLUDE_DIR}
                     )
 
