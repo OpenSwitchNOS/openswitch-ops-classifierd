@@ -153,7 +153,7 @@ acl_port_map_set_cfg_status(struct acl_port_map *acl_port_map,
 {
     struct smap cfg_status;
     char code_str[10];
-    //char version[25];
+    char version[25];
 
     smap_clone(&cfg_status, &row->aclv4_in_status);
 
@@ -164,13 +164,8 @@ acl_port_map_set_cfg_status(struct acl_port_map *acl_port_map,
     smap_remove(&cfg_status, OPS_CLS_STATUS_MSG_STR);
 
     /* Add values to the smap */
-    /*
-     * TODO: Uncomment this code when UI fills version field
-     *
-     * sprintf(version, "%" PRId64"", row->aclv4_in_cfg_version[0]);
-     * smap_add(&cfg_status, OPS_CLS_STATUS_VERSION_STR,
-     *          version);
-     */
+    sprintf(version, "%" PRId64"", row->aclv4_in_cfg_version[0]);
+    smap_add(&cfg_status, OPS_CLS_STATUS_VERSION_STR, version);
     smap_add(&cfg_status, OPS_CLS_STATUS_STATE_STR, state);
     sprintf(code_str, "%u", code);
     smap_add(&cfg_status, OPS_CLS_STATUS_CODE_STR, code_str);
