@@ -126,22 +126,6 @@ ovsrec_acl_cur_aces_getvalue(const struct ovsrec_acl *acl_row,
  * @todo This could/should be generated as part of IDL.
  */
 const int64_t
-ovsrec_port_aclv4_in_statistics_getvalue(const struct ovsrec_port *port_row,
-                                         const int64_t key)
-{
-    int i;
-    for (i = 0; i < port_row->n_aclv4_in_statistics; i ++) {
-        if (port_row->key_aclv4_in_statistics[i] == key) {
-            return port_row->value_aclv4_in_statistics[i];
-        }
-    }
-    return 0;
-}
-
-/**
- * @todo This could/should be generated as part of IDL.
- */
-const int64_t
 ovsrec_vlan_aclv4_in_statistics_getvalue(const struct ovsrec_vlan *vlan_row,
                                          const int64_t key)
 {
@@ -152,43 +136,6 @@ ovsrec_vlan_aclv4_in_statistics_getvalue(const struct ovsrec_vlan *vlan_row,
         }
     }
     return 0;
-}
-
-char *
-acl_entry_config_to_string(const int64_t sequence_num,
-                           const struct ovsrec_acl_entry *ace_row)
-{
-    struct ds dstring;
-    ds_init(&dstring);
-
-    ds_put_format(&dstring, "%" PRId64 " ", sequence_num);
-    ds_put_format(&dstring, "%s ", ace_row->action);
-    if (ace_row->n_protocol > 0) {
-        ds_put_format(&dstring, "%s ", acl_parse_protocol_get_name_from_number(ace_row->protocol[0]));
-    } else {
-        ds_put_format(&dstring, "%s ", "any");
-    }
-    acl_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
-    if (ace_row->n_src_l4_port_min && ace_row->n_src_l4_port_max) {
-        acl_entry_l4_port_config_to_ds(&dstring,
-                                       ace_row->src_l4_port_min[0],
-                                       ace_row->src_l4_port_max[0],
-                                       ace_row->n_src_l4_port_range_reverse);
-    }
-    acl_entry_ip_address_config_to_ds(&dstring, ace_row->dst_ip);
-    if (ace_row->n_dst_l4_port_min && ace_row->n_dst_l4_port_max) {
-        acl_entry_l4_port_config_to_ds(&dstring,
-                                       ace_row->dst_l4_port_min[0],
-                                       ace_row->dst_l4_port_max[0],
-                                       ace_row->n_dst_l4_port_range_reverse);
-    }
-    if (ace_row->log) {
-        ds_put_format(&dstring, "log ");
-    /* Log implies count, only print count if not logging */
-    } else if (ace_row->count) {
-        ds_put_format(&dstring, "count ");
-    }
-    return ds_steal_cstr(&dstring);
 }
 
 int
