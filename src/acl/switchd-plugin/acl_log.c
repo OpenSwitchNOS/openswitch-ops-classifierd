@@ -35,8 +35,7 @@
 #include "acl_log.h"
 #include "acl_parse.h"
 #include "acl_port.h"
-#include "connectivity.h"
-#include "ovs-thread.h"
+#include "hmap.h"
 #include "packets.h"
 #include "poll-loop.h"
 #include "run-blocks.h"
@@ -66,11 +65,8 @@ static int32_t prev_timer_interval_ms = 0;
 struct seq *
 acl_log_pktrx_seq_get(void)
 {
-    static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
-
-    if (ovsthread_once_start(&once)) {
+    if (!acl_log_pktrx_seq) {
         acl_log_pktrx_seq = seq_create();
-        ovsthread_once_done(&once);
     }
 
     return acl_log_pktrx_seq;
@@ -672,10 +668,206 @@ key_extract(struct parse_buff *pab, struct pkt_info *key)
    return 0;
 }
 
+/** Utilize OVSDB interface code generated from schema */
+extern struct ovsdb_idl *idl;
+
+struct ace_stat_s {
+    struct hmap_node hnode;     /* used for fast indexing */
+    struct uuid      uuid;      /* uuid of the ace row */
+    int64_t          hit_count; /* hit count for that ace */
+};
+
+struct ace_stats_cont_s {
+    size_t             num;         /* max capacity of the ace_stats array */
+    size_t             index;       /* index where the next insertion goes */
+    struct hmap        map;         /* hmap to index the ace_stats array */
+    struct ace_stat_s *ace_stats;   /* pointer to array of ace_stat_s */
+};
+
+/* This is the variable that will hold the baseline values for ACL logging
+ * statistics.
+ */
+static struct ace_stats_cont_s baseline_stats = { .num = 0 };
+
+/* The purpose of this function is to add one stat entry into the array and
+ * index it with the hash map for later look up.
+ */
+static bool
+acl_log_stats_add_stat(struct ace_stats_cont_s *cont, struct ace_stat_s *stat)
+{
+    if (cont->index >= cont->num) {
+        /* time to grow the array */
+        struct ace_stat_s *bigger_stats = xzalloc(cont->num * 2 *
+                                          sizeof(* cont->ace_stats));
+        if (!bigger_stats) {
+            /* the allocation failed - this is trouble */
+            return false;
+        }
+        memcpy(bigger_stats, cont->ace_stats, cont->num);
+        free(cont->ace_stats);
+        cont->ace_stats = bigger_stats;
+    }
+    /* add the stat at the current index */
+    memcpy(&cont->ace_stats[cont->index], stat, sizeof(*stat));
+    hmap_insert(&cont->map, &cont->ace_stats[cont->index].hnode,
+            uuid_hash(&cont->ace_stats[cont->index].uuid));
+    cont->index++;
+
+    /* success */
+    return true;
+}
+
+/* This function gets the hit count for a single ACE and assigns that hit
+ * count to the stat argument.
+ */
+static void
+acl_log_get_single_stat(struct ace_stat_s *stat,
+        const struct ovsrec_port *port_row, int index)
+{
+    stat->hnode.hash = 0;
+    stat->hnode.next = NULL;
+
+    /* get the uuid of the ACE */
+    memcpy(&stat->uuid,
+            &port_row->aclv4_in_applied->value_cur_aces[index]->header_.uuid,
+            sizeof(struct uuid));
+
+    /* read the hit count from the db */
+    stat->hit_count = ovsrec_port_aclv4_in_statistics_getvalue(
+                port_row, port_row->aclv4_in_applied->key_cur_aces[index]);
+}
+
+/* This function records the baseline statistics for the aclv4 applied to a
+ * single port.
+ */
+static void
+acl_log_port_aclv4_in_baseline_stats(const struct ovsrec_port *port_row,
+                                     const char* list_name)
+{
+    int i;
+
+    for (i = 0; i < port_row->aclv4_in_applied->n_cur_aces; i ++) {
+        if ((port_row->aclv4_in_applied->value_cur_aces[i]->action) &&
+                (port_row->aclv4_in_applied->value_cur_aces[i]->n_count) &&
+                (port_row->aclv4_in_applied->value_cur_aces[i]->n_log)) {
+            struct ace_stat_s stat;
+
+            acl_log_get_single_stat(&stat, port_row, i);
+
+            /* add the stat to prev_stats */
+            acl_log_stats_add_stat(&baseline_stats, &stat);
+        }
+    }
+}
+
+/* This function records the baseline values for all ACL statistics. This
+ * baseline will be used to calculate the delta when the ACL logging timer
+ * expires.
+ */
+static void
+acl_log_get_baseline_stats()
+{
+    const struct ovsrec_port *port_row;
+
+    /* if this is the first time getting baseline stats, initialize the
+     * structure */
+    if (baseline_stats.num == 0) {
+        baseline_stats.num = 256;
+        baseline_stats.index = 0;
+        baseline_stats.ace_stats = xzalloc(baseline_stats.num *
+                sizeof(* baseline_stats.ace_stats));
+        hmap_init(&baseline_stats.map);
+    }
+
+    /* record the statistics for each configured ACL */
+    OVSREC_PORT_FOR_EACH(port_row, idl) {
+        if (port_row->aclv4_in_applied) {
+            acl_log_port_aclv4_in_baseline_stats(port_row,
+                                                 port_row->aclv4_in_applied->name);
+        }
+    }
+}
+
+/* This function gets the statistics for the aclv4 applied to a single port,
+ * retrieves the baseline values if they are available, and prints the delta
+ * between them in a formatted log output.
+ */
+static void
+acl_log_port_aclv4_in_statistics(const struct ovsrec_port *port_row,
+                                 const char* list_name)
+{
+    char *ace_str;
+    int i;
+    struct ds log_dstr;
+
+    ds_init(&log_dstr);
+
+    ds_put_format(&log_dstr, "ACL %s on interface %s (in):\n", list_name, port_row->name);
+    ds_put_format(&log_dstr, "%20s  %s\n", "Hit Count", "Configuration");
+
+    /* Print each ACL entry as a single line (ala CLI input) */
+    for (i = 0; i < port_row->aclv4_in_applied->n_cur_aces; i ++) {
+        if ((port_row->aclv4_in_applied->value_cur_aces[i]->action) &&
+                (port_row->aclv4_in_applied->value_cur_aces[i]->n_count) &&
+                (port_row->aclv4_in_applied->value_cur_aces[i]->n_log)) {
+            struct ace_stat_s stat;
+            struct ace_stat_s *prev_stat;
+            int64_t hit_delta;
+
+            acl_log_get_single_stat(&stat, port_row, i);
+
+            hit_delta = stat.hit_count;
+
+            /* check for a previous hit count for this ace */
+            HMAP_FOR_EACH_WITH_HASH(prev_stat, hnode,
+                    uuid_hash(&stat.uuid), &baseline_stats.map) {
+                if (uuid_equals(&stat.uuid, &prev_stat->uuid)) {
+                    hit_delta = stat.hit_count - prev_stat->hit_count;
+                }
+            }
+
+            /* print the entry */
+            ds_put_format(&log_dstr, "%20" PRId64, hit_delta);
+            ace_str = acl_entry_config_to_string(
+                        port_row->aclv4_in_applied->key_cur_aces[i],
+                        port_row->aclv4_in_applied->value_cur_aces[i]);
+            ds_put_format(&log_dstr, "  %s\n", ace_str);
+            free(ace_str);
+        }
+    }
+
+    VLOG_INFO("%s", ds_steal_cstr(&log_dstr));
+    ds_destroy(&log_dstr);
+}
+
+/* This function prints the increase in hit counts for all ACL statistics
+ * over the previously recorded baseline.
+ */
+static void
+acl_log_get_stats()
+{
+    const struct ovsrec_port *port_row;
+
+    /* print and record the statistics for each configured ACL */
+    OVSREC_PORT_FOR_EACH(port_row, idl) {
+        if (port_row->aclv4_in_applied) {
+            acl_log_port_aclv4_in_statistics(port_row,
+                                             port_row->aclv4_in_applied->name);
+        }
+    }
+
+    /* clear the baseline */
+    hmap_clear(&baseline_stats.map);
+    baseline_stats.index = 0;
+    memset(baseline_stats.ace_stats, 0,
+            baseline_stats.num * sizeof(* baseline_stats.ace_stats));
+}
+
 void
 acl_log_init()
 {
       acllog_seqno = seq_read(acl_log_pktrx_seq_get());
+
       VLOG_DBG("ACL logging init");
 }
 
@@ -749,6 +941,7 @@ acl_log_run(struct run_blk_params *blk_params)
         /* if we can't identify the ACL that this packet matched, take no
          * further action on this packet */
         if (!acl) {
+            acllog_seqno = seq;
             return;
         }
 
@@ -820,12 +1013,10 @@ acl_log_run(struct run_blk_params *blk_params)
         VLOG_INFO("%s", ds_cstr_ro(&msg));
         ds_destroy(&msg);
 
-        if (start_time == LLONG_MIN)
-        {
-            /* this is the first time receiving a packet, so the ACEs may have
-             * non-zero counts that we have not previously stored */
-            /* TODO: record statistics */
-        }
+        /* get a baseline of the stats so the diff can be logged when the
+         * timer expires */
+        acl_log_get_baseline_stats();
+
         /* start the timer */
         start_time = cur_time;
         prev_timer_interval_ms = timer_interval_ms;
@@ -834,10 +1025,7 @@ acl_log_run(struct run_blk_params *blk_params)
         /* the timer has expired */
         VLOG_DBG("ACL log timer expired");
 
-        /* TODO */
-        /* 1. get the statistics for ACEs with the log action */
-        /* 2. print diffs */
-        /* 3. update previous counts */
+        acl_log_get_stats();
 
         /* start receiving packets again */
         start_time = LLONG_MAX;

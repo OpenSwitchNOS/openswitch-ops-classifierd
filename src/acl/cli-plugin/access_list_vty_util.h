@@ -58,25 +58,4 @@ void print_ace_pretty_ip_address(const char *format, char *address_str);
  */
 void print_ace_pretty_l4_ports(int64_t min, int64_t max, bool reverse);
 
-/**
- * Add IP address config information to an ACE dynamic string
- *
- * @param dstring      Pointer to initialized dynamic string
- * @param address_str  Pointer to IP address string
- */
-void acl_entry_ip_address_config_to_ds(struct ds *dstring, char *address_str);
-
-/**
- * Add L4 port config information to an ACE dynamic string
- *
- * @param dstring  Pointer to initialized dynamic string
- * @param min      First port number
- * @param max      Last port number
- * @param reverse  Whether range is reversed
- */
-void acl_entry_l4_port_config_to_ds(struct ds *dstring,
-                                    int64_t min,
-                                    int64_t max,
-                                    bool reverse);
-
 #endif /* _ACCESS_LIST_VTY_UTIL_H */

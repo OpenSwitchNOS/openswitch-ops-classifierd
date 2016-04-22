@@ -88,32 +88,3 @@ print_ace_pretty_l4_ports(int64_t min, int64_t max, bool reverse)
         vty_out(vty, "%s %5" PRId64 " %s %5" PRId64, "  ", min, "-", max);
     }
 }
-
-void
-acl_entry_ip_address_config_to_ds(struct ds *dstring, char *address_str)
-{
-    char user_str[INET_ADDRSTRLEN*2];
-    if(acl_ipv4_address_normalized_to_user(address_str, user_str))
-    {
-        ds_put_format(dstring, "%s ", user_str);
-    }
-}
-
-void
-acl_entry_l4_port_config_to_ds(struct ds *dstring,
-                               int64_t min, int64_t max, bool reverse)
-{
-    if (min == max) {
-        if (reverse) {
-            ds_put_format(dstring, "%s %" PRId64 " ", "neq", min);
-        } else {
-            ds_put_format(dstring, "%s %" PRId64 " ", "eq", min);
-        }
-    } else if (min == 0 && max < 65535) {
-        ds_put_format(dstring, "%s %" PRId64 " ", "lt", max + 1);
-    } else if (min > 0 && max == 65535) {
-        ds_put_format(dstring, "%s %" PRId64 " ", "gt", min - 1);
-    } else {
-        ds_put_format(dstring, "%s %" PRId64 " %" PRId64 " ", "range", min, max);
-    }
-}
