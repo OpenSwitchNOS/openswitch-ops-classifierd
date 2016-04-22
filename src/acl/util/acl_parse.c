@@ -212,9 +212,10 @@ acl_ipv4_address_normalized_to_user(const char *normalized_str, char *user_str)
 
     mask_substr = &slash_ptr[1];
 
-    /* Check to see if we have a host mask (/32) */
+    /* If we have a host mask (/32), copy out the address and NULL-terminate */
     if (!strcmp(mask_substr, "255.255.255.255")) {
         strncpy(user_str, normalized_str, slash_ptr - normalized_str);
+        user_str[slash_ptr - normalized_str] = '\0';
         return true;
     }
 
