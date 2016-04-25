@@ -37,13 +37,48 @@ acl_reconfigure(struct ovsdb_idl *idl, unsigned int idl_seqno)
 {
     int rc = 0;
     const struct ovsrec_acl *acl_row = NULL;
+    const char *status_version_str;
+    uint64_t status_version;
+    bool in_progress_cleared = false;
 
     VLOG_DBG("acl_reconfigure...\n");
 
     ovs_assert(idl);
 
     OVSREC_ACL_FOR_EACH (acl_row, idl) {
-        VLOG_DBG("ACL %s:  \n",acl_row->name);
+        if (OVSREC_IDL_IS_ROW_INSERTED(acl_row, idl_seqno) ||
+            OVSREC_IDL_IS_ROW_MODIFIED(acl_row, idl_seqno)) {
+            /* Get the status version */
+            status_version_str = smap_get(&acl_row->status, "version");
+            /* If the status version is valid, then update in_progress_aces
+             * only when in_progress_version == status_version and
+             * cfg_version > in_progress_version.
+             */
+            if (status_version_str) {
+                status_version = strtoull(status_version_str, NULL, 0);
+                if (acl_row->in_progress_version == status_version) {
+                    /* Clear the in_progress_aces as we have finished
+                     * processing the in_progress_aces.
+                     */
+                    ovsrec_acl_set_in_progress_aces(acl_row, NULL, NULL, 0);
+                    in_progress_cleared = true;
+                    rc++;
+                }
+            }
+            /* If status_version_str is NULL, it is the first time we are
+             * programming anything into aces column. We need to update
+             * in_progress_aces column. The other condition to check is
+             * if UI made a change and in_progress_cleared flag is true */
+            if (!status_version_str ||
+                ((in_progress_cleared == true) &&
+                 (acl_row->cfg_version > acl_row->in_progress_version))) {
+                ovsrec_acl_set_in_progress_aces(acl_row, acl_row->key_cfg_aces,
+                    acl_row->value_cfg_aces, acl_row->n_cfg_aces);
+                ovsrec_acl_set_in_progress_version(acl_row,
+                                                   acl_row->cfg_version);
+                rc++;
+            }
+        }
     } /* for each acl ROW */
 
     VLOG_DBG("%s: number of updates back to db: %d",__FUNCTION__,rc);

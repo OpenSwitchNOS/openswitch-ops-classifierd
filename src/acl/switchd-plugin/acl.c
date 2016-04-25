@@ -55,30 +55,6 @@ VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
 #define ACL_CFG_STATE_IN_PROGRESS   "in_progress"
 #define ACL_CFG_STATE_CANCELLED     "cancelled"
 
-struct db_ace {
-    uint32_t sequence_number;
-    struct ovsrec_acl_entry *acl_entry;
-};
-
-static int
-sort_compare_aces(size_t a, size_t b, void *aces_)
-{
-    const struct db_ace *aces = aces_;
-    uint32_t a_seq = aces[a].sequence_number;
-    uint32_t b_seq = aces[b].sequence_number;
-
-    return (a_seq < b_seq) ? -1 : (a_seq > b_seq);
-}
-
-static void
-sort_swap_aces(size_t a, size_t b, void *ptrs_)
-{
-    struct db_ace *ptrs = ptrs_;
-    struct db_ace tmp = ptrs[a];
-    ptrs[a] = ptrs[b];
-    ptrs[b] = tmp;
-}
-
 static bool
 populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
                                 const struct ovsrec_acl_entry *acl_entry)
@@ -182,59 +158,36 @@ ops_cls_list_new_from_acl(struct acl *acl)
 {
     const struct ovsrec_acl *acl_row = acl->ovsdb_row;
     bool valid = true;
+    size_t n_aces = acl_row->n_in_progress_aces;
 
     struct ops_cls_list *list = ops_cls_list_new();
     list->list_id = acl->uuid;
     list->list_name = xstrdup(acl->name);
     list->list_type = acl->type;
 
-    /* make a sorted copy of the ace strings from OVSDB */
-    size_t n_aces = acl_row->n_cfg_aces;
-    size_t n_sorted_aces = 0;
-    struct db_ace *sorted_aces = NULL;
-    if (n_aces > 0) {
-        sorted_aces = xmalloc(n_aces * sizeof sorted_aces[0]);
-
-        while (n_sorted_aces < n_aces) {
-            /* TODO: Deal with comment ACE's
-             *
-             if (node->value.is_comment) {
-                continue;
-             }
-            */
-            sorted_aces[n_sorted_aces].sequence_number = acl_row->key_cfg_aces[n_sorted_aces];
-            sorted_aces[n_sorted_aces].acl_entry = acl_row->value_cfg_aces[n_sorted_aces];
-            ++n_sorted_aces;
-        }
-        if (n_sorted_aces > 0) {
-            sort(n_sorted_aces, &sort_compare_aces, &sort_swap_aces,
-                 sorted_aces);
-        }
-    }
 
     /* allocate our PI entries and convert from json */
-    list->num_entries = n_sorted_aces + 1; /* +1 for implicit deny all */
+    list->num_entries = n_aces + 1; /* +1 for implicit deny all */
     list->entries = xzalloc(list->num_entries * sizeof *list->entries);
-    for (int i = 0; i < n_sorted_aces; ++i) {
-        const struct db_ace *dbace = &sorted_aces[i];
+    for (int i = 0; i < n_aces; ++i) {
         struct ops_cls_list_entry *entry = &list->entries[i];
 
-        if (!populate_entry_from_acl_entry(entry, dbace->acl_entry)) {
+        if (!populate_entry_from_acl_entry(entry,
+                                   acl_row->value_in_progress_aces[i])) {
             /* VLOG_ERR already emitted */
             valid = false;
         }
     }
 
     /* add implicit deny all to end */
-    list->entries[n_sorted_aces].entry_actions.action_flags =
-        OPS_CLS_ACTION_DENY;
+    list->entries[n_aces].entry_actions.action_flags =
+                                               OPS_CLS_ACTION_DENY;
 
     if (!valid) {
         ops_cls_list_delete(list);
         list = NULL;
     }
 
-    free(sorted_aces);
     return list;
 }
 
@@ -270,12 +223,12 @@ acl_type_from_string(const char *str)
 }
 
 /************************************************************
- * acl_new() and acl_delete() are low-level routines that deal with PI
+ * acl_create() and acl_delete() are low-level routines that deal with PI
  * acl data structures. They take care off all the memorary
  * management, hmap memberships, etc. They DO NOT make any PD calls.
  ************************************************************/
 static struct acl*
-acl_new(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
+acl_create(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
 {
     struct acl *acl = xzalloc(sizeof *acl);
     acl->uuid = ovsdb_row->header_.uuid;
@@ -335,7 +288,7 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
 
     /* Add values to the smap */
     smap_add(&cfg_status, ACL_CFG_STATUS_STR, state);
-    sprintf(version, "%" PRId64"", row->cfg_version);
+    sprintf(version, "%" PRId64"", row->in_progress_version);
     smap_add(&cfg_status, ACL_CFG_STATUS_VERSION, version);
     smap_add(&cfg_status, ACL_CFG_STATUS_STATE, state);
     sprintf(code_str, "%u", code);
@@ -356,7 +309,7 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
 }
 
 static void
-acl_update_internal(struct acl* acl)
+acl_cfg_update(struct acl* acl)
 {
     /* Always translate/validate user input, so we can fail early
      * on unsupported values */
@@ -390,9 +343,9 @@ acl_update_internal(struct acl* acl)
             sprintf(details, "ACL %s -- PD list_update succeeded", acl->name);
             VLOG_DBG(details);
             ovsrec_acl_set_cur_aces(acl->ovsdb_row,
-                                    acl->ovsdb_row->key_cfg_aces,
-                                    acl->ovsdb_row->value_cfg_aces,
-                                    acl->ovsdb_row->n_cfg_aces);
+                                    acl->ovsdb_row->key_in_progress_aces,
+                                    acl->ovsdb_row->value_in_progress_aces,
+                                    acl->ovsdb_row->n_in_progress_aces);
             /* status_str will be NULL on success */
             acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_APPLIED,
                                0, status_str);
@@ -420,10 +373,13 @@ acl_update_internal(struct acl* acl)
         sprintf(details, "ACL %s -- Not applied. No PD call necessary",
                 acl->name);
         VLOG_DBG(details);
-        ovsrec_acl_set_cur_aces(acl->ovsdb_row, acl->ovsdb_row->key_cfg_aces,
-            acl->ovsdb_row->value_cfg_aces, acl->ovsdb_row->n_cfg_aces);
+        ovsrec_acl_set_cur_aces(acl->ovsdb_row,
+                                acl->ovsdb_row->key_in_progress_aces,
+                                acl->ovsdb_row->value_in_progress_aces,
+                                acl->ovsdb_row->n_in_progress_aces);
         /* status_str will be NULL on success */
-        acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_APPLIED, 0, status_str);
+        acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_APPLIED, 0,
+                           status_str);
     }
 }
 
@@ -431,26 +387,6 @@ acl_update_internal(struct acl* acl)
  * acl_cfg_create(), acl_cfg_update(), acl_delete() are
  * the PI acl CRUD routines.
  ************************************************************/
-static struct acl*
-acl_cfg_create(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
-{
-    VLOG_DBG("ACL %s created", ovsdb_row->name);
-
-    struct acl *acl = acl_new(ovsdb_row, seqno);
-
-    /* TODO: Remove temporary processing of ACL:C like an ACL:U */
-    acl_update_internal(acl);
-
-    return acl;
-}
-
-static void
-acl_cfg_update(struct acl* acl)
-{
-    VLOG_DBG("ACL %s changed", acl->name);
-    acl_update_internal(acl);
-}
-
 static void
 acl_cfg_delete(struct acl* acl)
 {
@@ -509,7 +445,7 @@ acl_reconfigure_init(struct blk_params *blk_params)
         OVSREC_ACL_FOR_EACH_SAFE(acl_row, acl_row_next, idl) {
             struct acl *acl = acl_lookup_by_uuid(&acl_row->header_.uuid);
             if (!acl) {
-                acl = acl_cfg_create(acl_row, idl_seqno);
+                acl = acl_create(acl_row, idl_seqno);
             } else {
                 /* Always update these, even if nothing else has changed,
                  * The ovsdb_row may have changed out from under us.
@@ -523,7 +459,7 @@ acl_reconfigure_init(struct blk_params *blk_params)
                     (OVSREC_IDL_IS_ROW_MODIFIED(acl_row, idl_seqno) ||
                      OVSREC_IDL_IS_ROW_INSERTED(acl_row, idl_seqno));
 
-                if (row_changed) {
+                if (row_changed && acl_row->n_in_progress_aces > 0) {
                     acl_cfg_update(acl);
                 }
             }
