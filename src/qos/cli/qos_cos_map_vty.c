@@ -384,7 +384,7 @@ qos_cos_map_vty_init(void)
 }
 
 /**
- * Initializes qos_cos_map_ovsdb.
+ * This function initializes qos_cos_map_ovsdb.
  */
 void
 qos_cos_map_ovsdb_init(void)
