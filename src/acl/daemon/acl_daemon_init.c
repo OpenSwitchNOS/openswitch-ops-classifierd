@@ -47,10 +47,14 @@ acl_ovsdb_init(struct ovsdb_idl *idl)
 
     /* Mark the following columns write-only. */
     ovsdb_idl_add_column(idl, &ovsrec_acl_col_in_progress_aces);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_in_progress_version);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_status);
+    ovsdb_idl_add_column(idl, &ovsrec_acl_col_cfg_version);
     /* @todo: add hw_ready_state column for write */
 
     /* Omit alerts for the columns we are writing. */
     ovsdb_idl_omit_alert(idl, &ovsrec_acl_col_in_progress_aces);
+    ovsdb_idl_omit_alert(idl, &ovsrec_acl_col_in_progress_version);
     /* @todo: add hw_ready_state column to omit */
 
 } /* acl_ovsdb_init */
