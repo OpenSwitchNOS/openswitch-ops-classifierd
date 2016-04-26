@@ -769,6 +769,12 @@ void acl_callback_port_delete(struct blk_params *blk_params)
         br = blk_params->vrf->up;
     }
 
+    if (shash_is_empty(&br->wanted_ports)) {
+        VLOG_DBG("[%s]No port rows are modified; no ports to delete.",
+                 ACL_PLUGIN_NAME);
+        return;
+    }
+
     /* Find and delete ACL cfg for the ports that are being deleted */
     HMAP_FOR_EACH_SAFE(del_port, next_del_port, hmap_node, &br->ports) {
         if (!shash_find_data(&br->wanted_ports, del_port->name)) {
