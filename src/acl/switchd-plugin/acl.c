@@ -180,9 +180,9 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
     }
     else
     {
-    /* SB: @todo verify if business logic has validated protocol value */
-    entry->entry_fields.protocol = acl_entry->protocol[0];
-    entry->entry_fields.entry_flags |= OPS_CLS_PROTOCOL_VALID;
+        /* SB: @todo verify if business logic has validated protocol value */
+        entry->entry_fields.protocol = acl_entry->protocol[0];
+        entry->entry_fields.entry_flags |= OPS_CLS_PROTOCOL_VALID;
     }
 
     if (!acl_parse_actions(acl_entry->action,
@@ -191,7 +191,7 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
         valid = false;
     }
 
-    if(acl_entry->n_src_l4_port_min
+    if (acl_entry->n_src_l4_port_min
             && acl_entry->src_l4_port_min)
     {
         entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_EQ;
@@ -199,8 +199,9 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
         entry->entry_fields.L4_src_port_min = acl_entry->src_l4_port_min[0];
     }
 
-    if(acl_entry->n_src_l4_port_max
-            && acl_entry->src_l4_port_max)
+    if (acl_entry->n_src_l4_port_max
+            && acl_entry->src_l4_port_max
+            && acl_entry->src_l4_port_min[0] != acl_entry->src_l4_port_max[0])
     {
         /* assumes port min was specified, so changes operator to range */
         entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_RANGE;
@@ -208,7 +209,7 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
         entry->entry_fields.L4_src_port_max = acl_entry->src_l4_port_max[0];
     }
 
-    if(acl_entry->n_src_l4_port_range_reverse
+    if (acl_entry->n_src_l4_port_range_reverse
             && acl_entry->src_l4_port_range_reverse)
     {
         /* it assumes that CLI has validated port min and max are the same */
@@ -216,30 +217,30 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
     }
 
 
-    if(acl_entry->n_dst_l4_port_min
+    if (acl_entry->n_dst_l4_port_min
             && acl_entry->dst_l4_port_min)
     {
-        entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_EQ;
+        entry->entry_fields.L4_dst_port_op = OPS_CLS_L4_PORT_OP_EQ;
         entry->entry_fields.entry_flags |= OPS_CLS_L4_DEST_PORT_VALID;
         entry->entry_fields.L4_dst_port_min = acl_entry->dst_l4_port_min[0];
     }
 
-    if(acl_entry->n_dst_l4_port_max
-            && acl_entry->dst_l4_port_max)
+    if (acl_entry->n_dst_l4_port_max
+            && acl_entry->dst_l4_port_max
+            && acl_entry->dst_l4_port_min[0] != acl_entry->dst_l4_port_max[0])
     {
         /* assumes port min was specified, so changes operator to range */
-        entry->entry_fields.L4_src_port_op = OPS_CLS_L4_PORT_OP_RANGE;
+        entry->entry_fields.L4_dst_port_op = OPS_CLS_L4_PORT_OP_RANGE;
         entry->entry_fields.entry_flags |= OPS_CLS_L4_DEST_PORT_VALID;
         entry->entry_fields.L4_dst_port_max = acl_entry->dst_l4_port_max[0];
     }
 
-    if(acl_entry->n_dst_l4_port_range_reverse
+    if (acl_entry->n_dst_l4_port_range_reverse
             && acl_entry->dst_l4_port_range_reverse)
     {
         /* it assumes that CLI has validated port min and max are the same */
         entry->entry_fields.L4_dst_port_op = OPS_CLS_L4_PORT_OP_NEQ;
     }
-
 
     return valid;
 }
