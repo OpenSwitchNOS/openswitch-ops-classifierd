@@ -578,10 +578,12 @@ key_extract(struct parse_buff *pab, struct pkt_info *key)
       /* Transport layer. */
       if (key->ip.proto == IPPROTO_TCP) {
          if (tcphdr_ok(pab)) {
+            uint16_t tmp;
             struct tcphdr *tcp = tcp_hdr(pab);
             key->tp.src = htons(tcp->source);
             key->tp.dst = htons(tcp->dest);
-            key->tp.flags = TCP_FLAGS_BE16(*(uint16_t *)&(((union tcp_word_hdr *)(tcp))->words[3]));
+            tmp = (uint16_t)(((union tcp_word_hdr *)(tcp))->words[3]);
+            key->tp.flags = TCP_FLAGS_BE16(tmp);
          } else {
             memset(&key->tp, 0, sizeof(key->tp));
          }
