@@ -39,25 +39,6 @@
 #define ACL_LOG_TIMER_MAX "300"
 #define ACL_LOG_TIMER_DEFAULT ACL_LOG_TIMER_MAX
 
-bool acl_parse_ipv4_address(const char *in_address,
-                            enum ops_cls_list_entry_flags flag,
-                            uint32_t *flags,
-                            struct in_addr *v4_addr,
-                            struct in_addr *v4_mask,
-                            enum ops_cls_addr_family *family);
-bool acl_parse_protocol(const char *in_proto,
-                        enum ops_cls_list_entry_flags flag,
-                        uint32_t *flags,
-                        uint8_t *proto);
-bool acl_parse_actions(const char *in_action,
-                       struct ops_cls_list_entry_actions *actions);
-bool acl_parse_l4_port(const char *in_port,
-                       uint16_t *port);
-bool acl_parse_l4_operator(const char *in_op,
-                           enum ops_cls_list_entry_flags flag,
-                           uint32_t *flags,
-                           enum ops_cls_L4_operator *op);
-
 /**
  * Determine if a string is numeric or not
  *

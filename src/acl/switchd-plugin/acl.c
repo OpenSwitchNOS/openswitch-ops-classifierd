@@ -80,6 +80,73 @@ sort_swap_aces(size_t a, size_t b, void *ptrs_)
 }
 
 static bool
+acl_parse_ipv4_address(const char *in_address,
+                       enum ops_cls_list_entry_flags flag,
+                       uint32_t *flags,
+                       struct in_addr *v4_addr,
+                       struct in_addr *v4_mask,
+                       enum ops_cls_addr_family *family)
+{
+    char tmp_str[INET_ADDRSTRLEN*2]; /* Fits address, '/', mask, and NULL */
+    char *slash_ptr;
+    char *mask_substr = NULL;
+
+    *flags |= flag;
+    *family = OPS_CLS_AF_INET;
+
+    /* Get a copy of the string we can do destructive things to */
+    strncpy(tmp_str, in_address, INET_ADDRSTRLEN*2);
+
+    /* Find the slash character (if any) in input */
+    slash_ptr = strchr(tmp_str, '/');
+    if (slash_ptr) {
+        slash_ptr[0] = '\0'; /* Replace slash with NULL to split strings */
+        mask_substr = &slash_ptr[1]; /* Point to mask string for parsing */
+    } else {
+        VLOG_ERR("Invalid IPv4 address string %s: expectd 'A.B.C.D/W.X.Y.Z'", tmp_str);
+        return false;
+    }
+
+    if (!inet_pton(AF_INET, tmp_str, v4_addr)) {
+        VLOG_ERR("Invalid IPv4 address %s in DB", tmp_str);
+        return false;
+    }
+
+    if (!inet_pton(AF_INET, mask_substr, v4_mask)) {
+        VLOG_ERR("Invalid IPv4 mask %s in DB", mask_substr);
+        return false;
+    }
+
+    return true;
+}
+
+static bool
+acl_parse_actions(const char *in_action,
+                  struct ops_cls_list_entry_actions *actions)
+{
+    /* TODO: handle empty action */
+    /* TODO: handle conflicting actions (e.g. permit and deny) */
+
+    if (strstr(in_action, "permit")) {
+        actions->action_flags |= OPS_CLS_ACTION_PERMIT;
+    }
+
+    if (strstr(in_action, "deny")) {
+        actions->action_flags |= OPS_CLS_ACTION_DENY;
+    }
+
+    if (strstr(in_action, "log")) {
+        actions->action_flags |= OPS_CLS_ACTION_LOG;
+    }
+
+    if (strstr(in_action, "count")) {
+        actions->action_flags |= OPS_CLS_ACTION_COUNT;
+    }
+
+    return true;
+}
+
+static bool
 populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
                                 const struct ovsrec_acl_entry *acl_entry)
 {
