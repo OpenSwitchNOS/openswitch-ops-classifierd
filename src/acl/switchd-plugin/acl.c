@@ -81,7 +81,7 @@ sort_swap_aces(size_t a, size_t b, void *ptrs_)
 
 static bool
 acl_parse_ipv4_address(const char *in_address,
-                       enum ops_cls_list_entry_flags flag,
+                       uint32_t flag,
                        uint32_t *flags,
                        struct in_addr *v4_addr,
                        struct in_addr *v4_mask,
