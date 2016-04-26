@@ -14,7 +14,8 @@
  * limitations under the License.
  *
  *
- * This file contains the definition of data structures common to ACL API between ASIC providers and platform-independent code.
+ * This file contains the definition of data structures common to ACL API
+ * between ASIC providers and platform-independent code.
  */
 #ifndef OPS_CLS_ASIC_PLUGIN_H_
 #define OPS_CLS_ASIC_PLUGIN_H_   1
@@ -123,10 +124,7 @@ enum ops_cls_interface
 /**
  * Classifier List Application Interface flags
  */
-enum ops_cls_interface_flags
-{
-    OPS_CLS_INTERFACE_L3ONLY = 0x00000001
-};
+#define OPS_CLS_INTERFACE_L3ONLY  0x00000001 /**< L3 only flag */
 
 /**
  * Classifier List Application Interface struct.
@@ -136,33 +134,53 @@ enum ops_cls_interface_flags
 struct ops_cls_interface_info
 {
     enum ops_cls_interface       interface; /**< interface type*/
-    uint32_t                     flags;  /**< bitwise-OR of flags
-                                              defined in @ref
-                                              ops_cls_interface_flags */
+    uint32_t                     flags;  /**< bitwise-OR of interface flags */
 };
 
 /**
  * Classifier List Entry Match Field Valid Flags
  */
-enum ops_cls_list_entry_flags
-{
-    OPS_CLS_SRC_IPADDR_VALID   =     0x00000001,
-    OPS_CLS_DEST_IPADDR_VALID  =     0x00000002,
-    OPS_CLS_L4_SRC_PORT_VALID  =     0x00000004,
-    OPS_CLS_L4_DEST_PORT_VALID =     0x00000008,
-    OPS_CLS_PROTOCOL_VALID     =     0x00000010,
-    OPS_CLS_TOS_VALID          =     0x00000020,
-    OPS_CLS_TCP_FLAGS_VALID    =     0x00000040,
-    OPS_CLS_TCP_ESTABLISHED    =     0x00000080,
-    OPS_CLS_ICMP_CODE_VALID    =     0x00000100,
-    OPS_CLS_ICMP_TYPE_VALID    =     0x00000200,
-    OPS_CLS_VLAN_VALID         =     0x00000400,
-    OPS_CLS_DSCP_VALID         =     0x00000800,
-    OPS_CLS_SRC_MAC_VALID      =     0x00001000,
-    OPS_CLS_DST_MAC_VALID      =     0x00002000,
-    OPS_CLS_L2_COS_VALID       =     0x00004000,
-    OPS_CLS_L2_ETHERTYPE_VALID =     0x00008000
-};
+#define    OPS_CLS_SRC_IPADDR_VALID      0x00000001 /**< Indicates that the
+                                                         source IP address is
+                                                         valid */
+#define    OPS_CLS_DEST_IPADDR_VALID     0x00000002 /**< Indicates that the
+                                                         dest IP address is
+                                                         valid */
+#define    OPS_CLS_L4_SRC_PORT_VALID     0x00000004 /**< Indicates that the
+                                                         source port is
+                                                         valid */
+#define    OPS_CLS_L4_DEST_PORT_VALID    0x00000008 /**< Indicates that the
+                                                         dest port is
+                                                         valid */
+#define    OPS_CLS_PROTOCOL_VALID        0x00000010 /**< Indicates that the
+                                                         protocol field is
+                                                         set */
+#define    OPS_CLS_TOS_VALID             0x00000020 /**< Indicates that the
+                                                         ToS field is
+                                                         set */
+#define    OPS_CLS_TCP_FLAGS_VALID       0x00000040 /**< Indicates that the
+                                                         TCP flags are set */
+#define    OPS_CLS_TCP_ESTABLISHED       0x00000080 /**< Indicates that the
+                                                         TCP established field is set */
+#define    OPS_CLS_ICMP_CODE_VALID       0x00000100 /**< Indicates that the
+                                                         ICMP code field is
+                                                         set */
+#define    OPS_CLS_ICMP_TYPE_VALID       0x00000200 /**< Indicates that the
+                                                         ICMP type field is
+                                                         set */
+#define    OPS_CLS_VLAN_VALID            0x00000400 /**< Indicates that the
+                                                         VLAN is set */
+#define    OPS_CLS_DSCP_VALID            0x00000800 /**< Indicates that the
+                                                         DSCP is set */
+#define    OPS_CLS_SRC_MAC_VALID         0x00001000 /**< Indicates that the
+                                                         source mac is
+                                                         set */
+#define    OPS_CLS_DST_MAC_VALID         0x00002000 /**< Indicates that the
+                                                         dest mac is set */
+#define    OPS_CLS_L2_COS_VALID          0x00004000 /**< Indicates that cos
+                                                         is set */
+#define    OPS_CLS_L2_ETHERTYPE_VALID    0x00008000 /**< Indicates that L2
+                                                         ethertype is set */
 
 /**
  * Classifier List Entry L4 Comparison operator
@@ -192,8 +210,8 @@ enum ops_cls_addr_family
  */
 struct ops_cls_list_entry_match_fields
 {
-    uint32_t            entry_flags;        /**< bitwise-OR of flags defined
-                                                 in @ref ops_cls_list_entry_flags */
+    uint32_t            entry_flags;        /**< bitwise-OR of match field
+                                                 flags */
     union
     {
         struct in6_addr v6;
@@ -248,20 +266,17 @@ struct ops_cls_list_entry_match_fields
 /**
  * Classifier List Entry Action Flags
  */
-enum ops_cls_list_entry_action_flags
-{
-    OPS_CLS_ACTION_PERMIT =      0x00000001,
-    OPS_CLS_ACTION_DENY   =      0x00000002,
-    OPS_CLS_ACTION_LOG    =      0x00000004,
-    OPS_CLS_ACTION_COUNT  =      0x00000008
-};
+#define  OPS_CLS_ACTION_PERMIT  0x00000001 /**< Permit action flag */
+#define  OPS_CLS_ACTION_DENY    0x00000002 /**< Deny action flag   */
+#define  OPS_CLS_ACTION_LOG     0x00000004 /**< Log action flag    */
+#define  OPS_CLS_ACTION_COUNT   0x00000008 /**< Count action flag  */
 
 /**
  * Classifier List Entry Action Structure
  */
 struct ops_cls_list_entry_actions
 {
-    uint32_t         action_flags; /**< bitwise-OR of flags defined in @ref ops_cls_list_entry_action_flags */
+    uint32_t         action_flags; /**< bitwise-OR of action flags */
     /* additional actions to be added later */
 };
 
@@ -626,9 +641,16 @@ struct ops_cls_plugin_interface {
                                         struct ops_cls_pd_list_status *status);
 
     /**
-     * API for ACL logging.
+     * API to register the callback to log the packet that was copied to the
+     * CPU as a result of ACL logging
+     *
+     * @param[in] callback_handler - pointer to the function provided by PI for
+     *                               passing information about an ACL logging
+     *                               packet
+     * @retval OPS_OK              - if a non-NULL function pointer was passed
+     * @retval OPS_FAIL            - if a NULL value was passed
      */
-    int (*ofproto_ops_cls_acl_log_pkt_data_set)(
+    int (*ofproto_ops_cls_acl_log_pkt_register_cb)(
                               void (*callback_handler)(struct acl_log_info *));
 };
 #endif /* OPS_CLS_ASIC_PLUGIN_H_ */

@@ -15,15 +15,10 @@
  *
  ***************************************************************************/
 
-#ifndef _QOS_MAP_H_
-#define _QOS_MAP_H_
+#ifndef _MIRROR_VTY_H_
+#define _MIRROR_VTY_H_
 
-#include "vswitch-idl.h"
-#include "ofproto/ofproto-provider.h"
+void cli_pre_init(void)
+void cli_post_init(void);
 
-void qos_configure_global_cos_map(struct ofproto *,
-                                  struct ovsdb_idl *, unsigned int);
-void qos_configure_global_dscp_map(struct ofproto *,
-                                   struct ovsdb_idl *, unsigned int);
-
-#endif /* _QOS_MAP_H_ */
+#endif /* _MIRROR_VTY_H_ */
