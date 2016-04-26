@@ -56,6 +56,7 @@ set (SOURCES ${OPS_CLS_SOURCE_DIR}/classifierd.c
              ${ACL_DAEMON_DIR}/acl_daemon_ports.c)
 
 set (HEADERS ${OPS_CLS_INCLUDE_DIR}/ops-cls-asic-plugin.h)
+set (HEADERS ${CMAKE_SOURCE_DIR}/${INCL_DIR}/ops-cls-asic-plugin.h)
 
 # Rules to build ops-classifierd
 add_executable (${CLASSIFIERD} ${SOURCES})
