@@ -53,7 +53,9 @@ struct acl_db_util acl_db_accessor[ACL_CFG_MAX_TYPES];
     acl_db_accessor[idx].set_cfg = ovsrec_port_set_##base##_cfg;        \
     acl_db_accessor[idx].set_cfg_version = \
                                    ovsrec_port_set_##base##_cfg_version; \
-    acl_db_accessor[idx].set_cfg_status = ovsrec_port_set_##base##_status
+    acl_db_accessor[idx].set_cfg_status = ovsrec_port_set_##base##_status; \
+    acl_db_accessor[idx].set_clear_statistics_performed = \
+                          ovsrec_port_set_##base##_statistics_clear_performed;
 
 void
 acl_db_util_init(void) {
@@ -120,4 +122,12 @@ acl_db_util_set_cfg_status(const struct acl_db_util *acl_db,
                              const struct smap *cfg_status)
 {
     (*acl_db->set_cfg_status)(port, cfg_status);
+}
+
+void
+acl_db_util_set_clear_statistics(const struct acl_db_util *acl_db,
+                                 const struct ovsrec_port *port,
+                                 const bool clear_statistics)
+{
+    (*acl_db->set_clear_statistics_performed)(port, &clear_statistics, 1);
 }

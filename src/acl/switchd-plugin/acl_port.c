@@ -188,7 +188,10 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                  struct port *port, struct ofproto *ofproto)
 {
     struct ops_cls_pd_status status;
+    struct ops_cls_pd_list_status list_status;
+
     memset(&status, 0, sizeof status);
+    memset(&list_status, 0, sizeof list_status);
     struct ops_cls_interface_info interface_info;
     ops_cls_interface_info_construct(&interface_info,
                                      acl_port_map->parent, port);
@@ -231,7 +234,40 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
             ovs_assert(0);
         }
         if (acl_port_map->hw_acl == acl) {
-            /* Nothing to update in PD for this ACL_PORT_MAP */
+            /* Check if stats clear is requested */
+            if (port->cfg->aclv4_in_statistics_clear_requested) {
+                /* Call ASIC layer to clear statistics.
+                 * This field is set from UI when clear stats is requested.
+                 * We call ASIC layer to clear statistics and mark the
+                 * operation done by setting
+                 * aclv4_in_statistics_clear_performed column regardless of
+                 * result of the call.The UI is expected to look at this
+                 * column and reset the aclv4_in_statistics_clear_requested
+                 * column. We will then detect that the flag is reset and
+                 * reset our flag marking completion of the request/response
+                 * cycle
+                 */
+                VLOG_DBG("ACL_PORT_MAP %s:%s:%s clearing statistics\n",
+                         acl_port_map->parent->port->name,
+                         ops_cls_type_strings[acl_port_map->acl_db->type],
+                         ops_cls_direction_strings[
+                                            acl_port_map->acl_db->direction]);
+                rc = call_ofproto_ops_cls_statistics_clear(
+                                                    acl_port_map->hw_acl,
+                                                    acl_port_map->parent->port,
+                                                    ofproto,
+                                                    &interface_info,
+                                                    acl_port_map->acl_db->direction,
+                                                    &list_status);
+                method_called = OPS_CLS_STATUS_MSG_OP_CLEAR_STR;
+            } else if (port->cfg->aclv4_in_statistics_clear_performed) {
+                /* Reset the flag. This action completes the clear stats
+                 * cycle.
+                 */
+                acl_db_util_set_clear_statistics(acl_port_map->acl_db,
+                                                 port->cfg, false);
+
+            }
         } else if (!acl_port_map->hw_acl) {
             VLOG_DBG("ACL_PORT_MAP %s:%s:%s applying %s",
                      acl_port_map->parent->port->name,
@@ -272,6 +308,25 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
         /* status_str will be NULL on success */
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
                             OPS_CLS_STATE_APPLIED_STR, 0, status_str);
+    } else if (!strcmp(method_called, OPS_CLS_STATUS_MSG_OP_CLEAR_STR)) {
+        /* Set the clear statistics performed flag to true in OVSDB */
+        acl_db_util_set_clear_statistics(acl_port_map->acl_db,
+                                        port->cfg, true);
+        /* Print debug messages to note success or failure */
+        if (rc == 0) {
+             sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s succeeded",
+                  acl_port_map->parent->port->name,
+                  ops_cls_type_strings[acl_port_map->acl_db->type],
+                  ops_cls_direction_strings[acl_port_map->acl_db->direction],
+                  method_called);
+        } else {
+             sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s failed",
+                  acl_port_map->parent->port->name,
+                  ops_cls_type_strings[acl_port_map->acl_db->type],
+                  ops_cls_direction_strings[acl_port_map->acl_db->direction],
+                  method_called);
+        }
+        VLOG_DBG(details);
     } else if (rc == 0) {
         /* success */
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s succeeded",

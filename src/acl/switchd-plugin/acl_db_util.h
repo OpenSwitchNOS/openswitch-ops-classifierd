@@ -67,6 +67,9 @@ struct acl_db_util {
                             size_t n_cfg_version);
     void (*set_cfg_status)(const struct ovsrec_port *,
                             const struct smap *want_status);
+    void(*set_clear_statistics_performed) (const struct ovsrec_port *,
+                                   const bool *stats_clear_performed,
+                                   size_t n_stats_clear_performed);
 };
 
 enum acl_db_util_index {
@@ -151,5 +154,15 @@ void acl_db_util_set_applied(const struct acl_db_util *acl_db,
 void acl_db_util_set_cfg_status(const struct acl_db_util *acl_db,
                                   const struct ovsrec_port *port,
                                   const struct smap *cfg_status);
+
+/**
+ * Sets the clear statistics performed flag in the port row.
+ * @param[in] acl_db     - Pointer to the @see acl_db_util structure
+ * @param[in] port       - Pointer to the port row
+ * @param[in] clear_statistics - Flag to set in ovsdb
+ */
+void acl_db_util_set_clear_statistics(const struct acl_db_util *acl_db,
+                                      const struct ovsrec_port *port,
+                                      const bool clear_statistics);
 
 #endif  /* __SWITCHD__PLUGIN__ACL_DB_UTIL_H__ */

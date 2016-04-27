@@ -103,10 +103,13 @@ acl_callback_bridge_init(struct blk_params *blk_params)
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_applied);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_status);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_port_col_aclv4_in_statistics);
+    ovsdb_idl_omit_alert(blk_params->idl,
+                         &ovsrec_port_col_aclv4_in_statistics_clear_performed);
     ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_other_config);
     ovsdb_idl_omit(blk_params->idl, &ovsrec_acl_col_external_ids);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_cur_aces);
     ovsdb_idl_omit_alert(blk_params->idl, &ovsrec_acl_col_status);
+
 
     /* Initialize ACL DB Util array */
     acl_db_util_init();
