@@ -37,7 +37,7 @@ VLOG_DEFINE_THIS_MODULE(ops_cls_status_table);
 struct ops_cls_status_table_entry
                           *cls_global_status_table[OPS_CLS_STATUS_MAX] = {0};
 
-/**
+/*
  * Populates the global status table for the feature messages
  */
 void
@@ -74,7 +74,7 @@ ops_cls_status_table_populate(
 }
 
 
-/**
+/*
  * Returns the status message string for the given status_code
  */
 const char *

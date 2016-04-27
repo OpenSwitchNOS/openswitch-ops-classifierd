@@ -32,8 +32,8 @@ VLOG_DEFINE_THIS_MODULE(ops_cls_status_msgs);
 /** @ingroup ops_cls_status_msgs
  * @{ */
 
-/* This defines a common string that will be prefixed to the specific
- * error message. e.g.
+/** This defines a common string that will be prefixed to the specific
+ *  error message. e.g.
  *  Failed to <operation> <feature> on <interface type> <interface#>
  *  <sequence_no_str>
  *   operation - apply, remove, replace, update, get, clear, clearall
@@ -49,29 +49,25 @@ VLOG_DEFINE_THIS_MODULE(ops_cls_status_msgs);
  */
 #define OPS_CLS_STATUS_MSG_COMMON_ERR_PREFIX "Failed to %s %s on %s %s%s"
 
-/* string to be displayed if sequence number is valid
- * Note: one space at the end is added for readability because the reason
- * string will be appended to this string.
+/** string to be displayed if sequence number is valid
+ *  Note: one space at the end is added for readability because the reason
+ *  string will be appended to this string.
  */
 #define OPS_CLS_STATUS_MSG_SEQ_NUM_VALID    " at entry sequence number %d, "
 
-/* string to be displayed if sequence number is NOT valid
- * e.g. statistics operations or general failures not specific
- * to an entry
- * Note: one space at the end is added for readability because the reason
- * string will be appended to this string.
+/** string to be displayed if sequence number is NOT valid
+ *  e.g. statistics operations or general failures not specific
+ *  to an entry
+ *  Note: one space at the end is added for readability because the reason
+ *  string will be appended to this string.
  */
 #define OPS_CLS_STATUS_MSG_SEQ_NUM_INVALID  ", "
 
-#define OPS_CLS_STATUS_MSG_SEQ_NUM_STR_LEN 64 /**< sequence no string length,
-                                                   strlen of OPS_CLS_STATUS_
-                                                   MSG_SEQ_VALID (27) +
-                                                   SEQ_NUM_TO_STR_MAX_LEN (11)
-                                                   rounded to power of 2
-                                            */
-
-#define STATUS_MSG_LEN 256       /**< status message string max length
-                                      used only in debug function */
+/** sequence number string length
+ *  strlen of OPS_CLS_STATUS_MSG_SEQ_VALID (27) + SEQ_NUM_TO_STR_MAX_LEN (11)
+ *  and rounded the result to power of 2.
+ */
+#define OPS_CLS_STATUS_MSG_SEQ_NUM_STR_LEN 64
 
 /* Classifier status messages */
 const struct ops_cls_status_table_entry ops_cls_status_msgs[] = {
@@ -158,7 +154,7 @@ const struct ops_cls_status_table_entry ops_cls_status_msgs[] = {
     }
 };
 
-/**
+/*
  * Populates the global status table with classifier common status messages
  */
 void ops_cls_status_msgs_populate()

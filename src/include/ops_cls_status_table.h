@@ -24,7 +24,7 @@
 #include "ops-cls-asic-plugin.h"
 
 /**
- * Classifier List status entry structure
+ * Classifier List status table entry structure
  */
 struct ops_cls_status_table_entry
 {
@@ -37,7 +37,7 @@ struct ops_cls_status_table_entry
 /**
  * Populates the global status table for the feature messages
  *
- * @param  status_table used to populate the global status table
+ * @param  status_table, used to populate the global status table
  * @param  n_entries number of table entries to be populated
  *
  */
@@ -48,7 +48,7 @@ void ops_cls_status_table_populate(
 /**
  * Returns the status message string for the given status_code
  *
- * @param  status_code status code for which status string to be retrieved
+ * @param  status_code, status code for which status string to be retrieved
  *
  * @return status message string for the status code if found, otherwise
  *         returns NULL
