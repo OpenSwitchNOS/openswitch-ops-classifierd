@@ -1930,12 +1930,9 @@ cli_unapply_acl (const char *interface_type,
     }
 
     /* Wait until ACL un-apply either succeeds or fails and report to user */
-    /* @todo re-enable when un-apply correctly sets status
     return wait_for_acl_apply_status(interface_type, interface_id,
                                      acl_type, direction,
                                      pending_cfg_version);
-    also remove the below line */
-    return CMD_SUCCESS;
 }
 
 /**
