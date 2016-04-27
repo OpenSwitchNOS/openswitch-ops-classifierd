@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __SWITCHD__PLUGIN__ACL_DB_UTIL_H__
-#define __SWITCHD__PLUGIN__ACL_DB_UTIL_H__ 1
+#ifndef __ACL_DB_UTIL_H__
+#define __ACL_DB_UTIL_H__ 1
 
 #include <unistd.h>
 #include "vswitch-idl.h"
@@ -56,6 +56,8 @@ struct acl_db_util {
     off_t offset_cfg;
     off_t offset_cfg_version;
     off_t offset_cfg_status;
+    off_t offset_statistics_clear_requested;
+    off_t offset_statistics_clear_performed;
 
     /* pointers to IDL-generated setter functions */
     void (*set_applied)(const struct ovsrec_port *,
@@ -66,7 +68,13 @@ struct acl_db_util {
                             const int64_t *cfg_version,
                             size_t n_cfg_version);
     void (*set_cfg_status)(const struct ovsrec_port *,
-                            const struct smap *want_status);
+                            const struct smap *cfg_status);
+    void(*set_clear_statistics_requested) (const struct ovsrec_port *,
+                                   const int64_t *stats_clear_requested,
+                                   size_t n_stats_clear_requested);
+    void(*set_clear_statistics_performed) (const struct ovsrec_port *,
+                                   const int64_t *stats_clear_performed,
+                                   size_t n_stats_clear_performed);
 };
 
 enum acl_db_util_index {
@@ -82,6 +90,17 @@ extern struct acl_db_util acl_db_accessor[ACL_CFG_MAX_TYPES];
  */
 void acl_db_util_init(void);
 
+/**
+ * Gets  the acl_db_accessor pointer that has db access routines populated at
+ * the init time.
+ *
+ * @param[in] type - @see ops_cls_type
+ * @param[in] direction   - @see ops_cls_direction
+ *
+ * @returns Pointer to the acl_db_util structure from acl_db_accessor array
+ */
+struct acl_db_util *acl_db_util_accessor_get(enum ops_cls_type type,
+                                             enum ops_cls_direction direction);
 /**
  * Gets the applied column of a given ovsrec_port
  *
@@ -152,4 +171,48 @@ void acl_db_util_set_cfg_status(const struct acl_db_util *acl_db,
                                   const struct ovsrec_port *port,
                                   const struct smap *cfg_status);
 
-#endif  /* __SWITCHD__PLUGIN__ACL_DB_UTIL_H__ */
+/**
+ * Sets the clear statistics requested id in the port row.
+ * @param[in] acl_db     - Pointer to the @see acl_db_util structure
+ * @param[in] port       - Pointer to the port row
+ * @param[in] clear_stats_requested_id - int64_t id to set in ovsdb
+ */
+void acl_db_util_set_clear_statistics_requested(
+                                        const struct acl_db_util *acl_db,
+                                        const struct ovsrec_port *port,
+                                        const int64_t clear_stats_requested_id);
+/**
+ * Sets the clear statistics performed id in the port row.
+ * @param[in] acl_db     - Pointer to the @see acl_db_util structure
+ * @param[in] port       - Pointer to the port row
+ * @param[in] clear_stats_performed_id - int64_t id to set in ovsdb
+ */
+ void acl_db_util_set_clear_statistics_performed(
+                                        const struct acl_db_util *acl_db,
+                                        const struct ovsrec_port *port,
+                                        const int64_t clear_stats_performed_id);
+
+/**
+ * Gets the clear statistics requested column of a given ovsrec_port
+ *
+ * @param[in] acl_db - Pointer to the @see acl_db_utl structure
+ * @param[in] port   - Pointer to the port row
+ *
+ * @returns int64_t id as configured into the db from UI
+ */
+int64_t
+acl_db_util_get_clear_statistics_requested(const struct acl_db_util *acl_db,
+                                           const struct ovsrec_port *port);
+
+/**
+ * Gets the clear statistics performed column of a given ovsrec_port
+ *
+ * @param[in] acl_db - Pointer to the @see acl_db_utl structure
+ * @param[in] port   - Pointer to the port row
+ *
+ * @returns int64_t id as configured into the db from switchd
+ */
+int64_t
+acl_db_util_get_clear_statistics_performed(const struct acl_db_util *acl_db,
+                                           const struct ovsrec_port *port);
+#endif  /* __ACL_DB_UTIL_H__ */

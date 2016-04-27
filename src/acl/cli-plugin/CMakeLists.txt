@@ -46,6 +46,7 @@ include_directories (${CMAKE_INCL_DIR}
 # CLI library source files
 set (SOURCES_CLI
                  ${ACL_UTIL_DIR}/acl_parse.c
+                 ${ACL_UTIL_DIR}/acl_db_util.c
                  ${PROJECT_SOURCE_DIR}/access_list_vty.c
                  ${PROJECT_SOURCE_DIR}/access_list_vty_ovsdb.c
                  ${PROJECT_SOURCE_DIR}/access_list_vty_ovsdb_util.c
