@@ -269,7 +269,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
                  ops_cls_direction_strings[acl_port_map->acl_db->direction]);
         VLOG_DBG(details);
-        /* status_str will be NULL on success */
+        /* status_str will be empty string ("") on success */
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
                             OPS_CLS_STATE_APPLIED_STR, 0, status_str);
     } else if (rc == 0) {
@@ -283,7 +283,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
         acl_port_map_set_hw_acl(acl_port_map, acl);
         acl_db_util_set_applied(acl_port_map->acl_db, port->cfg,
                                  acl->ovsdb_row);
-        /* status_str will be NULL on success */
+        /* status_str will be empty string ("") on success */
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
                                     OPS_CLS_STATE_APPLIED_STR,
                                     status.status_code, status_str);
@@ -360,6 +360,11 @@ acl_port_map_unapply_internal(struct acl_port_map* acl_port_map,
      * So, ignore rc and clear out our record from the acl.
      */
     acl_port_map_set_hw_acl(acl_port_map, NULL);
+    acl_db_util_set_applied(acl_port_map->acl_db, port->cfg, NULL);
+    acl_port_map_set_cfg_status(acl_port_map, port->cfg,
+                                rc == 0 ? OPS_CLS_STATE_APPLIED_STR
+                                        : OPS_CLS_STATE_REJECTED_STR,
+                                status.status_code, "");
 }
 
 /**************************************************************************//**
