@@ -204,37 +204,4 @@ void ops_cls_status_msgs_get(enum ops_cls_list_status_code status_code,
     } /* end if status_table_str != NULL */
 }
 
-/**
- * Debug print function to display formatted status message strings
- * @todo: Modify to accept parameters and link this to appctl framework??
- *
- */
-void ops_cls_status_msgs_dbg_print()
-{
-    unsigned int i, n_entries, seq_num;
-    struct ops_cls_status_table_entry *status_entry;
-    char status_msg[STATUS_MSG_LEN] = {0};
-
-    n_entries = (unsigned int)(sizeof(ops_cls_status_msgs)/
-                                sizeof(ops_cls_status_msgs[0]));
-    for(i = 0; i < n_entries; i++) {
-        status_entry =
-            (struct ops_cls_status_table_entry *)&ops_cls_status_msgs[i];
-        if(status_entry)
-        {
-            seq_num = i % 2;
-            ops_cls_status_msgs_get(status_entry->status_code,
-                                    OPS_CLS_STATUS_MSG_OP_APPLY_STR,
-                                    OPS_CLS_STATUS_MSG_FEATURE_ACL_STR,
-                                    OPS_CLS_STATUS_MSG_IFACE_PORT_STR,
-                                    "1",seq_num,STATUS_MSG_LEN,&status_msg[0]);
-            VLOG_DBG("first status_msg => %s",status_msg);
-            ops_cls_status_msgs_get(status_entry->status_code,
-                                    NULL, NULL, NULL,NULL,
-                                    seq_num,STATUS_MSG_LEN,&status_msg[0]);
-            VLOG_DBG("second status_msg => %s",status_msg);
-        }
-    }
-}
-
 /** @} end of group ops_cls_status_msgs */
