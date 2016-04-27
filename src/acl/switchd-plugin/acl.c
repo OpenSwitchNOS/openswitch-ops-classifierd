@@ -15,9 +15,7 @@
  */
 
 #include "acl.h"
-#include "sort.h"
 #include "smap.h"
-#include "json.h"
 #include "vswitch-idl.h"
 #include "openvswitch/vlog.h"
 #include "ofproto/ofproto-provider.h"
@@ -82,9 +80,6 @@ static bool
 acl_parse_actions(const struct ovsrec_acl_entry *acl_entry,
                   struct ops_cls_list_entry_actions *actions)
 {
-    /* TODO: handle empty action */
-    /* TODO: handle conflicting actions (e.g. permit and deny) */
-
     if (acl_entry->action) {
         if (strstr(acl_entry->action, "permit")) {
             actions->action_flags |= OPS_CLS_ACTION_PERMIT;
@@ -363,6 +358,10 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
     ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_MSG, details); */
 }
 
+/************************************************************
+ * This function handles acl config update by making PD API
+ * call and then updating ovsdb for the status
+ ************************************************************/
 static void
 acl_cfg_update(struct acl* acl)
 {
@@ -438,8 +437,8 @@ acl_cfg_update(struct acl* acl)
 }
 
 /************************************************************
- * acl_cfg_create(), acl_cfg_update(), acl_delete() are
- * the PI acl CRUD routines.
+ * This function handles acl config delete by calling
+ * acl_delete  that deals with the PI data structures only.
  ************************************************************/
 static void
 acl_cfg_delete(struct acl* acl)

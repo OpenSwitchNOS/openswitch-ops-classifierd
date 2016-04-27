@@ -59,8 +59,6 @@ ops_cls_list_delete(struct ops_cls_list *list)
     }
 }
 
-/* TODO: Access classifier list routines via ofproto extension
-         instead of directly through ofproto_class */
 int
 call_ofproto_ops_cls_apply(struct acl                     *acl,
                            struct port                    *bridgec_port,

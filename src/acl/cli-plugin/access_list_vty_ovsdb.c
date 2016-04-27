@@ -35,6 +35,7 @@
 #include <vtysh_ovsdb_config.h>
 
 #include <acl_parse.h>
+#include <acl_db_util.h>
 
 #include "access_list_vty.h"
 #include "access_list_vty_util.h"
@@ -1045,6 +1046,8 @@ cli_clear_acl_statistics (const char *acl_type,
     const struct ovsrec_port *port_row;
     const struct ovsrec_vlan *vlan_row;
     const struct ovsrec_acl *acl_row;
+    int64_t clear_stats_req_id;
+    struct acl_db_util *acl_db_util;
 
     VLOG_DBG("Clearing statistics for %s ACL %s %s=%s direction=%s",
             acl_type, acl_name, interface_type, interface_id, direction);
@@ -1056,15 +1059,32 @@ cli_clear_acl_statistics (const char *acl_type,
         return CMD_OVSDB_FAILURE;
     }
 
+    /* retrieve acl_db_accessor */
+    acl_db_util = acl_db_util_accessor_get(OPS_CLS_ACL_V4, OPS_CLS_DIRECTION_IN);
+    if (!acl_db_util) {
+        VLOG_ERR("Unable to acquire acl_db_util accessor");
+        return CMD_OVSDB_FAILURE;
+    }
     /* No ACL specified (implicit "all" applied ACLs) */
     if (!acl_name) {
         OVSREC_PORT_FOR_EACH(port_row, idl) {
-            VLOG_DBG("Clearing ACL statistics port=%s", port_row->name);
-            ovsrec_port_set_aclv4_in_statistics(port_row, NULL, NULL, 0);
+
+            if (port_row->aclv4_in_applied) {
+                VLOG_DBG("Clearing ACL statistics port=%s", port_row->name);
+                /* retrieve current clear requested id and increment by 1 for
+                 * this clear request
+                 */
+                clear_stats_req_id = acl_db_util_get_clear_statistics_requested(
+                                        acl_db_util, port_row) + 1;
+
+                acl_db_util_set_clear_statistics_requested(acl_db_util,
+                                        port_row, clear_stats_req_id);
+            }
         }
+
         OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
-            VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 "", vlan_row->id);
-            ovsrec_vlan_set_aclv4_in_statistics(vlan_row, NULL, NULL, 0);
+            VLOG_DBG("Not supported: Clearing ACL statistics vlan=%" PRId64 "",
+                        vlan_row->id);
         }
     /* ACL specified */
     } else {
@@ -1076,15 +1096,23 @@ cli_clear_acl_statistics (const char *acl_type,
         /* No interface specified (implicit "all" interface type/id/direction) */
         if (!interface_type) {
             OVSREC_PORT_FOR_EACH(port_row, idl) {
-                if (port_row->aclv4_in_applied && (port_row->aclv4_in_applied == acl_row)) {
-                    VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s", port_row->name, acl_name);
-                    ovsrec_port_set_aclv4_in_statistics(port_row, NULL, NULL, 0);
+                if (port_row->aclv4_in_applied &&
+                    (port_row->aclv4_in_applied == acl_row)) {
+                    /* retrieve current clear requested id and increment by 1 for
+                     * this clear request
+                     */
+                    clear_stats_req_id = acl_db_util_get_clear_statistics_requested(
+                                            acl_db_util, port_row) + 1;
+
+                    acl_db_util_set_clear_statistics_requested(acl_db_util,
+                                            port_row, clear_stats_req_id);
                 }
+
             }
             OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
                 if (vlan_row->aclv4_in_applied && (vlan_row->aclv4_in_applied == acl_row)) {
-                    VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 " acl_name=%s", vlan_row->id, acl_name);
-                    ovsrec_vlan_set_aclv4_in_statistics(vlan_row, NULL, NULL, 0);
+                    VLOG_DBG("Not supported: Clearing ACL statistics vlan=%" PRId64 " acl_name=%s",
+                                vlan_row->id, acl_name);
                 }
             }
         /* Port (unfortunately called "interface" in the CLI) */
@@ -1096,8 +1124,16 @@ cli_clear_acl_statistics (const char *acl_type,
                 return CMD_ERR_NOTHING_TODO;
             }
             if (port_row->aclv4_in_applied && (port_row->aclv4_in_applied == acl_row)) {
-                VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s", port_row->name, acl_name);
-                ovsrec_port_set_aclv4_in_statistics(port_row, NULL, NULL, 0);
+                VLOG_DBG("Clearing ACL statistics port=%s acl_name=%s",
+                            port_row->name, acl_name);
+                /* retrieve current clear requested id and increment by 1 for
+                 * this clear request
+                 */
+                clear_stats_req_id = acl_db_util_get_clear_statistics_requested(
+                                        acl_db_util, port_row) + 1;
+                acl_db_util_set_clear_statistics_requested(acl_db_util,
+                                        port_row, clear_stats_req_id);
+
             } else {
                 vty_out(vty, "%% Specified ACL not applied to interface%s", VTY_NEWLINE);
                 return CMD_ERR_NOTHING_TODO;
@@ -1111,8 +1147,7 @@ cli_clear_acl_statistics (const char *acl_type,
                 return CMD_ERR_NOTHING_TODO;
             }
             if (vlan_row->aclv4_in_applied && (vlan_row->aclv4_in_applied == acl_row)) {
-                VLOG_DBG("Clearing ACL statistics vlan=%" PRId64 " acl_name=%s", vlan_row->id, acl_name);
-                ovsrec_vlan_set_aclv4_in_statistics(vlan_row, NULL, NULL, 0);
+                VLOG_DBG("Not supported: Clearing ACL statistics vlan=%" PRId64 " acl_name=%s", vlan_row->id, acl_name);
             } else {
                 vty_out(vty, "%% Specified ACL not applied to VLAN%s", VTY_NEWLINE);
                 return CMD_ERR_NOTHING_TODO;
@@ -1224,6 +1259,8 @@ access_list_ovsdb_init(void)
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_cfg_version);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_statistics);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_status);
+    ovsdb_idl_add_column(idl,
+                    &ovsrec_port_col_aclv4_in_statistics_clear_requested);
 
     /* ACL columns in VLAN table */
     ovsdb_idl_add_table(idl, &ovsrec_table_vlan);
@@ -1233,4 +1270,7 @@ access_list_ovsdb_init(void)
     ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_cfg_version);
     ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_statistics);
     ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_status);
+
+    /* Initialize ACL DB Util array */
+    acl_db_util_init();
 }
