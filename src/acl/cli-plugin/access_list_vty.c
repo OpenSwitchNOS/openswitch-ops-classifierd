@@ -255,8 +255,11 @@ ovsrec_vlan_aclv4_in_statistics_getvalue(const struct ovsrec_vlan *vlan_row,
  * @param acl_row ACL row pointer
  * @param key     numeric key (entry sequence number)
  * @param value   ACL Entry row pointer (NULL indicates delete)
+ *
+ * @return        false if attempting to delete a non-existent entry,
+ *                true otherwise
  */
-static inline void
+static inline bool
 ovsrec_acl_set_cfg_aces_from_cur_aces(const struct ovsrec_acl *acl_row,
                                       const int64_t key,
                                       struct ovsrec_acl_entry *value)
@@ -293,7 +296,7 @@ ovsrec_acl_set_cfg_aces_from_cur_aces(const struct ovsrec_acl *acl_row,
         if (!value) {
             free(key_list);
             free(value_list);
-            return;
+            return false;
         }
         /* Not an update or delete, so it's an insert. Append entry to list
            (will be sorted by key automatically). */
@@ -303,6 +306,7 @@ ovsrec_acl_set_cfg_aces_from_cur_aces(const struct ovsrec_acl *acl_row,
     ovsrec_acl_set_cfg_aces(acl_row, key_list, value_list, acl_row->n_cur_aces + entries_changed);
     free(key_list);
     free(value_list);
+    return true;
 }
 
 /**
@@ -1380,7 +1384,11 @@ cli_delete_ace (const char *acl_type,
     /* Check to make sure ACE is present in ACL */
 
     VLOG_DBG("Deleting ACE seq=%" PRId64, ace_sequence_number);
-    ovsrec_acl_set_cfg_aces_from_cur_aces(acl_row, ace_sequence_number, NULL);
+    if (!ovsrec_acl_set_cfg_aces_from_cur_aces(acl_row, ace_sequence_number, NULL)) {
+        vty_out(vty, "%% ACL entry does not exist%s", VTY_NEWLINE);
+        cli_do_config_abort(transaction);
+        return CMD_ERR_NOTHING_TODO;
+    }
     pending_cfg_version = acl_row->cfg_version + 1;
     ovsrec_acl_set_cfg_version(acl_row, pending_cfg_version);
     /* If ACE is no longer referenced it will be garbage-collected */
