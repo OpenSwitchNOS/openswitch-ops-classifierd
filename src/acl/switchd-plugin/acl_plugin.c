@@ -74,6 +74,9 @@ int init (int phase_id)
     /* initialize ACL logging code */
     acl_log_init();
 
+    /* Initialize debugging commands for ACL */
+    acl_debug_init();
+
     return 0;
 }
 
@@ -121,4 +124,10 @@ acl_callback_bridge_init(struct blk_params *blk_params)
 
     /* Find and initialize the asic plugin */
     acl_ofproto_init();
+}
+
+void
+acl_debug_init() {
+    /* Debug acl_port */
+    acl_port_debug_init();
 }

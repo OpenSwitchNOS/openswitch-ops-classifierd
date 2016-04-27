@@ -130,4 +130,9 @@ void acl_callback_port_update(struct blk_params *blk_params);
 void acl_callback_port_stats_get(struct stats_blk_params *sblk,
                                  enum stats_block_id blk_id);
 
+/**************************************************************************//**
+ * ACL port debug init
+ *****************************************************************************/
+void acl_port_debug_init(void);
+
 #endif  /* __SWITCHD__PLUGIN__ACL_PORT_H__ */
