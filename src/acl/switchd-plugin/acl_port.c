@@ -18,6 +18,8 @@
 #include "vrf.h"
 #include "acl_port.h"
 #include "vswitch-idl.h"
+#include "dynamic-string.h"
+#include "unixctl.h"
 #include "openvswitch/vlog.h"
 #include "reconfigure-blocks.h"
 #include "stats-blocks.h"
@@ -613,6 +615,33 @@ port_lookup(const struct uuid* uuid)
     return NULL;
 }
 
+/**************************************************************************//**
+ * This function shows all acl_ports in the hash map. Used for debugging.
+ * @param[in] conn - Pointer to unixctl connection
+ * @param[in] argc - Number of arguments in the command
+ * @param[in] argv - Command arguments
+ * @param[in] aux  - Aux pointer. Unused for now
+ *****************************************************************************/
+static void
+acl_show_ports(struct unixctl_conn *conn, int argc, const char *argv[],
+               void *aux OVS_UNUSED)
+{
+    struct ds ds = DS_EMPTY_INITIALIZER;
+    struct acl_port *acl_port, *next_acl_port;
+
+    HMAP_FOR_EACH_SAFE(acl_port, next_acl_port, all_node_uuid, &all_ports) {
+        ds_put_format(&ds, "-----------------------------\n");
+        ds_put_format(&ds, "Port name: %s\n", acl_port->port->name);
+        if (acl_port->port_map[ACL_CFG_V4_IN].hw_acl) {
+            ds_put_format(&ds, "Applied ACL name: %s\n",
+                acl_port->port_map[ACL_CFG_V4_IN].hw_acl->name);
+        }
+    }
+
+    unixctl_command_reply(conn, ds_cstr(&ds));
+    ds_destroy(&ds);
+}
+
 struct acl_port *
 port_lookup_by_name (const char *name)
 {
@@ -872,4 +901,12 @@ acl_callback_port_stats_get(struct stats_blk_params *sblk,
     for (int i = 0; i < ACL_CFG_MAX_TYPES; i++) {
         acl_port_map_stats_get(&acl_port->port_map[i], br->ofproto);
     }
+}
+
+void
+acl_port_debug_init()
+{
+    /* Dump acl_port hashmap */
+    unixctl_command_register("acl_plugin/show_port", NULL, 0, 1,
+                             acl_show_ports, NULL);
 }

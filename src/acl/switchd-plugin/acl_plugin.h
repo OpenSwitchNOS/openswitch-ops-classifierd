@@ -39,4 +39,9 @@ void acl_callback_bridge_init(struct blk_params *blk_params);
  */
 void acl_ofproto_init();
 
+/**
+ * Initialize debug commands for ACL plugin
+ */
+void acl_debug_init();
+
 #endif
