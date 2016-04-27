@@ -182,7 +182,10 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
                                  struct port *port, struct ofproto *ofproto)
 {
     struct ops_cls_pd_status status;
+    struct ops_cls_pd_list_status list_status;
+
     memset(&status, 0, sizeof status);
+    memset(&list_status, 0, sizeof list_status);
     struct ops_cls_interface_info interface_info;
     ops_cls_interface_info_construct(&interface_info,
                                      acl_port_map->parent, port);
@@ -193,6 +196,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
     /* status_str used to store status description in db */
     char status_str[OPS_CLS_STATUS_MSG_MAX_LEN] = {0};
     unsigned int sequence_number = 0;
+    int64_t clear_req_id, clear_performed_id;
 
     struct acl* acl;
     const struct ovsrec_acl *ovsdb_acl =
@@ -222,7 +226,42 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
             ovs_assert(0);
         }
         if (acl_port_map->hw_acl == acl) {
-            /* Nothing to update in PD for this ACL_PORT_MAP */
+            /* Perform clear statistics if clear requested id and clear
+             * performed id are different
+             */
+             clear_req_id = acl_db_util_get_clear_statistics_requested(
+                                            acl_port_map->acl_db,
+                                            acl_port_map->parent->ovsdb_row);
+             clear_performed_id = acl_db_util_get_clear_statistics_performed(
+                                            acl_port_map->acl_db,
+                                            acl_port_map->parent->ovsdb_row);
+            if (clear_req_id != clear_performed_id) {
+                /* Call ASIC layer to clear statistics.
+                 * This field is set from UI when clear stats is requested.
+                 * We call ASIC layer to clear statistics and mark the
+                 * operation done by setting
+                 * aclv4_in_statistics_clear_performed column regardless of
+                 * result of the call.The UI is expected to look at this
+                 * column and reset the aclv4_in_statistics_clear_requested
+                 * column. We will then detect that the flag is reset and
+                 * reset our flag marking completion of the request/response
+                 * cycle
+                 */
+                VLOG_DBG("ACL_PORT_MAP %s:%s:%s clearing statistics\n",
+                         acl_port_map->parent->port->name,
+                         ops_cls_type_strings[acl_port_map->acl_db->type],
+                         ops_cls_direction_strings[
+                                            acl_port_map->acl_db->direction]);
+                rc = call_ofproto_ops_cls_statistics_clear(
+                                                    acl_port_map->hw_acl,
+                                                    acl_port_map->parent->port,
+                                                    ofproto,
+                                                    &interface_info,
+                                                    acl_port_map->acl_db->direction,
+                                                    &list_status);
+                method_called = OPS_CLS_STATUS_MSG_OP_CLEAR_STR;
+
+            }
         } else if (!acl_port_map->hw_acl) {
             VLOG_DBG("ACL_PORT_MAP %s:%s:%s applying %s",
                      acl_port_map->parent->port->name,
@@ -263,6 +302,28 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
         /* status_str will be empty string ("") on success */
         acl_port_map_set_cfg_status(acl_port_map, port->cfg,
                             OPS_CLS_STATE_APPLIED_STR, 0, status_str);
+    } else if (!strcmp(method_called, OPS_CLS_STATUS_MSG_OP_CLEAR_STR)) {
+        /* Set the clear statistics performed column to match clear
+         * statistics requested column
+         */
+        acl_db_util_set_clear_statistics_performed(acl_port_map->acl_db,
+                                                   port->cfg,
+                                                   clear_req_id);
+        /* Print debug messages to note success or failure */
+        if (rc == 0) {
+             sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s succeeded",
+                  acl_port_map->parent->port->name,
+                  ops_cls_type_strings[acl_port_map->acl_db->type],
+                  ops_cls_direction_strings[acl_port_map->acl_db->direction],
+                  method_called);
+        } else {
+             sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s failed",
+                  acl_port_map->parent->port->name,
+                  ops_cls_type_strings[acl_port_map->acl_db->type],
+                  ops_cls_direction_strings[acl_port_map->acl_db->direction],
+                  method_called);
+        }
+        VLOG_DBG(details);
     } else if (rc == 0) {
         /* success */
         sprintf(details, "ACL_PORT_MAP %s:%s:%s -- PD %s succeeded",
@@ -626,7 +687,7 @@ acl_port_new(struct port *port, unsigned int seqno,
 {
     struct acl_port *acl_port = xzalloc(sizeof *acl_port);
 
-    /* setup my port_map to know about me and which colgrp they represent */
+    /* setup my port_map to know about me and which acl_port_map they represent */
     for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
         acl_port_map_construct(&acl_port->port_map[i], acl_port, i);
     }
