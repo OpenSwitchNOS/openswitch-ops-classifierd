@@ -97,25 +97,27 @@ acl_parse_ipv4_address(const char *in_address,
 }
 
 static bool
-acl_parse_actions(const char *in_action,
+acl_parse_actions(const struct ovsrec_acl_entry *acl_entry,
                   struct ops_cls_list_entry_actions *actions)
 {
     /* TODO: handle empty action */
     /* TODO: handle conflicting actions (e.g. permit and deny) */
 
-    if (strstr(in_action, "permit")) {
-        actions->action_flags |= OPS_CLS_ACTION_PERMIT;
+    if (acl_entry->action) {
+        if (strstr(acl_entry->action, "permit")) {
+            actions->action_flags |= OPS_CLS_ACTION_PERMIT;
+        } else {
+            if (strstr(acl_entry->action, "deny")) {
+                actions->action_flags |= OPS_CLS_ACTION_DENY;
+            }
+        }
     }
 
-    if (strstr(in_action, "deny")) {
-        actions->action_flags |= OPS_CLS_ACTION_DENY;
-    }
-
-    if (strstr(in_action, "log")) {
+    if (acl_entry->log) {
         actions->action_flags |= OPS_CLS_ACTION_LOG;
     }
 
-    if (strstr(in_action, "count")) {
+    if (acl_entry->count) {
         actions->action_flags |= OPS_CLS_ACTION_COUNT;
     }
 
@@ -161,7 +163,7 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
         entry->entry_fields.entry_flags |= OPS_CLS_PROTOCOL_VALID;
     }
 
-    if (!acl_parse_actions(acl_entry->action,
+    if (!acl_parse_actions(acl_entry,
                            &entry->entry_actions)) {
         VLOG_ERR("invalid action %s", acl_entry->action);
         valid = false;
