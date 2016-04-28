@@ -511,9 +511,9 @@ acl_port_map_stats_get(struct acl_port_map *acl_port_map,
         /* collect stats */
         for(entry_idx = 0; entry_idx < num_entries; entry_idx++) {
             if(statistics[entry_idx].stats_enabled){
-                ovs_assert(entry_idx < acl_port_map->hw_acl->ovsdb_row->n_cfg_aces);
+                ovs_assert(entry_idx < acl_port_map->hw_acl->ovsdb_row->n_cur_aces);
                 key_stats[num_stat_entries] =
-                    acl_port_map->hw_acl->ovsdb_row->key_cfg_aces[entry_idx];
+                    acl_port_map->hw_acl->ovsdb_row->key_cur_aces[entry_idx];
                 val_stats[num_stat_entries] = statistics[entry_idx].hitcounts;
                 num_stat_entries++;
             }
@@ -535,9 +535,9 @@ acl_port_map_stats_get(struct acl_port_map *acl_port_map,
          */
 
         /* convert entry_id to sequence_number using cur_aces */
-        if(status.entry_id < acl_port_map->hw_acl->ovsdb_row->n_cfg_aces) {
+        if(status.entry_id < acl_port_map->hw_acl->ovsdb_row->n_cur_aces) {
             sequence_number =
-                acl_port_map->hw_acl->ovsdb_row->key_cfg_aces[status.entry_id];
+                acl_port_map->hw_acl->ovsdb_row->key_cur_aces[status.entry_id];
         }
 
         ops_cls_status_msgs_get(status.status_code,
