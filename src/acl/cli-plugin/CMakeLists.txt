@@ -47,6 +47,10 @@ include_directories (${CMAKE_INCL_DIR}
 set (SOURCES_CLI
                  ${ACL_UTIL_DIR}/acl_parse.c
                  ${PROJECT_SOURCE_DIR}/access_list_vty.c
+                 ${PROJECT_SOURCE_DIR}/access_list_vty_ovsdb.c
+                 ${PROJECT_SOURCE_DIR}/access_list_vty_ovsdb_util.c
+                 ${PROJECT_SOURCE_DIR}/access_list_vty_util.c
+                 ${PROJECT_SOURCE_DIR}/vtysh_ovsdb_access_list_context.c
     )
 
 add_library (${LIBACLCLI} SHARED ${SOURCES_CLI})
