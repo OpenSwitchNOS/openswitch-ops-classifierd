@@ -52,7 +52,7 @@ static struct ovs_mutex acl_log_mutex = OVS_MUTEX_INITIALIZER;
 static struct acl_log_info info OVS_GUARDED_BY(acl_log_mutex) = { .valid_fields = 0 };
 
 /* These are for the switchd plugins */
-static uint64_t acllog_seqno = LLONG_MIN;
+static uint64_t acl_log_seqno = LLONG_MIN;
 static long long int start_time = LLONG_MIN;
 static int32_t prev_timer_interval_ms = 0;
 
@@ -672,10 +672,210 @@ key_extract(struct parse_buff *pab, struct pkt_info *key)
    return 0;
 }
 
+/* The purpose of this function is to match the information from an ACL
+ * logging packet that was received against a platform-independent
+ * representation one access control entry. The function returns true if the
+ * packet matches, and it returns false if the packet does not match the
+ * entry.  The argument in_cos will be non-NULL only if a valid value for
+ * the COS is available. */
+static bool
+acl_log_entry_match(struct ops_cls_list_entry_match_fields *entry_f,
+                    struct pkt_info *key, uint8_t *in_cos)
+{
+    /* src ip addr */
+    if (entry_f->entry_flags & OPS_CLS_SRC_IPADDR_VALID) {
+        if (entry_f->src_addr_family == OPS_CLS_AF_INET) {
+            if ((entry_f->src_ip_address.v4.s_addr ^ ntohl(key->ipv4.addr.src))
+                    & entry_f->src_ip_address_mask.v4.s_addr) {
+                return false;
+            }
+        } else if (entry_f->src_addr_family == OPS_CLS_AF_INET6) {
+            int i;
+            for (i = 0; i < (sizeof(entry_f->src_ip_address.v6) / 4); i++) {
+                if ((entry_f->src_ip_address.v6.s6_addr[i] ^
+                            key->ipv6.addr.src.s6_addr[i])
+                        & entry_f->src_ip_address_mask.v6.s6_addr[i]) {
+                    return false;
+                }
+            }
+        }
+    }
+    /* dst ip addr */
+    if (entry_f->entry_flags & OPS_CLS_DEST_IPADDR_VALID) {
+        if (entry_f->dst_addr_family == OPS_CLS_AF_INET) {
+            if ((entry_f->dst_ip_address.v4.s_addr ^ ntohl(key->ipv4.addr.dst))
+                    & entry_f->dst_ip_address_mask.v4.s_addr) {
+                return false;
+            }
+        } else if (entry_f->dst_addr_family == OPS_CLS_AF_INET6) {
+            int i;
+            for (i = 0; i < (sizeof(entry_f->dst_ip_address.v6) / 4); i++) {
+                if ((entry_f->dst_ip_address.v6.s6_addr[i] ^
+                            key->ipv6.addr.dst.s6_addr[i])
+                        & entry_f->dst_ip_address_mask.v6.s6_addr[i]) {
+                    return false;
+                }
+            }
+        }
+    }
+    /* l4 src port */
+    if (entry_f->entry_flags & OPS_CLS_L4_SRC_PORT_VALID) {
+        if (entry_f->L4_src_port_op == OPS_CLS_L4_PORT_OP_EQ) {
+            if (entry_f->L4_src_port_min != key->tp.src) {
+                return false;
+            }
+        } else if (entry_f->L4_src_port_op == OPS_CLS_L4_PORT_OP_RANGE) {
+            if ((entry_f->L4_src_port_min > key->tp.src) ||
+                    (entry_f->L4_src_port_max < key->tp.src)) {
+                return false;
+            }
+        } else if (entry_f->L4_src_port_op == OPS_CLS_L4_PORT_OP_NEQ) {
+            if (entry_f->L4_src_port_min == key->tp.src) {
+                return false;
+            }
+        } else if (entry_f->L4_src_port_op == OPS_CLS_L4_PORT_OP_LT) {
+            if (entry_f->L4_src_port_min <= key->tp.src) {
+                return false;
+            }
+        } else if (entry_f->L4_src_port_op == OPS_CLS_L4_PORT_OP_GT) {
+            if (entry_f->L4_src_port_min >= key->tp.src) {
+                return false;
+            }
+        }
+    }
+    /* l4 dst port */
+    if (entry_f->entry_flags & OPS_CLS_L4_DEST_PORT_VALID) {
+        if (entry_f->L4_dst_port_op == OPS_CLS_L4_PORT_OP_EQ) {
+            if (entry_f->L4_dst_port_min != key->tp.dst) {
+                return false;
+            }
+        } else if (entry_f->L4_dst_port_op == OPS_CLS_L4_PORT_OP_RANGE) {
+            if ((entry_f->L4_dst_port_min > key->tp.dst) ||
+                    (entry_f->L4_dst_port_max < key->tp.dst)) {
+                return false;
+            }
+        } else if (entry_f->L4_dst_port_op == OPS_CLS_L4_PORT_OP_NEQ) {
+            if (entry_f->L4_dst_port_min == key->tp.dst) {
+                return false;
+            }
+        } else if (entry_f->L4_dst_port_op == OPS_CLS_L4_PORT_OP_LT) {
+            if (entry_f->L4_dst_port_min <= key->tp.dst) {
+                return false;
+            }
+        } else if (entry_f->L4_dst_port_op == OPS_CLS_L4_PORT_OP_GT) {
+            if (entry_f->L4_dst_port_min >= key->tp.dst) {
+                return false;
+            }
+        }
+    }
+    /* ip protocol */
+    if (entry_f->entry_flags & OPS_CLS_PROTOCOL_VALID) {
+        if (entry_f->protocol != key->ip.proto) {
+            return false;
+        }
+    }
+    /* tos */
+    if (entry_f->entry_flags & OPS_CLS_TOS_VALID) {
+        if (entry_f->tos != key->ip.tos) {
+            return false;
+        }
+    }
+    /* tcp flags */
+    if (entry_f->entry_flags & OPS_CLS_TCP_FLAGS_VALID) {
+        if ((entry_f->tcp_flags ^ ntohs(key->tp.flags))
+                & entry_f->tcp_flags_mask) {
+            return false;
+        }
+    }
+    /* tcp established - currently unused */
+    /* icmp code */
+    if (entry_f->entry_flags & OPS_CLS_ICMP_CODE_VALID) {
+        if (entry_f->icmp_code != key->tp.dst) {
+            return false;
+        }
+    }
+    /* icmp type */
+    if (entry_f->entry_flags & OPS_CLS_ICMP_TYPE_VALID) {
+        if (entry_f->icmp_type != key->tp.src) {
+            return false;
+        }
+    }
+    /* vlan */
+    if (entry_f->entry_flags & OPS_CLS_VLAN_VALID) {
+        if (entry_f->vlan != key->eth.tci) {
+            return false;
+        }
+    }
+    /* dscp - currently unused */
+    /* src mac */
+    if (entry_f->entry_flags & OPS_CLS_SRC_MAC_VALID) {
+        int i;
+        for (i = 0; i < ETH_ALEN; i++) {
+            if ((entry_f->src_mac[i] ^ key->eth.src[i])
+                    & entry_f->src_mac_mask[i]) {
+                return false;
+            }
+        }
+    }
+    /* dst mac */
+    if (entry_f->entry_flags & OPS_CLS_DST_MAC_VALID) {
+        int i;
+        for (i = 0; i < ETH_ALEN; i++) {
+            if ((entry_f->dst_mac[i] ^ key->eth.dst[i])
+                    & entry_f->dst_mac_mask[i]) {
+                return false;
+            }
+        }
+    }
+    /* cos */
+    if (entry_f->entry_flags & OPS_CLS_L2_COS_VALID) {
+        if (!in_cos || (entry_f->L2_cos != *in_cos)) {
+            return false;
+        }
+    }
+    /* ethertype */
+    if (entry_f->entry_flags & OPS_CLS_L2_ETHERTYPE_VALID) {
+        if (entry_f->L2_ethertype != key->eth.type) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/* The purpose of this function is to attempt to identify the index of the
+ * ACE within an ACL that an ACL logging packet's contents and related
+ * information (e.g., VLAN, COS) matches.  If a matching ACE is found, the
+ * index will be assigned to index, and the function will return true.  If
+ * no matching ACE is found or if the arguments acl, key, or index are NULL,
+ * the function will return false. The argument in_cos is non-NULL if the
+ * caller has a valid value for the COS; it is NULL otherwise. */
+static bool
+acl_log_get_entry_index(struct acl *acl, struct pkt_info *key, uint8_t *in_cos,
+                        uint32_t *index)
+{
+    int i;
+
+    if (!acl || !key || !index) {
+        /* in_cos may be NULL for legitimate reasons */
+        return false;
+    }
+
+    for (i = 0; i < acl->ovsdb_row->n_cur_aces; i++) {
+        if (acl_log_entry_match(
+                    &acl->want_pi[ACL_CFG_V4_IN].entries[i].entry_fields,
+                    key, in_cos)) {
+            *index = i;
+            return true;
+        }
+    }
+    return false;
+}
+
 void
 acl_log_init()
 {
-      acllog_seqno = seq_read(acl_log_pktrx_seq_get());
+      acl_log_seqno = seq_read(acl_log_pktrx_seq_get());
       VLOG_DBG("ACL logging init");
 }
 
@@ -715,7 +915,7 @@ acl_log_run(struct run_blk_params *blk_params)
 
         /* We are in the state where we are waiting for packets, but we have
          * not received any packets, so return. */
-        if (seq == acllog_seqno) {
+        if (seq == acl_log_seqno) {
             return;
         }
 
@@ -723,7 +923,6 @@ acl_log_run(struct run_blk_params *blk_params)
         memset(&key, 0, sizeof(key));
         memset(&pkt_buff, 0, sizeof(pkt_buff));
 
-        VLOG_DBG("ACL log packet received");
         /* stop the system from capturing any more packets */
         /*     functionality currently unavailable */
 
@@ -749,7 +948,11 @@ acl_log_run(struct run_blk_params *blk_params)
         /* if we can't identify the ACL that this packet matched, take no
          * further action on this packet */
         if (!acl) {
+            acl_log_seqno = seq;
+            VLOG_DBG("ACL log packet received but no matching ACL found");
             return;
+        } else {
+            VLOG_DBG("ACL log packet received");
         }
 
         /* fill in unknown data about the ACL/ACE */
@@ -763,8 +966,16 @@ acl_log_run(struct run_blk_params *blk_params)
         }
 
         if (!(ACL_LOG_ENTRY_NUM & pkt_buff.pkt_info.valid_fields)) {
-            /* get entry number */
-            /* pkt_buff.pkt_info.valid_fields |= ACL_LOG_ENTRY_NUM; */
+            /* try to get ACL entry index by comparing packet against
+             * applicable ACL in platform-independent representation of
+             * ovsdb contents */
+            if (acl_log_get_entry_index(acl, &key,
+                        (pkt_buff.pkt_info.valid_fields & ACL_LOG_IN_COS ?
+                            &pkt_buff.pkt_info.in_cos : NULL),
+                        &pkt_buff.pkt_info.entry_num)) {
+                /* if a match was found, set the flag */
+                pkt_buff.pkt_info.valid_fields |= ACL_LOG_ENTRY_NUM;
+            }
         }
         if ((ACL_LOG_ENTRY_NUM & pkt_buff.pkt_info.valid_fields)) {
             if (pkt_buff.pkt_info.entry_num <
@@ -851,11 +1062,11 @@ acl_log_run(struct run_blk_params *blk_params)
         poll_timer_wait_until(start_time + timer_interval_ms);
     }
 
-    acllog_seqno = seq;
+    acl_log_seqno = seq;
 }
 
 void
 acl_log_wait(struct run_blk_params *blk_params)
 {
-    seq_wait(acl_log_pktrx_seq_get(), acllog_seqno);
+    seq_wait(acl_log_pktrx_seq_get(), acl_log_seqno);
 }
