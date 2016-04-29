@@ -56,8 +56,6 @@ struct acl_port_map {
  * PD calls.
  *************************************************************/
 struct acl_port {
-    struct hmap_node   all_node_uuid; /* In 'all_acl_ports'. */
-    struct uuid        uuid;
     unsigned int       interface_flags; /*< Type of port, L3 only, L2 etc */
     struct port        *port;       /*< struct port */
     /* Hold all of my p2acl records internally, no need to
@@ -68,11 +66,6 @@ struct acl_port {
     unsigned int       delete_seqno; /* mark/sweep to identify deleted */
 };
 
-/*************************************************************
- * acl_port search routines
- *************************************************************/
-struct acl_port *acl_port_lookup_by_uuid(const struct uuid* uuid);
-
 /**************************************************************************//**
  * This function looks up an acl_port based on name of the port
  *
@@ -81,7 +74,7 @@ struct acl_port *acl_port_lookup_by_uuid(const struct uuid* uuid);
  * @returns  Pointer to acl_port if found
  *           NULL otherwise
  *****************************************************************************/
-struct acl_port *port_lookup_by_name (const char *name);
+struct acl_port *acl_port_lookup (const char *name);
 
 /************************************************************
  * Top level routine to check if a port's ACLs need to reconfigure
