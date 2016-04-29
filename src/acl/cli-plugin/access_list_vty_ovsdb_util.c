@@ -163,21 +163,19 @@ acl_entry_config_to_string(const int64_t sequence_num,
 
     ds_put_format(&dstring, "%" PRId64 " ", sequence_num);
     ds_put_format(&dstring, "%s ", ace_row->action);
-    if (ace_row->n_protocol != 0) {
+    if (ace_row->n_protocol > 0) {
         ds_put_format(&dstring, "%s ", acl_parse_protocol_get_name_from_number(ace_row->protocol[0]));
+    } else {
+        ds_put_format(&dstring, "%s ", "any");
     }
-    if (ace_row->src_ip) {
-        acl_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
-    }
+    acl_entry_ip_address_config_to_ds(&dstring, ace_row->src_ip);
     if (ace_row->n_src_l4_port_min && ace_row->n_src_l4_port_max) {
         acl_entry_l4_port_config_to_ds(&dstring,
                                        ace_row->src_l4_port_min[0],
                                        ace_row->src_l4_port_max[0],
                                        ace_row->n_src_l4_port_range_reverse);
     }
-    if (ace_row->dst_ip) {
-        acl_entry_ip_address_config_to_ds(&dstring, ace_row->dst_ip);
-    }
+    acl_entry_ip_address_config_to_ds(&dstring, ace_row->dst_ip);
     if (ace_row->n_dst_l4_port_min && ace_row->n_dst_l4_port_max) {
         acl_entry_l4_port_config_to_ds(&dstring,
                                        ace_row->dst_l4_port_min[0],
@@ -292,28 +290,26 @@ print_acl_tabular(const struct ovsrec_acl *acl_row)
     for (i = 0; i < acl_row->n_cur_aces; i ++) {
         /* Entry sequence number, action, and protocol (if any) */
         vty_out(vty, "%10" PRId64 " ", acl_row->key_cur_aces[i]);
-        /* Comment (if any) */
-        if (acl_row->value_cur_aces[i]->comment) {
+        /* No action was specified (comment-only entry) */
+        if (acl_row->value_cur_aces[i]->comment && !acl_row->value_cur_aces[i]->action) {
             vty_out(vty, "%s", acl_row->value_cur_aces[i]->comment);
-        }
-        if (acl_row->value_cur_aces[i]->action) {
-            /* Adjust spacing if a comment was printed as first line */
+            vty_out(vty, "%s", VTY_NEWLINE);
+        } else {
+            /* If comment specified in addition to action */
             if (acl_row->value_cur_aces[i]->comment) {
+                vty_out(vty, "%s", acl_row->value_cur_aces[i]->comment);
                 vty_out(vty, "%s", VTY_NEWLINE);
+                /* Adjust spacing */
                 vty_out(vty, "%-10s ", "");
             }
             vty_out(vty, "%-31s ", acl_row->value_cur_aces[i]->action);
-        } else {
-            vty_out(vty, "%-31s ", "");
-        }
-        if (acl_row->value_cur_aces[i]->n_protocol != 0) {
-            vty_out(vty, "%s ", acl_parse_protocol_get_name_from_number(acl_row->value_cur_aces[i]->protocol[0]));
-        } else {
-            vty_out(vty, "%s ", "");
-        }
-        vty_out(vty, "%s", VTY_NEWLINE);
-        /* Source IP, port information */
-        if (acl_row->value_cur_aces[i]->src_ip) {
+            if (acl_row->value_cur_aces[i]->n_protocol != 0) {
+                vty_out(vty, "%s ", acl_parse_protocol_get_name_from_number(acl_row->value_cur_aces[i]->protocol[0]));
+            } else {
+                vty_out(vty, "%s ", "any ");
+            }
+            vty_out(vty, "%s", VTY_NEWLINE);
+            /* Source IP, port information */
             vty_out(vty, "%-10s ", "");
             print_ace_pretty_ip_address("%-31s ", acl_row->value_cur_aces[i]->src_ip);
             if (acl_row->value_cur_aces[i]->n_src_l4_port_min &&
@@ -324,9 +320,7 @@ print_acl_tabular(const struct ovsrec_acl *acl_row)
                         acl_row->value_cur_aces[i]->n_src_l4_port_range_reverse);
             }
             vty_out(vty, "%s", VTY_NEWLINE);
-        }
-        /* Destination IP, port information */
-        if (acl_row->value_cur_aces[i]->dst_ip) {
+            /* Destination IP, port information */
             vty_out(vty, "%-10s ", "");
             print_ace_pretty_ip_address("%-31s ", acl_row->value_cur_aces[i]->dst_ip);
             if (acl_row->value_cur_aces[i]->n_dst_l4_port_min &&
@@ -337,13 +331,13 @@ print_acl_tabular(const struct ovsrec_acl *acl_row)
                         acl_row->value_cur_aces[i]->n_dst_l4_port_range_reverse);
             }
             vty_out(vty, "%s", VTY_NEWLINE);
-        }
-        /* Additional parameters, each on their own line */
-        if (acl_row->value_cur_aces[i]->n_log) {
-            vty_out(vty, "%-10s Logging: enabled %s", "", VTY_NEWLINE);
-        }
-        if (acl_row->value_cur_aces[i]->n_count) {
-            vty_out(vty, "%-10s Hit-counts: enabled %s", "", VTY_NEWLINE);
+            /* Additional parameters, each on their own line */
+            if (acl_row->value_cur_aces[i]->n_log) {
+                vty_out(vty, "%-10s Logging: enabled %s", "", VTY_NEWLINE);
+            }
+            if (acl_row->value_cur_aces[i]->n_count) {
+                vty_out(vty, "%-10s Hit-counts: enabled %s", "", VTY_NEWLINE);
+            }
         }
     }
 }

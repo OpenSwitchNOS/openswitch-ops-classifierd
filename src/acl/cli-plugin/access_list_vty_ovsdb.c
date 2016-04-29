@@ -355,15 +355,19 @@ cli_create_update_ace (const char *acl_type,
             ovsrec_acl_entry_set_action(ace_row, ace_action);
         }
     }
-    if (ace_ip_protocol) {
-        if (acl_parse_str_is_numeric(ace_ip_protocol)) {
-            protocol_num = strtoll(ace_ip_protocol, NULL, 0);
+    /* Check that protocol is present and not "any" */
+    if (ace_ip_protocol && strcmp(ace_source_ip_address, "any")) {
+        protocol_num = acl_parse_protocol_get_number_from_name(ace_ip_protocol);
+        if (protocol_num != ACL_PROTOCOL_INVALID) {
+            ovsrec_acl_entry_set_protocol(ace_row, &protocol_num, 1);
         } else {
-            protocol_num = acl_parse_protocol_get_number_from_name(ace_ip_protocol);
+            vty_out(vty, "%% Invalid protocol%s", VTY_NEWLINE);
+            cli_do_config_abort(transaction);
+            return CMD_ERR_NOTHING_TODO;
         }
-        ovsrec_acl_entry_set_protocol(ace_row, &protocol_num, 1);
     }
-    if (ace_source_ip_address) {
+    /* Check that source IP is present and not "any" */
+    if (ace_source_ip_address && strcmp(ace_source_ip_address, "any")) {
         if (acl_ipv4_address_user_to_normalized(ace_source_ip_address, addr_str)) {
             ovsrec_acl_entry_set_src_ip(ace_row, addr_str);
         } else {
@@ -415,7 +419,8 @@ cli_create_update_ace (const char *acl_type,
             ovsrec_acl_entry_set_src_l4_port_max(ace_row, &max_num, 1);
         }
     }
-    if (ace_destination_ip_address) {
+    /* Check that destination IP is present and not "any" */
+    if (ace_destination_ip_address && strcmp(ace_destination_ip_address, "any")) {
         if (acl_ipv4_address_user_to_normalized(ace_destination_ip_address, addr_str)) {
             ovsrec_acl_entry_set_dst_ip(ace_row, addr_str);
         } else {
