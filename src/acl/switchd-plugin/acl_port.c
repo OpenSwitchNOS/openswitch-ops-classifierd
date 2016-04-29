@@ -596,28 +596,12 @@ acl_port_map_unapply_for_acl_cfg_delete(struct acl_port_map* acl_port_map)
 /**************************************************************************//**
  * Hash map containing all acl_ports
  *****************************************************************************/
-static struct hmap all_ports = HMAP_INITIALIZER(&all_ports);
+static struct shash all_ports = SHASH_INITIALIZER(&all_ports);
 
-/**************************************************************************//**
- * This function looks up an acl_port based on UUID of a port row
- *
- * @param[in] uuid   - Pointer to @see struct uuid
- *
- * @returns  Pointer to acl_port if found
- *           NULL otherwise
- *****************************************************************************/
-static struct acl_port *
-port_lookup(const struct uuid* uuid)
+struct acl_port *
+acl_port_lookup(const char *name)
 {
-    struct acl_port *port;
-
-    HMAP_FOR_EACH_WITH_HASH(port, all_node_uuid, uuid_hash(uuid),
-                            &all_ports) {
-        if (uuid_equals(&port->uuid, uuid)) {
-            return port;
-        }
-    }
-    return NULL;
+    return ((struct acl_port *)shash_find_data(&all_ports, name));
 }
 
 /**************************************************************************//**
@@ -632,9 +616,11 @@ acl_show_ports(struct unixctl_conn *conn, int argc, const char *argv[],
                void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
-    struct acl_port *acl_port, *next_acl_port;
+    struct shash_node *node, *next;
+    struct acl_port *acl_port;
 
-    HMAP_FOR_EACH_SAFE(acl_port, next_acl_port, all_node_uuid, &all_ports) {
+    SHASH_FOR_EACH_SAFE(node, next, &all_ports) {
+        acl_port = (struct acl_port *)node->data;
         ds_put_format(&ds, "-----------------------------\n");
         ds_put_format(&ds, "Port name: %s\n", acl_port->port->name);
         if (acl_port->port_map[ACL_CFG_V4_IN].hw_acl) {
@@ -647,19 +633,6 @@ acl_show_ports(struct unixctl_conn *conn, int argc, const char *argv[],
     ds_destroy(&ds);
 }
 
-struct acl_port *
-port_lookup_by_name (const char *name)
-{
-    struct acl_port *port, *next_port;
-
-    /* Walk all ports to find a match */
-    HMAP_FOR_EACH_SAFE(port, next_port, all_node_uuid, &all_ports) {
-        if (!strcmp(port->port->name, name)) {
-            return port;
-        }
-    }
-    return NULL;
-}
 
 /**************************************************************************//**
  * This function creates an acl_port when the port is seen for the first time
@@ -679,7 +652,6 @@ acl_port_new(struct port *port, unsigned int seqno,
              unsigned int interface_flags)
 {
     struct acl_port *acl_port = xzalloc(sizeof *acl_port);
-    acl_port->uuid = port->cfg->header_.uuid;
 
     /* setup my port_map to know about me and which colgrp they represent */
     for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
@@ -690,8 +662,7 @@ acl_port_new(struct port *port, unsigned int seqno,
     acl_port->interface_flags |= interface_flags;
     acl_port->ovsdb_row = port->cfg;
     acl_port->delete_seqno = seqno;
-    hmap_insert(&all_ports, &acl_port->all_node_uuid,
-                uuid_hash(&acl_port->uuid));
+    shash_add_assert(&all_ports, port->name, acl_port);
     return acl_port;
 }
 
@@ -702,18 +673,17 @@ acl_port_new(struct port *port, unsigned int seqno,
  * @param[in] acl_port - Port to be deleted
  *****************************************************************************/
 static void
-acl_port_delete(struct acl_port* acl_port)
+acl_port_delete(const char *port_name)
 {
-    if (acl_port) {
-        hmap_remove(&all_ports, &acl_port->all_node_uuid);
+    struct acl_port *port = shash_find_and_delete_assert(&all_ports,
+                                                         port_name);
 
-        /* cleanup my port_map */
-        for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
-            acl_port_map_destruct(&acl_port->port_map[i]);
-        }
-
-        free(acl_port);
+    /* cleanup my port_map */
+    for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
+        acl_port_map_destruct(&port->port_map[i]);
     }
+
+    free(port);
 }
 
 /**************************************************************************//**
@@ -784,7 +754,7 @@ acl_port_cfg_delete(struct acl_port* acl_port, struct port *port,
 void acl_callback_port_delete(struct blk_params *blk_params)
 {
     /* Handle port deletes here */
-    bool have_ports = !hmap_is_empty(&all_ports);
+    bool have_ports = !shash_is_empty(&all_ports);
     struct acl_port *acl_port;
     struct bridge *br;
     struct port *del_port, *next_del_port;
@@ -803,19 +773,13 @@ void acl_callback_port_delete(struct blk_params *blk_params)
         br = blk_params->vrf->up;
     }
 
-    if (shash_is_empty(&br->wanted_ports)) {
-        VLOG_DBG("[%s]No port rows are modified; no ports to delete.",
-                 ACL_PLUGIN_NAME);
-        return;
-    }
-
     /* Find and delete ACL cfg for the ports that are being deleted */
     HMAP_FOR_EACH_SAFE(del_port, next_del_port, hmap_node, &br->ports) {
         if (!shash_find_data(&br->wanted_ports, del_port->name)) {
-            acl_port = port_lookup(&del_port->cfg->header_.uuid);
+            acl_port = acl_port_lookup(del_port->name);
             if (acl_port) {
                 acl_port_cfg_delete(acl_port, del_port, blk_params->ofproto);
-                acl_port_delete(acl_port);
+                acl_port_delete(del_port->name);
             }
         }
     }
@@ -837,7 +801,7 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
     /* Port modify routine */
     HMAP_FOR_EACH(port, hmap_node, &br->ports) {
         if (OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno)) {
-            acl_port = port_lookup(&port->cfg->header_.uuid);
+            acl_port = acl_port_lookup(port->name);
             if (acl_port) {
                 if (port->cfg->aclv4_in_cfg) {
                     /* Reconfigure ACL */
@@ -866,7 +830,7 @@ acl_callback_port_update(struct blk_params *blk_params)
     if (blk_params->vrf) {
         interface_flags |= OPS_CLS_INTERFACE_L3ONLY;
     }
-    acl_port = port_lookup(&blk_params->port->cfg->header_.uuid);
+    acl_port = acl_port_lookup(blk_params->port->name);
     if (!acl_port) {
         /* Create and apply if ACL is configured on the port.*/
         if (blk_params->port->cfg->aclv4_in_cfg) {
@@ -897,7 +861,7 @@ acl_callback_port_stats_get(struct stats_blk_params *sblk,
     }
 
     /* Get the ACL port based on given port */
-    acl_port = port_lookup(&sblk->port->cfg->header_.uuid);
+    acl_port = acl_port_lookup(sblk->port->name);
     if (!acl_port) {
         VLOG_DBG("Stats get not needed for port %s\n", sblk->port->name);
         return;
