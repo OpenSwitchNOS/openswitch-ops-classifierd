@@ -67,6 +67,11 @@ acl_parse_ipv4_address(const char *in_address,
     char *slash_ptr;
     char *mask_substr = NULL;
 
+    /* NULL address taken to mean "any"; return without setting flags */
+    if (!in_address) {
+        return true;
+    }
+
     *flags |= flag;
     *family = OPS_CLS_AF_INET;
 
@@ -152,13 +157,9 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
         valid = false;
     }
 
-    if (acl_entry->n_protocol == 0)
+    /* No protocol specified for IPv4 entry taken to mean "any" */
+    if (acl_entry->n_protocol > 0)
     {
-        VLOG_INFO("populate_entry_from_acl_entry: Protocol not specified");
-    }
-    else
-    {
-        /* SB: @todo verify if business logic has validated protocol value */
         entry->entry_fields.protocol = acl_entry->protocol[0];
         entry->entry_fields.entry_flags |= OPS_CLS_PROTOCOL_VALID;
     }
