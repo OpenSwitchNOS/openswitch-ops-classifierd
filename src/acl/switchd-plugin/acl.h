@@ -42,9 +42,9 @@ struct acl {
     const struct ovsrec_acl *ovsdb_row;
     unsigned int       delete_seqno; /* mark/sweep to identify deleted */
 
-    /* members represending my cached PI state */
-    struct ovs_list acl_port_map;    /* List of struct p2acls. */
-    struct ops_cls_list *want_pi; /* temporary until Change system in place */
+    /* members representing my cached PI state */
+    struct ovs_list acl_port_map;    /* List of struct acl_port_map. */
+    struct ops_cls_list *cfg_pi; /* List of user configured acls */
 };
 
 /*************************************************************

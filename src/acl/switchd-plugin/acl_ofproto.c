@@ -70,7 +70,7 @@ call_ofproto_ops_cls_apply(struct acl                     *acl,
                            struct ops_cls_pd_status       *pd_status)
 {
     int rc;
-    rc = plugin->ofproto_ops_cls_apply(acl->want_pi, ofproto, bridgec_port,
+    rc = plugin->ofproto_ops_cls_apply(acl->cfg_pi, ofproto, bridgec_port,
                                        interface_info, direction, pd_status);
     VLOG_DBG("%s rc (%d)", __func__, rc);
     return rc;
@@ -104,7 +104,7 @@ call_ofproto_ops_cls_replace(struct acl                      *orig_acl,
 {
     int rc;
     rc = plugin->ofproto_ops_cls_replace(&orig_acl->uuid, orig_acl->name,
-                                         new_acl->want_pi, ofproto,
+                                         new_acl->cfg_pi, ofproto,
                                          bridgec_port, interface_info,
                                          direction, pd_status);
     VLOG_DBG("%s rc (%d)", __func__, rc);
@@ -116,7 +116,7 @@ call_ofproto_ops_cls_list_update(struct acl                     *acl,
                                  struct ops_cls_pd_list_status  *status)
 {
     int rc;
-    rc = plugin->ofproto_ops_cls_list_update(acl->want_pi, status);
+    rc = plugin->ofproto_ops_cls_list_update(acl->cfg_pi, status);
     VLOG_DBG("%s rc (%d)", __func__, rc);
     return rc;
 }

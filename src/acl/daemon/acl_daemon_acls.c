@@ -56,7 +56,7 @@ acl_reconfigure(struct ovsdb_idl *idl, unsigned int idl_seqno)
              */
             if (status_version_str) {
                 status_version = strtoull(status_version_str, NULL, 0);
-                if (acl_row->in_progress_version == status_version) {
+                if (acl_row->in_progress_version[0] == status_version) {
                     /* Clear the in_progress_aces as we have finished
                      * processing the in_progress_aces.
                      */
@@ -71,11 +71,11 @@ acl_reconfigure(struct ovsdb_idl *idl, unsigned int idl_seqno)
              * if UI made a change and in_progress_cleared flag is true */
             if (!status_version_str ||
                 ((in_progress_cleared == true) &&
-                 (acl_row->cfg_version > acl_row->in_progress_version))) {
+                 (acl_row->cfg_version[0] > acl_row->in_progress_version[0]))) {
                 ovsrec_acl_set_in_progress_aces(acl_row, acl_row->key_cfg_aces,
                     acl_row->value_cfg_aces, acl_row->n_cfg_aces);
                 ovsrec_acl_set_in_progress_version(acl_row,
-                                                   acl_row->cfg_version);
+                                                   acl_row->cfg_version,1);
                 rc++;
             }
         }

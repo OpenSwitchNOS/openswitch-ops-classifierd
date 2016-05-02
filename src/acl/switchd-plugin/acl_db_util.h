@@ -25,7 +25,7 @@
 /**************************************************************************//**
  * acl_db_util
  *
- * Data structure to ease access to the many P2ACL field
+ * Data structure to ease access to the many acl_port_map field
  * "quartets" stored in the ovsrec_port table.
  *
  * For now, access to IDL generated fields cannot cleanly be
@@ -39,7 +39,7 @@
  * This structure, and it's associated getters/setters solve that
  * problem. Functions coded to work with acl_db_util_get_applied()
  * and acl_db_util_set_applied() will be able to work with the _applied
- * field of any p2acl "quartet".
+ * field of any acl_port_map "quartet".
  *****************************************************************************/
 struct acl_db_util {
     enum ops_cls_type type;

@@ -49,16 +49,11 @@ struct acl_port_map {
  * There should be one of these for every 'struct port'
  * maintained by bridge.c.
  *
- * TODO: Once switchd refactor is complete, we should use their
- * methods to track changes in bridge.c managed port structures.
- * For now we track the Port OVSDB table ourselves and then go
- * query bridge.c to get it's port structure right before making
- * PD calls.
  *************************************************************/
 struct acl_port {
     unsigned int       interface_flags; /*< Type of port, L3 only, L2 etc */
     struct port        *port;       /*< struct port */
-    /* Hold all of my p2acl records internally, no need to
+    /* Hold all of my acl_port_map records internally, no need to
        allocate them separately. */
     struct acl_port_map port_map[ACL_CFG_MAX_TYPES];
 

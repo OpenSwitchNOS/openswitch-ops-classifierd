@@ -82,20 +82,20 @@ int init (int phase_id)
 
 int run(void)
 {
-    VLOG_DBG("ACL_PLUGIN is running");
+    VLOG_INFO("[%s] is running", ACL_PLUGIN_NAME);
     return 0;
 }
 
 int wait(void)
 {
-    VLOG_DBG("ACL_PLUGIN is waiting..");
+    VLOG_INFO("[%s] is waiting", ACL_PLUGIN_NAME);
     return 0;
 }
 
 int destroy(void)
 {
     unregister_plugin_extension("ACL_PLUGIN");
-    VLOG_DBG("ACL_PLUGIN was destroyed");
+    VLOG_INFO("[%s] was destroyed", ACL_PLUGIN_NAME);
     return 0;
 }
 

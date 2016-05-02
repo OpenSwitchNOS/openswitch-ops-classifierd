@@ -203,9 +203,6 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
     unsigned int sequence_number = 0;
 
     struct acl* acl;
-    /* TODO: Start looking at want_version too.
-     *       Short circuit if want_version == want_status_version.
-     */
     const struct ovsrec_acl *ovsdb_acl =
         acl_db_util_get_cfg(acl_port_map->acl_db, acl_port_map->parent->ovsdb_row);
     if (!ovsdb_acl) {
@@ -389,7 +386,6 @@ acl_port_map_cfg_create(struct acl_port_map *acl_port_map, struct port *port,
     /* no new/alloc to perform. Lifetime of acl_port_map is controlled by
        its containing acl_port */
 
-    /* TODO: Remove temporary processing of ACL_PORT_MAP:C like an ACL_PORT_MAP:U */
     acl_port_map_update_cfg_internal(acl_port_map, port, ofproto);
 }
 
@@ -725,9 +721,6 @@ acl_port_cfg_update(struct acl_port *acl_port, struct port *port,
                     struct ofproto *ofproto)
 {
     VLOG_DBG("PORT %s changed", acl_port->port->name);
-    /* TODO: rework this when we have the full
-       Change/Transaction structure */
-    /* Defer PD update to P2ACL structs */
     for (int i = 0; i < ACL_CFG_MAX_TYPES; ++i) {
         acl_port_map_cfg_update(&acl_port->port_map[i], port, ofproto);
     }

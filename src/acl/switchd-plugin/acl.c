@@ -30,30 +30,6 @@
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
 
-/* TODO: Remove these once new schema parser is generating them */
-#ifndef ACE_KEY_
-#define ACE_KEY_
-#define ACE_KEY_ACTION                    "action"
-#define ACE_KEY_IP_PROTOCOL               "protocol"
-#define ACE_KEY_SOURCE_IP_ADDRESS         "src_ip"
-#define ACE_KEY_SOURCE_PORT_OPERATOR      "src_l4_op"
-#define ACE_KEY_SOURCE_PORT               "src_l4_port"
-#define ACE_KEY_SOURCE_PORT_MAX           "src_l4_port_max"
-#define ACE_KEY_DESTINATION_IP_ADDRESS    "dst_ip"
-#define ACE_KEY_DESTINATION_PORT_OPERATOR "dst_l4_op"
-#define ACE_KEY_DESTINATION_PORT          "dst_l4_port"
-#define ACE_KEY_DESTINATION_PORT_MAX      "dst_l4_port_max"
-#endif
-
-#define ACL_CFG_STATUS_STR          "status_string"
-#define ACL_CFG_STATUS_VERSION      "version"
-#define ACL_CFG_STATUS_STATE        "state"
-#define ACL_CFG_STATUS_CODE         "code"
-#define ACL_CFG_STATUS_MSG          "message"
-#define ACL_CFG_STATE_APPLIED       "applied"
-#define ACL_CFG_STATE_REJECTED      "rejected"
-#define ACL_CFG_STATE_IN_PROGRESS   "in_progress"
-#define ACL_CFG_STATE_CANCELLED     "cancelled"
 
 static bool
 acl_parse_ipv4_address(const char *in_address,
@@ -84,7 +60,7 @@ acl_parse_ipv4_address(const char *in_address,
         slash_ptr[0] = '\0'; /* Replace slash with NULL to split strings */
         mask_substr = &slash_ptr[1]; /* Point to mask string for parsing */
     } else {
-        VLOG_ERR("Invalid IPv4 address string %s: expectd 'A.B.C.D/W.X.Y.Z'", tmp_str);
+        VLOG_ERR("Invalid IPv4 address string %s: expected 'A.B.C.D/W.X.Y.Z'", tmp_str);
         return false;
     }
 
@@ -135,7 +111,6 @@ populate_entry_from_acl_entry(struct ops_cls_list_entry *entry,
 {
     bool valid = true;
 
-    /* TODO: support more than ipv4 */
     if (!acl_parse_ipv4_address
         (acl_entry->src_ip,
          OPS_CLS_SRC_IPADDR_VALID,
@@ -232,12 +207,18 @@ ops_cls_list_new_from_acl(struct acl *acl)
     size_t n_aces = acl_row->n_in_progress_aces;
 
     struct ops_cls_list *list = ops_cls_list_new();
+    if (!list) {
+        VLOG_ERR("Failed to allocate new acl list in software for %s\n",
+                    acl_row->name);
+        return NULL;
+    }
+
     list->list_id = acl->uuid;
     list->list_name = xstrdup(acl->name);
     list->list_type = acl->type;
 
 
-    /* allocate our PI entries and convert from json */
+    /* allocate our PI entries and convert from acl_entry idl cache */
     list->num_entries = n_aces + 1; /* +1 for implicit deny all */
     list->entries = xzalloc(list->num_entries * sizeof *list->entries);
     for (int i = 0; i < n_aces; ++i) {
@@ -266,6 +247,7 @@ ops_cls_list_new_from_acl(struct acl *acl)
  * acl lookup routines
  *************************************************************/
 static struct hmap all_acls_by_uuid = HMAP_INITIALIZER(&all_acls_by_uuid);
+
 struct acl *
 acl_lookup_by_uuid(const struct uuid* uuid)
 {
@@ -310,7 +292,7 @@ acl_create(const struct ovsrec_acl *ovsdb_row, unsigned int seqno)
     acl->delete_seqno = seqno;
 
     list_init(&acl->acl_port_map);
-    /* acl->want_pi already NULL from xzalloc */
+    /* acl->cfg_pi already NULL from xzalloc */
 
     /* link myself into all the lists/maps I'm supposed to be in */
     hmap_insert(&all_acls_by_uuid, &acl->all_node_uuid, uuid_hash(&acl->uuid));
@@ -326,7 +308,7 @@ acl_delete(struct acl* acl)
      * are still interconnected.
      *
      * And even in that case, we'll need to make sure we teardown
-     * acl_ports (and their contained p2acl records) before we
+     * acl_ports (and their contained @see acl_port_map record) before we
      * teardown the ACL records.
      */
     ovs_assert(list_is_empty(&acl->acl_port_map));
@@ -334,7 +316,7 @@ acl_delete(struct acl* acl)
     hmap_remove(&all_acls_by_uuid, &acl->all_node_uuid);
 
     /* free up my cached copy of the PI API struct */
-    ops_cls_list_delete(acl->want_pi); /* temporary until Change system in place */
+    ops_cls_list_delete(acl->cfg_pi);
 
     free(CONST_CAST(char *, acl->name));
     free(acl);
@@ -351,32 +333,33 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
     smap_clone(&cfg_status, &row->status);
 
     /* Remove any values that exist */
-    smap_remove(&cfg_status, ACL_CFG_STATUS_STR);
-    smap_remove(&cfg_status, ACL_CFG_STATUS_VERSION);
-    smap_remove(&cfg_status, ACL_CFG_STATUS_STATE);
-    smap_remove(&cfg_status, ACL_CFG_STATUS_CODE);
-    smap_remove(&cfg_status, ACL_CFG_STATUS_MSG);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_STR);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_VERSION_STR);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_STATE_STR);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_CODE_STR);
+    smap_remove(&cfg_status, OPS_CLS_STATUS_MSG_STR);
 
     /* Add values to the smap */
-    smap_add(&cfg_status, ACL_CFG_STATUS_STR, state);
-    sprintf(version, "%" PRId64"", row->in_progress_version);
-    smap_add(&cfg_status, ACL_CFG_STATUS_VERSION, version);
-    smap_add(&cfg_status, ACL_CFG_STATUS_STATE, state);
+    smap_add(&cfg_status, OPS_CLS_STATUS_STR, state);
+    ovs_assert(row->cfg_version);
+    sprintf(version, "%" PRId64"", row->cfg_version[0]);
+    smap_add(&cfg_status, OPS_CLS_STATUS_VERSION_STR, version);
+    smap_add(&cfg_status, OPS_CLS_STATUS_STATE_STR, state);
     sprintf(code_str, "%u", code);
-    smap_add(&cfg_status, ACL_CFG_STATUS_CODE, code_str);
-    smap_add(&cfg_status, ACL_CFG_STATUS_MSG, details);
+    smap_add(&cfg_status, OPS_CLS_STATUS_CODE_STR, code_str);
+    smap_add(&cfg_status, OPS_CLS_STATUS_MSG_STR, details);
 
     /* Write cfg_status column */
     ovsrec_acl_set_status(row, &cfg_status);
 
     /* TODO: Make this code work/
-    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_STR, state);
+    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_STR, state);
     sprintf(version, "%" PRId64"", row->cfg_version);
-    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_VERSION, version);
-    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_STATE, state);
+    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_VERSION, version);
+    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_STATE, state);
     sprintf(code_str, "%u", code);
-    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_CODE, code_str);
-    ovsrec_acl_update_cfg_status_setkey(row, ACL_CFG_STATUS_MSG, details); */
+    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_CODE, code_str);
+    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_MSG, details); */
 }
 
 static void
@@ -393,13 +376,13 @@ acl_cfg_update(struct acl* acl)
         sprintf(details, "ACL %s -- unable to translate from ovsdb",
                 acl->name);
         VLOG_DBG(details);
-        /* @todo looks like we need a PI error code here?? */
-        acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_REJECTED, 4, details);
+        /* @todo nice to have PI error code for this condition */
+        acl_set_cfg_status(acl->ovsdb_row, OPS_CLS_STATE_REJECTED_STR, 4, details);
         return;
     } else {
         /* delete old PI cache of API obj, and remember new one */
-        ops_cls_list_delete(acl->want_pi); /* Temporary until Change system in place */
-        acl->want_pi = list;
+        ops_cls_list_delete(acl->cfg_pi);
+        acl->cfg_pi = list;
     }
 
     if (!list_is_empty(&acl->acl_port_map)) {
@@ -418,7 +401,7 @@ acl_cfg_update(struct acl* acl)
                                     acl->ovsdb_row->value_in_progress_aces,
                                     acl->ovsdb_row->n_in_progress_aces);
             /* status_str will be NULL on success */
-            acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_APPLIED,
+            acl_set_cfg_status(acl->ovsdb_row, OPS_CLS_STATE_APPLIED_STR,
                                0, status_str);
         } else {
             sprintf(details, "ACL %s -- PD list_update failed for"
@@ -437,7 +420,7 @@ acl_cfg_update(struct acl* acl)
                                     netdev_get_name(status.port->netdev),
                                     sequence_number,
                                     OPS_CLS_STATUS_MSG_MAX_LEN,status_str);
-            acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_REJECTED,
+            acl_set_cfg_status(acl->ovsdb_row, OPS_CLS_STATE_REJECTED_STR,
                                status.status_code, status_str);
         }
     } else {
@@ -449,8 +432,7 @@ acl_cfg_update(struct acl* acl)
                                 acl->ovsdb_row->value_in_progress_aces,
                                 acl->ovsdb_row->n_in_progress_aces);
         /* status_str will be NULL on success */
-        acl_set_cfg_status(acl->ovsdb_row, ACL_CFG_STATE_APPLIED, 0,
-                           status_str);
+        acl_set_cfg_status(acl->ovsdb_row, OPS_CLS_STATE_APPLIED_STR, 0, status_str);
     }
 }
 
@@ -465,7 +447,8 @@ acl_cfg_delete(struct acl* acl)
 
     /* Unapply ACL on any ports is handled as part of
        plugin reconfigure blocks.
-       TODO: Check if there are any ports left and report error if the p2acl list is not empty*/
+       TODO: Check if there are any ports left and report error if the
+       acl_port_map is not empty*/
 
     acl_delete(acl);
 }
@@ -544,8 +527,6 @@ acl_reconfigure_init(struct blk_params *blk_params)
         struct acl *acl, *next_acl;
         HMAP_FOR_EACH_SAFE (acl, next_acl, all_node_uuid, &all_acls_by_uuid) {
             if (acl->delete_seqno < idl_seqno) {
-                /* TODO: After we use Change objects, move the
-                 *       ACL:D handling to before ACL:[CU] */
                 acl_cfg_delete(acl);
             }
         }
