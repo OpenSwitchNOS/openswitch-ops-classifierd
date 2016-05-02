@@ -26,6 +26,7 @@
 #include "acl_ofproto.h"
 #include "reconfigure-blocks.h"
 #include "acl_plugin.h"
+#include "acl_port.h"
 #include "ops_cls_status_msgs.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
@@ -463,10 +464,7 @@ acl_cfg_delete(struct acl* acl)
 {
     VLOG_DBG("ACL %s deleted", acl->name);
 
-    /* Unapply ACL on any ports is handled as part of
-       plugin reconfigure blocks.
-       TODO: Check if there are any ports left and report error if the p2acl list is not empty*/
-
+    acl_port_unapply_if_needed(acl);
     acl_delete(acl);
 }
 
