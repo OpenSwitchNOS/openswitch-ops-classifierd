@@ -740,7 +740,7 @@ acl_log_run(struct run_blk_params *blk_params)
         if (ACL_LOG_INGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
             snprintf(port_name, sizeof(port_name), "%d",
                     pkt_buff.pkt_info.ingress_port);
-            acl_port = port_lookup_by_name(port_name);
+            acl_port = acl_port_lookup(port_name);
             if (acl_port) {
                 acl = acl_port->port_map[ACL_CFG_V4_IN].hw_acl;
             }
