@@ -556,8 +556,6 @@ acl_port_map_stats_get(struct acl_port_map *acl_port_map,
     free(statistics);
 }
 
-/** TODO: Enable this block after list delete is implemented */
-#if 0
 /**************************************************************************//**
  * This function unapplies an ACL to a given port with a given
  * configuration when an ACL is deleted.
@@ -572,22 +570,9 @@ acl_port_map_unapply_for_acl_cfg_delete(struct acl_port_map* acl_port_map)
              ops_cls_type_strings[acl_port_map->acl_db->type],
              ops_cls_direction_strings[acl_port_map->acl_db->direction]);
 
-/*    struct port *port = global_port_lookup(acl_port_map->parent->port->name);
-    if (!port) {
-        VLOG_ERR("INTERNAL ERROR: PORT %s not found. Unable to unapply acl_port_map",
-                 acl_port_map->parent->port->name);
-        return;
-    }
-
-    acl_port_map_unapply_internal(acl_port_map, port);
-*/
-    /* TODO: We must update OVSDB
-     *       _applied must go to NULL
-     *       _cfg_status must change too
-     *         failed w/ reason = ACL deleted while applied
-     */
+    acl_port_map_cfg_delete(acl_port_map, acl_port_map->parent->port,
+                            acl_port_map->parent->port->bridge->ofproto);
 }
-#endif
 
 /**************************************************************************//**
  * Hash map containing all acl_ports
@@ -775,6 +760,20 @@ void acl_callback_port_delete(struct blk_params *blk_params)
                 acl_port_delete(del_port->name);
             }
         }
+    }
+}
+
+void
+acl_port_unapply_if_needed(struct acl *acl)
+{
+    struct acl_port_map *port, *next;
+
+    if (list_is_empty(&acl->acl_port_map)) {
+        return;
+    }
+
+    LIST_FOR_EACH_SAFE(port, next, acl_node, &acl->acl_port_map) {
+        acl_port_map_unapply_for_acl_cfg_delete(port);
     }
 }
 

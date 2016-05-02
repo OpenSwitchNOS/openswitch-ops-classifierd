@@ -123,4 +123,12 @@ void acl_callback_port_stats_get(struct stats_blk_params *sblk,
  *****************************************************************************/
 void acl_port_debug_init(void);
 
+/**************************************************************************//**
+ * This function unapplies an ACL from all ports to which it is applied.
+ * It is called when an ACL is deleted after applying to interfaces
+ *
+ * @param[in] acl - Pointer to the @see struct acl
+ *****************************************************************************/
+void acl_port_unapply_if_needed(struct acl *acl);
+
 #endif  /* __SWITCHD__PLUGIN__ACL_PORT_H__ */
