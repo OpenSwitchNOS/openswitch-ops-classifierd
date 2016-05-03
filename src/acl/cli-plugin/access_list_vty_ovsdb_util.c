@@ -416,10 +416,6 @@ ovsrec_acl_set_cfg_aces_from_cur_aces(const struct ovsrec_acl *acl_row,
     return true;
 }
 
-/**
- * @todo use a timer to avoid waiting forever if ops-switchd is gone
- * @todo allow ctrl-c to interrupt waiting
- */
 int
 wait_for_ace_update_status(const char *acl_type,
                            const char *acl_name,
@@ -432,7 +428,8 @@ wait_for_ace_update_status(const char *acl_type,
     const char *status_message_str;
     const char *status_code_str;
 
-    while (true) {
+    /* Loop can be halted by Ctrl-C (SIGINT) */
+    while (!vty_interrupted_flag_get()) {
         /* Let OVSDB IDL update thread run */
         VTYSH_OVSDB_UNLOCK;
         /* Set latch to wake up OVSDB thread and get new status */
@@ -466,12 +463,10 @@ wait_for_ace_update_status(const char *acl_type,
             }
         }
     }
+    vty_out(vty, "%s%% Command interrupted; not all changes may have been processed%s", VTY_NEWLINE, VTY_NEWLINE);
+    return CMD_WARNING;
 }
 
-/**
- * @todo use a timer to avoid waiting forever if ops-switchd is gone
- * @todo allow ctrl-c to interrupt waiting
- */
 int
 wait_for_acl_apply_status(const char *interface_type,
                           const char *interface_id,
@@ -487,7 +482,8 @@ wait_for_acl_apply_status(const char *interface_type,
     const char *status_message_str;
     const char *status_code_str;
 
-    while (true) {
+    /* Loop can be halted by Ctrl-C (SIGINT) */
+    while (!vty_interrupted_flag_get()) {
         /* Let OVSDB IDL update thread run */
         VTYSH_OVSDB_UNLOCK;
         /* Set latch to wake up OVSDB thread and get new status */
@@ -540,4 +536,6 @@ wait_for_acl_apply_status(const char *interface_type,
             }
         }
     }
+    vty_out(vty, "%s%% Command interrupted; not all changes may have been processed%s", VTY_NEWLINE, VTY_NEWLINE);
+    return CMD_WARNING;
 }
