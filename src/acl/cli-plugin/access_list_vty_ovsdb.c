@@ -124,8 +124,11 @@ cli_create_acl_if_needed(const char *acl_type, const char *acl_name)
     if (!acl_row) {
         const char* max_acls_str;
         int64_t max_acls;
+        int64_t pending_cfg_version = 0;
 
         /* Get max ACLs from system table, other config */
+        //! @todo needs ops-sysd https://review.openswitch.net/#/c/8235/
+        // max_acls_str = smap_get(&ovs->other_info, "max_acls");
         max_acls_str = smap_get(&ovs->other_config, "max_acls");
 
         if (max_acls_str) {
@@ -149,7 +152,7 @@ cli_create_acl_if_needed(const char *acl_type, const char *acl_name)
         acl_row = ovsrec_acl_insert(transaction);
         ovsrec_acl_set_list_type(acl_row, acl_type);
         ovsrec_acl_set_name(acl_row, acl_name);
-        ovsrec_acl_set_cfg_version(acl_row, 0);
+        ovsrec_acl_set_cfg_version(acl_row, &pending_cfg_version, 1);
 
         /* Update System (parent) table */
         acl_info = xmalloc(sizeof *ovs->acls * (ovs->n_acls + 1));
@@ -490,8 +493,8 @@ cli_create_update_ace (const char *acl_type,
 
     /* Update ACL (parent) table */
     ovsrec_acl_set_cfg_aces_from_cur_aces(acl_row, ace_sequence_number, (struct ovsrec_acl_entry *) ace_row);
-    pending_cfg_version = acl_row->cfg_version + 1;
-    ovsrec_acl_set_cfg_version(acl_row, pending_cfg_version);
+    pending_cfg_version = acl_row->cfg_version[0] + 1;
+    ovsrec_acl_set_cfg_version(acl_row, &pending_cfg_version, 1);
 
     /* Complete transaction */
     txn_status = cli_do_config_finish(transaction);
@@ -547,8 +550,8 @@ cli_delete_ace (const char *acl_type,
         cli_do_config_abort(transaction);
         return CMD_ERR_NOTHING_TODO;
     }
-    pending_cfg_version = acl_row->cfg_version + 1;
-    ovsrec_acl_set_cfg_version(acl_row, pending_cfg_version);
+    pending_cfg_version = acl_row->cfg_version[0] + 1;
+    ovsrec_acl_set_cfg_version(acl_row, &pending_cfg_version, 1);
     /* If ACE is no longer referenced it will be garbage-collected */
 
     /* Complete transaction */
@@ -629,8 +632,8 @@ cli_resequence_acl (const char *acl_type,
 
     /* Replace ACL's entries with resequenced ones */
     ovsrec_acl_set_cfg_aces(acl_row, key_list, value_list, acl_row->n_cur_aces);
-    pending_cfg_version = acl_row->cfg_version + 1;
-    ovsrec_acl_set_cfg_version(acl_row, pending_cfg_version);
+    pending_cfg_version = acl_row->cfg_version[0] + 1;
+    ovsrec_acl_set_cfg_version(acl_row, &pending_cfg_version, 1);
 
     /* Clean up temporary data structures */
     free(key_list);
@@ -1180,8 +1183,12 @@ cli_set_acl_log_timer(const char* timer_value)
 void
 access_list_ovsdb_init(void)
 {
-    /* acls column in System table */
+    /* System table, columns */
+    ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_acls);
+    ovsdb_idl_add_column(idl, &ovsrec_system_col_other_config);
+    //! @todo needs ops-sysd https://review.openswitch.net/#/c/8235/
+    // ovsdb_idl_add_column(idl, &ovsrec_system_col_other_info);
 
     /* ACL table, columns */
     ovsdb_idl_add_table(idl, &ovsrec_table_acl);
@@ -1211,6 +1218,7 @@ access_list_ovsdb_init(void)
 
     /* ACL columns in Port table */
     ovsdb_idl_add_table(idl, &ovsrec_table_port);
+    ovsdb_idl_add_column(idl, &ovsrec_port_col_name);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_applied);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_cfg);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_cfg_version);
@@ -1219,6 +1227,7 @@ access_list_ovsdb_init(void)
 
     /* ACL columns in VLAN table */
     ovsdb_idl_add_table(idl, &ovsrec_table_vlan);
+    ovsdb_idl_add_column(idl, &ovsrec_vlan_col_id);
     ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_applied);
     ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_cfg);
     ovsdb_idl_add_column(idl, &ovsrec_vlan_col_aclv4_in_cfg_version);
