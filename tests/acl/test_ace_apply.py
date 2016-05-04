@@ -22,7 +22,7 @@ OpenSwitch Test for ACE apply to interfaces.
 from pytest import mark
 from re import search
 import pytest
-import topology_lib_vtysh.exceptions
+from topology_lib_vtysh import exceptions
 
 TOPOLOGY = """
 # +--------+
@@ -103,7 +103,7 @@ def test_ace_apply(topology, step):
     step('################ to interface ###############')
     step('################ ACL does not exist ###############')
 
-    with pytest.raises(topology_lib_vtysh.exceptions.AclDoesNotExistException):
+    with pytest.raises(exceptions.AclDoesNotExistException):
         with ops1.libs.vtysh.ConfigInterface('4') as ctx:
             ctx.apply_access_list_ip_in('test4')
 
@@ -433,7 +433,7 @@ def test_ace_apply(topology, step):
     step('################ sctp range L4  ###############')
     step('################ EchoCommandException  ###############')
 
-    with pytest.raises(topology_lib_vtysh.exceptions.EchoCommandException):
+    with pytest.raises(exceptions.EchoCommandException):
         with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
             ctx.permit(
                 '',
