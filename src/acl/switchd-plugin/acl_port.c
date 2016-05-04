@@ -153,28 +153,20 @@ acl_port_map_set_cfg_status(struct acl_port_map *acl_port_map,
                             const struct ovsrec_port *row,
                             char *state, unsigned int code, char *details)
 {
-    struct smap cfg_status;
-    char code_str[10];
-    char version[25];
+    char code_str[OPS_CLS_CODE_STR_MAX_LEN];
+    char version[OPS_CLS_VERSION_STR_MAX_LEN];
 
-    smap_clone(&cfg_status, &row->aclv4_in_status);
-
-    /* Remove any values that exist */
-    smap_remove(&cfg_status, OPS_CLS_STATUS_VERSION_STR);
-    smap_remove(&cfg_status, OPS_CLS_STATUS_STATE_STR);
-    smap_remove(&cfg_status, OPS_CLS_STATUS_CODE_STR);
-    smap_remove(&cfg_status, OPS_CLS_STATUS_MSG_STR);
-
-    /* Add values to the smap */
-    sprintf(version, "%" PRId64"", row->aclv4_in_cfg_version[0]);
-    smap_add(&cfg_status, OPS_CLS_STATUS_VERSION_STR, version);
-    smap_add(&cfg_status, OPS_CLS_STATUS_STATE_STR, state);
-    sprintf(code_str, "%u", code);
-    smap_add(&cfg_status, OPS_CLS_STATUS_CODE_STR, code_str);
-    smap_add(&cfg_status, OPS_CLS_STATUS_MSG_STR, details);
-
-    /* Write cfg_status column */
-    acl_db_util_set_cfg_status(acl_port_map->acl_db, row, &cfg_status);
+    snprintf(version, OPS_CLS_VERSION_STR_MAX_LEN,
+             "%" PRId64"", row->aclv4_in_cfg_version[0]);
+    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_VERSION_STR,
+                                              version);
+    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_STATE_STR,
+                                              state);
+    snprintf(code_str, OPS_CLS_CODE_STR_MAX_LEN, "%u", code);
+    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_CODE_STR,
+                                              code_str);
+    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_MSG_STR,
+                                              details);
 }
 
 /**************************************************************************//**
