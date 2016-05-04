@@ -327,40 +327,16 @@ static void
 acl_set_cfg_status(const struct ovsrec_acl *row, char *state, unsigned int code,
                    char *details)
 {
-    struct smap cfg_status;
     char code_str[10];
     char version[25];
 
-    smap_clone(&cfg_status, &row->status);
-
-    /* Remove any values that exist */
-    smap_remove(&cfg_status, OPS_CLS_STATUS_STR);
-    smap_remove(&cfg_status, OPS_CLS_STATUS_VERSION_STR);
-    smap_remove(&cfg_status, OPS_CLS_STATUS_STATE_STR);
-    smap_remove(&cfg_status, OPS_CLS_STATUS_CODE_STR);
-    smap_remove(&cfg_status, OPS_CLS_STATUS_MSG_STR);
-
-    /* Add values to the smap */
-    smap_add(&cfg_status, OPS_CLS_STATUS_STR, state);
-    ovs_assert(row->cfg_version);
-    sprintf(version, "%" PRId64"", row->cfg_version[0]);
-    smap_add(&cfg_status, OPS_CLS_STATUS_VERSION_STR, version);
-    smap_add(&cfg_status, OPS_CLS_STATUS_STATE_STR, state);
+    ovsrec_acl_update_status_setkey(row, OPS_CLS_STATUS_STR, state);
+    sprintf(version, "%" PRId64"", row->in_progress_version[0]);
+    ovsrec_acl_update_status_setkey(row, OPS_CLS_STATUS_VERSION_STR, version);
+    ovsrec_acl_update_status_setkey(row, OPS_CLS_STATUS_STATE_STR, state);
     sprintf(code_str, "%u", code);
-    smap_add(&cfg_status, OPS_CLS_STATUS_CODE_STR, code_str);
-    smap_add(&cfg_status, OPS_CLS_STATUS_MSG_STR, details);
-
-    /* Write cfg_status column */
-    ovsrec_acl_set_status(row, &cfg_status);
-
-    /* TODO: Make this code work/
-    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_STR, state);
-    sprintf(version, "%" PRId64"", row->cfg_version);
-    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_VERSION, version);
-    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_STATE, state);
-    sprintf(code_str, "%u", code);
-    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_CODE, code_str);
-    ovsrec_acl_update_cfg_status_setkey(row, OPS_CLS_STATUS_MSG, details); */
+    ovsrec_acl_update_status_setkey(row, OPS_CLS_STATUS_CODE_STR, code_str);
+    ovsrec_acl_update_status_setkey(row, OPS_CLS_STATUS_MSG_STR, details);
 }
 
 static void
