@@ -18,6 +18,8 @@
 #define __OPS_CLS_STATUS_MSGS_H__
 
 #define OPS_CLS_STATUS_MSG_MAX_LEN 512  /**< status msg max length */
+#define OPS_CLS_VERSION_STR_MAX_LEN 25 /**< Version string max length */
+#define OPS_CLS_CODE_STR_MAX_LEN    15 /**< Code string max length */
 
 /* Following macros define the strings that are used by the db
  * in status smap column
