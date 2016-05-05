@@ -358,7 +358,7 @@ cli_create_update_ace (const char *acl_type,
         }
     }
     /* Check that protocol is present and not "any" */
-    if (ace_ip_protocol && strcmp(ace_source_ip_address, "any")) {
+    if (ace_ip_protocol && strcmp(ace_ip_protocol, "any")) {
         protocol_num = acl_parse_protocol_get_number_from_name(ace_ip_protocol);
         if (protocol_num != ACL_PROTOCOL_INVALID) {
             ovsrec_acl_entry_set_protocol(ace_row, &protocol_num, 1);
