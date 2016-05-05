@@ -128,9 +128,7 @@ cli_create_acl_if_needed(const char *acl_type, const char *acl_name)
         int64_t pending_cfg_version = 0;
 
         /* Get max ACLs from system table, other config */
-        //! @todo needs ops-sysd https://review.openswitch.net/#/c/8235/
-        // max_acls_str = smap_get(&ovs->other_info, "max_acls");
-        max_acls_str = smap_get(&ovs->other_config, "max_acls");
+        max_acls_str = smap_get(&ovs->other_info, "max_acls");
 
         if (max_acls_str) {
             max_acls = strtol(max_acls_str, NULL, 0);
@@ -1222,8 +1220,7 @@ access_list_ovsdb_init(void)
     ovsdb_idl_add_table(idl, &ovsrec_table_system);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_acls);
     ovsdb_idl_add_column(idl, &ovsrec_system_col_other_config);
-    //! @todo needs ops-sysd https://review.openswitch.net/#/c/8235/
-    // ovsdb_idl_add_column(idl, &ovsrec_system_col_other_info);
+    ovsdb_idl_add_column(idl, &ovsrec_system_col_other_info);
 
     /* ACL table, columns */
     ovsdb_idl_add_table(idl, &ovsrec_table_acl);

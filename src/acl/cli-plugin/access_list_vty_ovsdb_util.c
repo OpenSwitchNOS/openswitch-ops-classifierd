@@ -158,11 +158,8 @@ check_ace_capacity (const struct ovsrec_acl *acl_row,
     }
 
     /* Get max ACEs and max ACEs per acl from system table, other config */
-    //! @todo needs ops-sysd https://review.openswitch.net/#/c/8235/
-    // max_aces_str = smap_get(&ovs->other_info, "max_aces");
-    // max_aces_per_acl_str = smap_get(&ovs->other_info, "max_aces_per_acl");
-    max_aces_str = smap_get(&ovs->other_config, "max_aces");
-    max_aces_per_acl_str = smap_get(&ovs->other_config, "max_aces_per_acl");
+    max_aces_str = smap_get(&ovs->other_info, "max_aces");
+    max_aces_per_acl_str = smap_get(&ovs->other_info, "max_aces_per_acl");
 
     if (max_aces_str && max_aces_per_acl_str) {
         max_aces = strtol(max_aces_str, NULL, 0);
