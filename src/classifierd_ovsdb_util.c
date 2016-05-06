@@ -291,7 +291,7 @@ classifierd_run(void)
     /* Update the local configuration and push any changes to the dB. */
     txn = ovsdb_idl_txn_create(idl);
     if (classifierd_reconfigure()) {
-        VLOG_DBG("%s: Commiting changes\n",__FUNCTION__);
+        VLOG_DBG("%s: Committing changes\n",__FUNCTION__);
         /* Some OVSDB write needs to happen. */
         ovsdb_idl_txn_commit_block(txn);
     }

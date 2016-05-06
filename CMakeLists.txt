@@ -50,7 +50,7 @@ include_directories (${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/${INCL_DIR}
 
 # Sources to build ops-classifierd
 set (SOURCES ${OPS_CLS_SOURCE_DIR}/classifierd.c
-             ${OPS_CLS_SOURCE_DIR}/classifierd_ovsdb_if.c
+             ${OPS_CLS_SOURCE_DIR}/classifierd_ovsdb_util.c
              ${ACL_DAEMON_DIR}/acl_daemon_init.c
              ${ACL_DAEMON_DIR}/acl_daemon_acls.c
              ${ACL_DAEMON_DIR}/acl_daemon_ports.c)
