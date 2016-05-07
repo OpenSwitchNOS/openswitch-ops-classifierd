@@ -23,6 +23,7 @@ from pytest import mark
 from re import search
 import pytest
 from topology_lib_vtysh import exceptions
+import time
 
 TOPOLOGY = """
 # +--------+
@@ -41,6 +42,12 @@ type=openswitch name="OpenSwitch 1"] ops1
 
 @mark.test_id(10402)
 def test_ace_parameters(topology, step):
+    step('################ Introduce delay in ACE ###########')
+    step('################ creation in case docker ###############')
+    step('################ is not up for > 45 seconds ###############')
+
+    time.sleep(60)
+
     """
     Adding ACL entries
 
@@ -58,7 +65,7 @@ def test_ace_parameters(topology, step):
 
     test1_result = ops1('show run')
 
-    # Verify ACE presents after created.
+    # Verify ACE present after created.
     assert search(
        ''
        r'1\s+permit\s+pim\s+[0-9]\.[0-9]\.[0-9]\.[0-9]'
