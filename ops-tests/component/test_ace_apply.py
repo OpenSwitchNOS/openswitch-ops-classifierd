@@ -23,6 +23,7 @@ from pytest import mark
 from re import search
 import pytest
 from topology_lib_vtysh import exceptions
+import time
 
 TOPOLOGY = """
 # +--------+
@@ -41,6 +42,12 @@ type=openswitch name="OpenSwitch 1"] ops1
 
 @mark.test_id(10403)
 def test_ace_apply(topology, step):
+    step('################ Introduce delay in ACE ###########')
+    step('################ creation in case docker ###############')
+    step('################ is not up for > 45 seconds ###############')
+
+    time.sleep(60)
+
     """
     Test apply of ACEs to ports.
 
