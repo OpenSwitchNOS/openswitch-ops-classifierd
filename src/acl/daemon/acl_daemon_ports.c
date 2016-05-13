@@ -36,8 +36,8 @@ VLOG_DEFINE_THIS_MODULE(acl_daemon_ports);
 static bool
 acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
 {
-    int hw_ready_state = false;
-    const char *status = NULL;
+    bool hw_ready_state = false;
+    const char *status  = NULL;
 
     ovs_assert(port_row);
 
@@ -79,6 +79,7 @@ acl_single_port_reconfigure(const struct ovsrec_port *port_row)
 {
     int  rc = 0;
     bool hw_ready_state = false;
+    const char *hw_status = NULL;
 
     ovs_assert(port_row);
     ovs_assert(port_row->n_interfaces == 1);
@@ -91,28 +92,28 @@ acl_single_port_reconfigure(const struct ovsrec_port *port_row)
     VLOG_DBG("Port %s:  linked to interface %s\n",
               port_row->name,port_row->interfaces[0]->name);
 
-    /* @todo: update following block once hw_ready_state is
-     * available.
-     */
-#if HW_READY_STATE
-    if(port_row->interfaces[0]->hw_ready_state == false) {
-#else
-    if(1) {
-#endif
+    hw_status =
+            smap_get((const struct smap *)&port_row->interfaces[0]->hw_status,
+                     OPS_INT_HW_READY_KEY_STR);
+
+    if((hw_status == NULL) ||
+       (strcmp(hw_status, "false") == 0)) {
         hw_ready_state = acl_ports_is_hw_ready(port_row);
 
-    }
+        if(hw_ready_state) {
+            /* set interface hw_ready_state in db */
+            ovsrec_interface_update_hw_status_setkey(
+                                             port_row->interfaces[0],
+                                             OPS_INT_HW_READY_KEY_STR,
+                                             "true");
+        } else {
+            /* set interface hw_ready_state in db */
+            ovsrec_interface_update_hw_status_setkey(
+                                           port_row->interfaces[0],
+                                           OPS_INT_HW_READY_BLOCKED_REASON_STR,
+                                           "acls");
+        }
 
-    if(hw_ready_state) {
-    /* @todo: update following block once hw_ready_state is
-     * available.
-     */
-#if HW_READY_STATE
-        /* set interface hw_ready_state in db */
-        ovsrec_interface_set_hw_ready_state(
-                                      port_row->interfaces[0],
-                                      hw_ready_state);
-#endif
         /* increment rc to indicate db update */
         rc++;
     }
@@ -128,10 +129,8 @@ static int
 acl_lag_port_reconfigure(const struct ovsrec_port *port_row)
 {
     int rc = 0;
-#if HW_READY_STATE
-    bool hw_ready_state;
     unsigned int intf_idx;
-#endif
+    const char *hw_status = NULL;
 
     ovs_assert(port_row);
     ovs_assert(port_row->n_interfaces > 1);
@@ -145,29 +144,29 @@ acl_lag_port_reconfigure(const struct ovsrec_port *port_row)
         return rc;
     }
 
-#if HW_READY_STATE
-    hw_ready_state = true;
     for(intf_idx = 0; intf_idx < port_row->n_interfaces; intf_idx++) {
-        /* @todo: update following block once hw_ready_state is
-         * available.
-         */
+        hw_status =
+            smap_get(
+               (const struct smap *)&port_row->interfaces[intf_idx]->hw_status,
+               OPS_INT_HW_READY_KEY_STR);
 
-        if(port_row->interfaces[intf_idx]->hw_ready_state == false) {
+        if((hw_status == NULL) || (strcmp(hw_status, "false") == 0)) {
             VLOG_DBG("port %s: setting hw_ready_state to true on "
                      "interface %s\n",port_row->name,
-                      port_row->interfaces[interface_idx]->name);
+                      port_row->interfaces[intf_idx]->name);
 
 
-            ovsrec_interface_set_hw_ready_state(
-                                            port_row->interfaces[intf_idx],
-                                            hw_ready_state);
+            ovsrec_interface_update_hw_status_setkey(
+                                         port_row->interfaces[0],
+                                         OPS_INT_HW_READY_KEY_STR,
+                                         "true");
 
             /* increment rc to indicate db update */
             rc++;
 
         }
     } /* end for loop */
-#endif
+
     return rc;
 }
 
