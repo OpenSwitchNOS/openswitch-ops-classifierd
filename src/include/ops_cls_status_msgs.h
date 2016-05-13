@@ -45,6 +45,11 @@
 #define OPS_CLS_STATE_CANCELLED_STR    \
                 "cancelled"      /**< "cancelled" string for state smap   */
 
+#define OPS_INTF_HW_READY_KEY_STR     \
+     "ready"                       /**< "ready" string for hw state          */
+#define OPS_INTF_HW_READY_BLOCKED_REASON_STR     \
+     "ready_state_blocked_reason"  /**< "blocked reason" string for hw state */
+
 /* Following macros define the strings that can be used by the
  * callers to fill in variable operation str in ops_cls_status_msgs
  */
