@@ -1352,6 +1352,19 @@ DEFUN (cli_access_list_log_timer, cli_access_list_log_timer_cmd,
 }
 
 /**
+ * Action routine for displaying ACL log timer
+ */
+DEFUN (cli_show_access_list_log_timer, cli_show_access_list_log_timer_cmd,
+       "show access-list log-timer",
+       SHOW_STR
+       ACL_STR
+       "Display ACL log timer length (frequency)\n"
+      )
+{
+    return cli_print_acl_log_timer();
+}
+
+/**
  * Prompt string when in access-list context
  */
 static struct cmd_node access_list_node = {
@@ -1420,6 +1433,8 @@ access_list_vty_init(void)
     install_element(ENABLE_NODE, &cli_clear_access_list_hitcounts_all_cmd);
 
     install_element(CONFIG_NODE, &cli_access_list_log_timer_cmd);
+    install_element(ENABLE_NODE, &cli_show_access_list_log_timer_cmd);
+    install_element(VIEW_NODE, &cli_show_access_list_log_timer_cmd);
 
     install_element(ACCESS_LIST_NODE, &config_exit_cmd);
     install_element(ACCESS_LIST_NODE, &config_quit_cmd);
