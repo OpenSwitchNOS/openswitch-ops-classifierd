@@ -110,13 +110,13 @@ get_vlan_by_id_str(const char *id_str)
  * @todo This could/should be generated as part of IDL.
  */
 const struct ovsrec_acl_entry*
-ovsrec_acl_cur_aces_getvalue(const struct ovsrec_acl *acl_row,
+ovsrec_acl_cfg_aces_getvalue(const struct ovsrec_acl *acl_row,
                              const int64_t key)
 {
     int i;
-    for (i = 0; i < acl_row->n_cur_aces; i ++) {
-        if (acl_row->key_cur_aces[i] == key) {
-            return acl_row->value_cur_aces[i];
+    for (i = 0; i < acl_row->n_cfg_aces; i ++) {
+        if (acl_row->key_cfg_aces[i] == key) {
+            return acl_row->value_cfg_aces[i];
         }
     }
     return NULL;
@@ -361,56 +361,6 @@ print_vlan_aclv4_in_statistics(const struct ovsrec_vlan *vlan_row)
             free(ace_str);
         }
     }
-}
-
-bool
-ovsrec_acl_set_cfg_aces_from_cur_aces(const struct ovsrec_acl *acl_row,
-                                      const int64_t key,
-                                      struct ovsrec_acl_entry *value)
-{
-    /* Assume we may add an entry until we find out this is an update or delete */
-    int entries_changed = 1;
-    /* malloc one extra entry key-value pair in case we insert */
-    int64_t *key_list = xmalloc(sizeof(int64_t) * (acl_row->n_cur_aces + entries_changed));
-    struct ovsrec_acl_entry **value_list = xmalloc(sizeof *acl_row->value_cur_aces * (acl_row->n_cur_aces + entries_changed));
-    int cur_idx, cfg_idx;
-
-    for (cur_idx = 0, cfg_idx = 0; cur_idx < acl_row->n_cur_aces; cur_idx++) {
-        if (key == acl_row->key_cur_aces[cur_idx]) {
-            /* For update, use provided value instead of cur_aces value */
-            if (value != NULL) {
-                key_list[cfg_idx] = key;
-                value_list[cfg_idx] = value;
-                entries_changed = 0;
-                cfg_idx++;
-            /* For delete operation, don't copy into cfg_aces or bump cfg_idx*/
-            } else {
-                entries_changed = -1;
-            }
-        } else {
-            /* For all other entries, copy cur_aces to cfg_aces */
-            key_list[cfg_idx] = acl_row->key_cur_aces[cur_idx];
-            value_list[cfg_idx] = acl_row->value_cur_aces[cur_idx];
-            cfg_idx++;
-        }
-    }
-    /* If matching entry key was not found */
-    if (entries_changed > 0) {
-        /* Check if it was a delete where the value wasn't found */
-        if (!value) {
-            free(key_list);
-            free(value_list);
-            return false;
-        }
-        /* Not an update or delete, so it's an insert. Append entry to list
-           (will be sorted by key automatically). */
-        key_list[acl_row->n_cur_aces] = key;
-        value_list[acl_row->n_cur_aces] = value;
-    }
-    ovsrec_acl_set_cfg_aces(acl_row, key_list, value_list, acl_row->n_cur_aces + entries_changed);
-    free(key_list);
-    free(value_list);
-    return true;
 }
 
 int

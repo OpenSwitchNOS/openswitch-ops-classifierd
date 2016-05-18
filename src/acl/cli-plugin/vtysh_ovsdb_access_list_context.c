@@ -64,17 +64,17 @@ show_run_access_list_callback(void *p_private)
                                   "ip",
                                   acl_row->name);
             /* Print each ACL entry as a single line (ala CLI input) */
-            for (i = 0; i < acl_row->n_cur_aces; i ++) {
+            for (i = 0; i < acl_row->n_cfg_aces; i ++) {
                 /* If entry has or is a comment, print as its own line */
-                if (acl_row->value_cur_aces[i]->comment) {
+                if (acl_row->value_cfg_aces[i]->comment) {
                     vtysh_ovsdb_cli_print(p_msg,
                                           "    %" PRId64 " comment %s",
-                                          acl_row->key_cur_aces[i],
-                                          acl_row->value_cur_aces[i]->comment);
+                                          acl_row->key_cfg_aces[i],
+                                          acl_row->value_cfg_aces[i]->comment);
                 }
-                if (acl_row->value_cur_aces[i]->action) {
-                    ace_str = acl_entry_config_to_string(acl_row->key_cur_aces[i],
-                                                         acl_row->value_cur_aces[i]);
+                if (acl_row->value_cfg_aces[i]->action) {
+                    ace_str = acl_entry_config_to_string(acl_row->key_cfg_aces[i],
+                                                         acl_row->value_cfg_aces[i]);
                     vtysh_ovsdb_cli_print(p_msg, "    %s", ace_str);
                     free(ace_str);
                 }

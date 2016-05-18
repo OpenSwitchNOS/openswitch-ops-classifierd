@@ -58,14 +58,14 @@ const struct ovsrec_port * get_port_by_name(const char *name);
 const struct ovsrec_vlan *get_vlan_by_id_str(const char *id_str);
 
 /**
- * Look up an ACE by key (sequence number) in current ACEs
+ * Look up an ACE by key (sequence number) in configured ACEs
  *
  * @param  acl_row         ACL row pointer
  * @param  sequence_number ACE sequence number
  *
  * @return                 Pointer to ovsrec_acl_entry structure object
  */
-const struct ovsrec_acl_entry *ovsrec_acl_cur_aces_getvalue(const struct ovsrec_acl *acl_row,
+const struct ovsrec_acl_entry *ovsrec_acl_cfg_aces_getvalue(const struct ovsrec_acl *acl_row,
                                                             const int64_t key);
 
 /**
@@ -147,21 +147,6 @@ void print_port_aclv4_in_statistics(const struct ovsrec_port *port_row);
  * @param vlan_row Pointer to VLAN row
  */
 void print_vlan_aclv4_in_statistics(const struct ovsrec_vlan *vlan_row);
-
-/**
- * Take ACL Entries from an ACL's cur_aces, copy them into cfg_aces, and update
- * the provided entry with a new value.
- *
- * @param acl_row ACL row pointer
- * @param key     numeric key (entry sequence number)
- * @param value   ACL Entry row pointer (NULL indicates delete)
- *
- * @return        false if attempting to delete a non-existent entry,
- *                true otherwise
- */
-bool ovsrec_acl_set_cfg_aces_from_cur_aces(const struct ovsrec_acl *acl_row,
-                                           const int64_t key,
-                                           struct ovsrec_acl_entry *value);
 
 /**
  * Wait for an ACL matching the given type and name to have a status for the

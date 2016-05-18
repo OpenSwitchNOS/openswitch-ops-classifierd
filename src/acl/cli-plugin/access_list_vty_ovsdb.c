@@ -293,9 +293,9 @@ cli_create_update_ace (const char *acl_type,
     /* Otherwise set sequence number to the current highest + auto-increment */
     } else {
         int64_t highest_ace_seq = 0;
-        if (acl_row->n_cur_aces > 0) {
+        if (acl_row->n_cfg_aces > 0) {
             /* ACEs are stored sorted, so just get the last one */
-            highest_ace_seq = acl_row->key_cur_aces[acl_row->n_cur_aces - 1];
+            highest_ace_seq = acl_row->key_cfg_aces[acl_row->n_cfg_aces - 1];
         }
         if (highest_ace_seq + ACE_SEQ_AUTO_INCR > ACE_SEQ_MAX) {
             vty_out(vty, "%% Unable to automatically set sequence number%s", VTY_NEWLINE);
@@ -316,7 +316,7 @@ cli_create_update_ace (const char *acl_type,
 
     /* Updating an ACE always (except comments) creates a new row.
        If the old ACE is no longer referenced it will be garbage-collected. */
-    old_ace_row = ovsrec_acl_cur_aces_getvalue(acl_row, ace_sequence_number);
+    old_ace_row = ovsrec_acl_cfg_aces_getvalue(acl_row, ace_sequence_number);
     if (old_ace_row) {
         VLOG_DBG("Updating ACE seq=%" PRId64, ace_sequence_number);
 
@@ -491,7 +491,7 @@ cli_create_update_ace (const char *acl_type,
     }
 
     /* Update ACL (parent) table */
-    ovsrec_acl_set_cfg_aces_from_cur_aces(acl_row, ace_sequence_number, (struct ovsrec_acl_entry *) ace_row);
+    ovsrec_acl_update_cfg_aces_setkey(acl_row, ace_sequence_number, (struct ovsrec_acl_entry *) ace_row);
     pending_cfg_version = acl_row->cfg_version[0] + 1;
     ovsrec_acl_set_cfg_version(acl_row, &pending_cfg_version, 1);
 
@@ -544,11 +544,12 @@ cli_delete_ace (const char *acl_type,
     /* Check to make sure ACE is present in ACL */
 
     VLOG_DBG("Deleting ACE seq=%" PRId64, ace_sequence_number);
-    if (!ovsrec_acl_set_cfg_aces_from_cur_aces(acl_row, ace_sequence_number, NULL)) {
+    if (!ovsrec_acl_cfg_aces_getvalue(acl_row, ace_sequence_number)) {
         vty_out(vty, "%% ACL entry does not exist%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
         return CMD_ERR_NOTHING_TODO;
     }
+    ovsrec_acl_update_cfg_aces_delkey(acl_row, ace_sequence_number);
     pending_cfg_version = acl_row->cfg_version[0] + 1;
     ovsrec_acl_set_cfg_version(acl_row, &pending_cfg_version, 1);
     /* If ACE is no longer referenced it will be garbage-collected */
@@ -595,7 +596,7 @@ cli_resequence_acl (const char *acl_type,
     }
 
     /* Check for an empty list */
-    if (!acl_row->n_cur_aces) {
+    if (!acl_row->n_cfg_aces) {
         vty_out(vty, "%% ACL is empty%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
         return CMD_ERR_NOTHING_TODO;
@@ -612,25 +613,25 @@ cli_resequence_acl (const char *acl_type,
      *   input should be accepted
      *   resequence should result in ACE #5 seq=4294967295
      */
-    if (start_num + ((acl_row->n_cur_aces - 1) * increment_num) > ACE_SEQ_MAX) {
+    if (start_num + ((acl_row->n_cfg_aces - 1) * increment_num) > ACE_SEQ_MAX) {
         vty_out(vty, "%% Sequence numbers would exceed maximum%s", VTY_NEWLINE);
         cli_do_config_abort(transaction);
         return CMD_ERR_NOTHING_TODO;
     }
 
     /* Initialize temporary data structures */
-    key_list = xmalloc(sizeof(int64_t) * (acl_row->n_cur_aces));
-    value_list = xmalloc(sizeof *acl_row->value_cur_aces * (acl_row->n_cur_aces));
+    key_list = xmalloc(sizeof(int64_t) * (acl_row->n_cfg_aces));
+    value_list = xmalloc(sizeof *acl_row->value_cfg_aces * (acl_row->n_cfg_aces));
 
     /* Walk through sorted list, resequencing by adding into new_aces */
-    for (i = 0; i < acl_row->n_cur_aces; i++) {
+    for (i = 0; i < acl_row->n_cfg_aces; i++) {
         key_list[i] = current_num;
-        value_list[i] = acl_row->value_cur_aces[i];
+        value_list[i] = acl_row->value_cfg_aces[i];
         current_num += increment_num;
     }
 
     /* Replace ACL's entries with resequenced ones */
-    ovsrec_acl_set_cfg_aces(acl_row, key_list, value_list, acl_row->n_cur_aces);
+    ovsrec_acl_set_cfg_aces(acl_row, key_list, value_list, acl_row->n_cfg_aces);
     pending_cfg_version = acl_row->cfg_version[0] + 1;
     ovsrec_acl_set_cfg_version(acl_row, &pending_cfg_version, 1);
 
