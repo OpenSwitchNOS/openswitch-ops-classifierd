@@ -114,7 +114,9 @@ cli_show_mirror_running_config_callback(void *p_private)
                      /* if this port is also a destination, note this fact for
                       * 'both' designation
                       */
-                     both_array[n_dst_port] = true;
+                     if (both_array) {
+                        both_array[n_dst_port] = true;
+                     }
                      break;
                   }
                }
@@ -140,7 +142,7 @@ cli_show_mirror_running_config_callback(void *p_private)
 
             } else {
 
-               if (!both_array[n_dst_port]) {
+               if (both_array && !both_array[n_dst_port]) {
                   vty_out(vty, "    source interface %s tx%s", dst_port->name, VTY_NEWLINE);
                }
             }
@@ -151,7 +153,7 @@ cli_show_mirror_running_config_callback(void *p_private)
          /* reuse, but invert the 'both' avoidance logic to display the 'both' ones */
          for (n_dst_port=0; n_dst_port < mirror->n_select_dst_port; n_dst_port++ ) {
 
-            if (both_array[n_dst_port]) {
+            if (both_array && both_array[n_dst_port]) {
                dst_port = mirror->select_dst_port[n_dst_port];
                vty_out(vty, "    source interface %s both%s", dst_port->name, VTY_NEWLINE);
             }
@@ -237,7 +239,9 @@ cli_show_mirror_exec (const char *mirror_arg)
                      dst_port = mirror->select_dst_port[n_dst_port];
                      if (strncmp(dst_port->name, src_port->name, INTERFACE_NAMSIZ) == 0) {
                         both = true;
-                        both_array[n_dst_port] = true;
+                        if (both_array) {
+                           both_array[n_dst_port] = true;
+                        }
                         break;
                      }
                   }
@@ -257,16 +261,16 @@ cli_show_mirror_exec (const char *mirror_arg)
 
                for (n_dst_port=0; n_dst_port < mirror->n_select_dst_port; n_dst_port++ ) {
 
-                  if (!both_array[n_dst_port]) {
+                  if (both_array && !both_array[n_dst_port]) {
                      dst_port = mirror->select_dst_port[n_dst_port];
                      vty_out(vty, " Source: interface %s tx%s", dst_port->name, VTY_NEWLINE);
                   }
                }
+            }
 
-               if (both_array) {
-                  free (both_array);
-                  both_array = NULL;
-               }
+            if (both_array) {
+               free (both_array);
+               both_array = NULL;
             }
 
             vty_out(vty, " Destination: interface %s%s", (mirror->output_port ?
@@ -1082,6 +1086,10 @@ is_a_src_iface_an_active_dest(const struct ovsrec_mirror* this_mirror)
          for (n_src_port=0; n_src_port < this_mirror->n_select_src_port; n_src_port++) {
 
             src_port = this_mirror->select_src_port[n_src_port];
+            if (src_port == NULL) {
+               VLOG_ERR("%s: Unable to access mirror source rx port", __func__);
+               return false;
+            }
 
             if (strncmp (src_port->name, mirror->output_port->name,
                                             INTERFACE_NAMSIZ) == 0) {
@@ -1099,11 +1107,15 @@ is_a_src_iface_an_active_dest(const struct ovsrec_mirror* this_mirror)
          for (n_dst_port=0; n_dst_port < this_mirror->n_select_dst_port; n_dst_port++) {
 
             dst_port = this_mirror->select_dst_port[n_dst_port];
+            if (dst_port == NULL) {
+               VLOG_ERR("%s: Unable to access mirror source tx port", __func__);
+               return false;
+            }
 
             if (strncmp (dst_port->name, mirror->output_port->name,
                                             INTERFACE_NAMSIZ) == 0) {
                vty_out (vty, "Interface (%s) already in use as destination in active session %s%s",
-                                                                src_port->name,
+                                                                dst_port->name,
                                                       mirror->name,VTY_NEWLINE);
                return true;
             }
