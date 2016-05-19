@@ -26,6 +26,7 @@
  ***************************************************************************/
 
 #include <vswitch-idl.h>
+#include <ovsdb-idl.h>
 
 #include <openvswitch/vlog.h>
 #include <dynamic-string.h>
@@ -48,24 +49,17 @@ VLOG_DEFINE_THIS_MODULE(vtysh_access_list_cli_ovsdb_util);
 /** Utilize OVSDB interface code generated from schema */
 extern struct ovsdb_idl *idl;
 
-/**
- * @todo This is not a very performant way to get a row by index columns.
- *       Initially it was the only way to do so; replace with something
- *       more efficient.
- */
+/** Utilized OVSDB table indices */
+extern struct ovsdb_idl_index *acl_table_index;
+
 const struct ovsrec_acl *
 get_acl_by_type_name(const char *acl_type, const char *acl_name)
 {
-    const static struct ovsrec_acl *acl;
-
-    OVSREC_ACL_FOR_EACH(acl, idl) {
-        if ((!strcmp(acl->list_type, acl_type)) &&
-            (!strcmp(acl->name, acl_name))) {
-            return (struct ovsrec_acl *) acl;
-        }
-    }
-
-    return NULL;
+    const struct ovsrec_acl acl = {.list_type = (char *) acl_type,
+                                   .name      = (char *) acl_name};
+    struct ovsdb_idl_index_cursor cursor;
+    ovsdb_idl_initialize_cursor(idl, &ovsrec_table_acl, "by_typeAndName", &cursor);
+    return ovsrec_acl_index_find(&cursor, &acl);
 }
 
 /**

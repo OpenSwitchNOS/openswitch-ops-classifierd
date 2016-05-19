@@ -47,6 +47,27 @@ VLOG_DEFINE_THIS_MODULE(vtysh_access_list_cli_ovsdb);
 /** Utilize OVSDB interface code generated from schema */
 extern struct ovsdb_idl *idl;
 
+/** Allow ACL table to be indexed */
+struct ovsdb_idl_index *acl_table_index;
+
+static int
+ovsrec_acl_name_comparator(const void *a, const void *b)
+{
+    struct ovsrec_acl *acl_a, *acl_b;
+    acl_a = (struct ovsrec_acl *)a;
+    acl_b = (struct ovsrec_acl *)b;
+    return strcmp(acl_a->name, acl_b->name);
+}
+
+static int
+ovsrec_acl_list_type_comparator(const void *a, const void *b)
+{
+    struct ovsrec_acl *acl_a, *acl_b;
+    acl_a = (struct ovsrec_acl *)a;
+    acl_b = (struct ovsrec_acl *)b;
+    return strcmp(acl_a->list_type, acl_b->list_type);
+}
+
 int
 cli_print_acls(const char *acl_type, const char *acl_name, const char *config)
 {
@@ -1276,4 +1297,9 @@ access_list_ovsdb_init(void)
 
     /* Initialize ACL DB Util array */
     acl_db_util_init();
+
+    /* Initialize DB indexing for ACL table */
+    acl_table_index = ovsdb_idl_create_index(idl, &ovsrec_table_acl, "by_typeAndName");
+    ovsdb_idl_index_add_column(acl_table_index, &ovsrec_acl_col_list_type, OVSDB_INDEX_ASC, ovsrec_acl_list_type_comparator);
+    ovsdb_idl_index_add_column(acl_table_index, &ovsrec_acl_col_name, OVSDB_INDEX_ASC, ovsrec_acl_name_comparator);
 }
