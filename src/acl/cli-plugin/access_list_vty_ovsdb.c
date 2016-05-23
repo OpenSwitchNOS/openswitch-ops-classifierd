@@ -615,6 +615,8 @@ cli_print_acls (const char *interface_type,
     const struct ovsrec_port *port_row = NULL;
     const struct ovsrec_vlan *vlan_row = NULL;
     char vlan_id_str[21]; /* Max string length of 64-bit number +1 for NULL */
+    bool applied_cfg_mismatch = false;
+    bool aces_cur_cfg_mismatch = false;
 
     /* Get System table */
     ovs = ovsrec_system_first(idl);
@@ -642,16 +644,34 @@ cli_print_acls (const char *interface_type,
             OVSREC_PORT_FOR_EACH(port_row, idl) {
                 if (!configuration && port_row->aclv4_in_applied == acl_row) {
                     print_acl_apply_commands("interface", port_row->name, "in", port_row->aclv4_in_applied);
+                    if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(port_row->aclv4_in_applied)) {
+                        aces_cur_cfg_mismatch = true;
+                    }
                 } else if (port_row->aclv4_in_cfg == acl_row) {
                     print_acl_apply_commands("interface", port_row->name, "in", port_row->aclv4_in_cfg);
+                    if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(port_row->aclv4_in_cfg)) {
+                        aces_cur_cfg_mismatch = true;
+                    }
+                }
+                if (!applied_cfg_mismatch && (port_row->aclv4_in_applied != port_row->aclv4_in_cfg)) {
+                    applied_cfg_mismatch = true;
                 }
             }
             OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
                 sprintf(vlan_id_str, "%" PRId64, vlan_row->id);
                 if (!configuration && vlan_row->aclv4_in_applied == acl_row) {
                     print_acl_apply_commands("vlan", vlan_id_str, "in", vlan_row->aclv4_in_applied);
+                    if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(vlan_row->aclv4_in_applied)) {
+                        aces_cur_cfg_mismatch = true;
+                    }
                 } else if (vlan_row->aclv4_in_cfg == acl_row) {
                     print_acl_apply_commands("vlan", vlan_id_str, "in", vlan_row->aclv4_in_cfg);
+                    if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(vlan_row->aclv4_in_cfg)) {
+                        aces_cur_cfg_mismatch = true;
+                    }
+                }
+                if (!applied_cfg_mismatch && (vlan_row->aclv4_in_applied != vlan_row->aclv4_in_cfg)) {
+                    applied_cfg_mismatch = true;
                 }
             }
         }
@@ -668,6 +688,12 @@ cli_print_acls (const char *interface_type,
             acl_row = port_row->aclv4_in_applied;
         } else {
             acl_row = port_row->aclv4_in_cfg;
+        }
+        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(acl_row)) {
+            aces_cur_cfg_mismatch = true;
+        }
+        if (!applied_cfg_mismatch && (port_row->aclv4_in_applied != port_row->aclv4_in_cfg)) {
+            applied_cfg_mismatch = true;
         }
         if (acl_row) {
             /* Print tabular */
@@ -697,6 +723,12 @@ cli_print_acls (const char *interface_type,
             acl_row = vlan_row->aclv4_in_applied;
         } else {
             acl_row = vlan_row->aclv4_in_cfg;
+        }
+        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(acl_row)) {
+            aces_cur_cfg_mismatch = true;
+        }
+        if (!applied_cfg_mismatch && (vlan_row->aclv4_in_applied != vlan_row->aclv4_in_cfg)) {
+            applied_cfg_mismatch = true;
         }
         if (acl_row) {
             /* Print tabular */
@@ -731,20 +763,47 @@ cli_print_acls (const char *interface_type,
                 OVSREC_PORT_FOR_EACH(port_row, idl) {
                     if (!configuration && port_row->aclv4_in_applied) {
                         print_acl_apply_commands("interface", port_row->name, "in", port_row->aclv4_in_applied);
+                        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(port_row->aclv4_in_applied)) {
+                            aces_cur_cfg_mismatch = true;
+                        }
                     } else if (configuration && port_row->aclv4_in_cfg) {
                         print_acl_apply_commands("interface", port_row->name, "in", port_row->aclv4_in_cfg);
+                        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(port_row->aclv4_in_cfg)) {
+                            aces_cur_cfg_mismatch = true;
+                        }
+                    }
+                    if (!applied_cfg_mismatch && (port_row->aclv4_in_applied != port_row->aclv4_in_cfg)) {
+                        applied_cfg_mismatch = true;
                     }
                 }
                 OVSREC_VLAN_FOR_EACH(vlan_row, idl) {
                     sprintf(vlan_id_str, "%" PRId64, vlan_row->id);
                     if (!configuration && vlan_row->aclv4_in_applied) {
                         print_acl_apply_commands("vlan", vlan_id_str, "in", vlan_row->aclv4_in_applied);
+                        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(vlan_row->aclv4_in_applied)) {
+                            aces_cur_cfg_mismatch = true;
+                        }
                     } else if (configuration && vlan_row->aclv4_in_cfg) {
                         print_acl_apply_commands("vlan", vlan_id_str, "in", vlan_row->aclv4_in_cfg);
+                        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(vlan_row->aclv4_in_cfg)) {
+                            aces_cur_cfg_mismatch = true;
+                        }
+                    }
+                    if (!applied_cfg_mismatch && (vlan_row->aclv4_in_applied != vlan_row->aclv4_in_cfg)) {
+                        applied_cfg_mismatch = true;
                     }
                 }
             }
         }
+    }
+
+    /* Warn about mismatch of applied ACLs */
+    if (applied_cfg_mismatch) {
+        vty_out(vty, "%% Warning: user-specified access-list apply does not match active configuration%s", VTY_NEWLINE);
+    }
+    /* Warn about mismatch of ACL entries */
+    if (aces_cur_cfg_mismatch) {
+        vty_out(vty, "%% Warning: user-specified access-list entries do not match active configuration%s", VTY_NEWLINE);
     }
 
     return CMD_SUCCESS;
