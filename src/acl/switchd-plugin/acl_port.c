@@ -296,7 +296,8 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
     }
 
     if (method_called == NULL) {
-        sprintf(details, "ACL_PORT_MAP %s:%s:%s no PD call needed",
+        snprintf(details, sizeof(details),
+                 "ACL_PORT_MAP %s:%s:%s no PD call needed",
                  acl_port_map->parent->port->name,
                  ops_cls_type_strings[acl_port_map->acl_db->type],
                  ops_cls_direction_strings[acl_port_map->acl_db->direction]);
