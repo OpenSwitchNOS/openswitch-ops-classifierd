@@ -48,7 +48,7 @@ const char *const temp_copp_keys[COPP_NUM_CLASSES] = {
     [COPP_ARP_BROADCAST] =      "temp_copp_arp_broadcast",
     [COPP_ARP_MY_UNICAST] =     "temp_copp_arp_my_unicast",
     [COPP_ARP_SNOOP] =          "temp_copp_arp_snoop",
-    [COPP_BGP] =               "temp_copp_bgp",
+    [COPP_BGP] =                "temp_copp_bgp",
     [COPP_DEFAULT_UNKNOWN] =    "temp_copp_default_unknown",
     [COPP_DHCPv4] =             "temp_copp_dhcpv4",
     [COPP_DHCPv6] =             "temp_copp_dhcpv6",
@@ -62,7 +62,9 @@ const char *const temp_copp_keys[COPP_NUM_CLASSES] = {
     [COPP_OSPFv2_UNICAST] =     "temp_copp_ospfv2_unicast",
     [COPP_sFLOW_SAMPLES] =      "temp_copp_sflow_samples",
     [COPP_STP_BPDU] =           "temp_copp_stp_bpdu",
-    [COPP_UNKNOWN_IP_UNICAST] = "temp_copp_unknown_ip_unicast"
+    [COPP_UNKNOWN_IP_UNICAST] = "temp_copp_unknown_ip_unicast",
+    [COPP_IPv4_OPTIONS] =       "temp_copp_ipv4_options",
+    [COPP_IPv6_OPTIONS] =       "temp_copp_ipv6_options"
 };
 
 enum copp_totals {
