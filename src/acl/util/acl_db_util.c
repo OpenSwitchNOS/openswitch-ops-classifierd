@@ -17,6 +17,7 @@
 #include <stddef.h>
 #include "vswitch-idl.h"
 #include "acl_db_util.h"
+#include "ops_cls_status_msgs.h"
 
 /**
  * Global array of groups of DB access routines. There will be one entry
@@ -140,12 +141,16 @@ acl_db_util_get_cfg_version(const struct acl_db_util *acl_db,
     return MEMBER_AT_OFFSET(port, acl_db->offset_cfg_version, int64_t *);
 }
 
-const struct smap*
+const char*
 acl_db_util_get_cfg_status(const struct acl_db_util *acl_db,
                              const struct ovsrec_port *port)
 {
-    return MEMBER_AT_OFFSET(port, acl_db->offset_cfg_status,
-                            const struct smap*);
+    struct smap acl_status;
+
+    acl_status = MEMBER_AT_OFFSET(port, acl_db->offset_cfg_status,
+                                  const struct smap);
+
+    return smap_get(&acl_status, OPS_CLS_STATUS_CODE_STR);
 }
 
 int64_t
