@@ -67,19 +67,19 @@
  * callers to fill in variable operation str in ops_cls_status_msgs
  */
 #define OPS_CLS_STATUS_MSG_OP_APPLY_STR    \
-                "apply"         /**< string to display apply operation    */
+                "apply"         /**< string to display apply operation      */
 #define OPS_CLS_STATUS_MSG_OP_REMOVE_STR   \
-                "remove"        /**< string to display remove operation   */
+                "remove"        /**< string to display remove operation     */
 #define OPS_CLS_STATUS_MSG_OP_REPLACE_STR  \
-                "replace"       /**< string to display replace operation  */
+                "replace"       /**< string to display replace operation    */
 #define OPS_CLS_STATUS_MSG_OP_UPDATE_STR   \
-                "update"        /**< string to display update operation   */
+                "update"        /**< string to display update operation     */
 #define OPS_CLS_STATUS_MSG_OP_GET_STR      \
-                "get"           /**< string to display get operation      */
+                "get"           /**< string to display get operation        */
 #define OPS_CLS_STATUS_MSG_OP_CLEAR_STR    \
-                "clear"         /**< string to display clear operation    */
+                "clear"         /**< string to display clear operation      */
 #define OPS_CLS_STATUS_MSG_OP_CLEARALL_STR   \
-                "clear all"     /**< string to display clearall operation */
+                "clear all"     /**< string to display clearall operation   */
 
 /* Following macros define the strings that can be used by the
  * callers to fill in variable feature str in ops_cls_status_msgs
