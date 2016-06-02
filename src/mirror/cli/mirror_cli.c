@@ -206,8 +206,8 @@ cli_show_mirror_exec (const char *mirror_arg)
             /* print mirror detail */
             vty_out(vty, " Mirror Session: %s%s", mirror->name, VTY_NEWLINE);
 
-            mstate = smap_get (&mirror->mirror_status, MIRROR_CONFIG_OPERATION_STATE);
-            vty_out(vty, " Status: %s%s", (mstate ? mstate : MIRROR_CONFIG_STATE_SHUTDOWN),
+            mstate = smap_get (&mirror->mirror_status, MIRROR_STATUS_MAP_KEY_OPERATION_STATE);
+            vty_out(vty, " Status: %s%s", (mstate ? mstate : MIRROR_STATUS_MAP_STATE_SHUTDOWN),
                                                             VTY_NEWLINE);
 
             /* an array to flag which select_dst_ports are found to be 'both'
@@ -304,9 +304,9 @@ cli_show_mirror_exec (const char *mirror_arg)
                          "------------- --------------%s", VTY_NEWLINE);
          }
 
-         mstate = smap_get (&mirror->mirror_status, MIRROR_CONFIG_OPERATION_STATE);
+         mstate = smap_get (&mirror->mirror_status, MIRROR_STATUS_MAP_KEY_OPERATION_STATE);
          vty_out(vty, "%-63s %-14s%s", mirror->name,
-                      (mstate ? mstate : MIRROR_CONFIG_STATE_SHUTDOWN), VTY_NEWLINE);
+                      (mstate ? mstate : MIRROR_STATUS_MAP_STATE_SHUTDOWN), VTY_NEWLINE);
 
       }
 
