@@ -158,10 +158,12 @@ cli_show_mirror_running_config_callback(void *p_private)
          }
       }
 
-      if (both_array) {
-         free (both_array);
-         both_array = NULL;
-      }
+      free (both_array);
+      /* This is necessary since an alloc/free may occur for each loop
+       * iteration, but freeing does not clear the pointer which would
+       * infer a buffer when none is there.
+       */
+      both_array = NULL;
 
       /* active/no shutdown */
       if (mirror->active && (*mirror->active == true)) {
@@ -206,8 +208,8 @@ cli_show_mirror_exec (const char *mirror_arg)
             /* print mirror detail */
             vty_out(vty, " Mirror Session: %s%s", mirror->name, VTY_NEWLINE);
 
-            mstate = smap_get (&mirror->mirror_status, MIRROR_CONFIG_OPERATION_STATE);
-            vty_out(vty, " Status: %s%s", (mstate ? mstate : MIRROR_CONFIG_STATE_SHUTDOWN),
+            mstate = smap_get (&mirror->mirror_status, MIRROR_STATUS_MAP_KEY_OPERATION_STATE);
+            vty_out(vty, " Status: %s%s", (mstate ? mstate : MIRROR_STATUS_MAP_STATE_SHUTDOWN),
                                                             VTY_NEWLINE);
 
             /* an array to flag which select_dst_ports are found to be 'both'
@@ -216,8 +218,6 @@ cli_show_mirror_exec (const char *mirror_arg)
 
                both_array = calloc(mirror->n_select_dst_port, sizeof *both_array);
                if (both_array == NULL) {
-                  VLOG_DBG("Failed to allocate memory for mirror array. Function=%s, Line=%d", __func__, __LINE__);
-                  vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
                   return CMD_WARNING;
                }
             }
@@ -304,9 +304,9 @@ cli_show_mirror_exec (const char *mirror_arg)
                          "------------- --------------%s", VTY_NEWLINE);
          }
 
-         mstate = smap_get (&mirror->mirror_status, MIRROR_CONFIG_OPERATION_STATE);
+         mstate = smap_get (&mirror->mirror_status, MIRROR_STATUS_MAP_KEY_OPERATION_STATE);
          vty_out(vty, "%-63s %-14s%s", mirror->name,
-                      (mstate ? mstate : MIRROR_CONFIG_STATE_SHUTDOWN), VTY_NEWLINE);
+                      (mstate ? mstate : MIRROR_STATUS_MAP_STATE_SHUTDOWN), VTY_NEWLINE);
 
       }
 
@@ -422,8 +422,6 @@ update_bridge_mirrors (struct ovsrec_mirror *mirror_row, bool delete)
    /* build new bridge row mirrors map */
    mirrors = calloc(n_mirrors, sizeof(*default_bridge_row->mirrors));
    if (mirrors == NULL) {
-      VLOG_DBG("Failed to allocate memory for mirror array. Function=%s, Line=%d", __func__, __LINE__);
-      vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
       return false;
    }
 
@@ -587,6 +585,37 @@ is_iface_a_port (const char* iface)
    return NULL;
 }
 
+
+/* Mirror source & dest Interfaces can only include frontplane ports -
+ * interfaces or LAGs. VLAN, tunnel or other interfaces are not supported.
+ * An interface/LAG is an ovsrec_port with one/many member
+ * ovsrec_interfaces of type 'system'.
+ */
+const struct ovsrec_port*
+is_iface_valid (const char* iface)
+{
+
+   const struct ovsrec_port *port_row = NULL;
+   const struct ovsrec_interface* intf_row = NULL;
+   int i = 0;
+
+   port_row = is_iface_a_port(iface);
+   if ((port_row == NULL) || (port_row->n_interfaces == 0)) {
+      return NULL;
+   }
+
+   for (i = 0; i < port_row->n_interfaces; i++) {
+
+      intf_row = port_row->interfaces[i];
+      if (strcmp(intf_row->type, OVSREC_INTERFACE_TYPE_SYSTEM) != 0) {
+         /* this interface is not of type 'system' (physical port) */
+         return NULL;
+      }
+   }
+   return port_row;
+}
+
+
 /* utility to determine if a mirror is active */
 bool
 is_mirror_active(const struct ovsrec_mirror *mirror)
@@ -620,8 +649,6 @@ update_dst_port (const struct ovsrec_mirror *mirror,
 
    ports = calloc(n_ports, sizeof(*mirror->select_dst_port));
    if (ports == NULL) {
-      VLOG_DBG("Failed to allocate memory for port array. Function=%s, Line=%d", __func__, __LINE__);
-      vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
       return CMD_WARNING;
    }
 
@@ -671,8 +698,6 @@ update_src_port (const struct ovsrec_mirror *mirror,
 
    ports = calloc(n_ports, sizeof(*mirror->select_src_port));
    if (ports == NULL) {
-      VLOG_DBG("Failed to allocate memory for port array. Function=%s, Line=%d", __func__, __LINE__);
-      vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
       return CMD_WARNING;
    }
 
@@ -784,7 +809,7 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
    enum ovsdb_idl_txn_status txn_status;
    int rc = CMD_SUCCESS;
 
-   port_row = is_iface_a_port(iface_name);
+   port_row = is_iface_valid(iface_name);
    if (NULL == port_row) {
       vty_out (vty, "Invalid interface %s%s", iface_name, VTY_NEWLINE);
       return CMD_ERR_NOTHING_TODO;
@@ -812,20 +837,12 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
 
    if (delete) {
 
-      if ((rc == CMD_SUCCESS) &&
-          /* remove interface src/rx on null (both) or 'rx' */
-          ((direction == NULL) || (strncmp(direction, SRC_DIR_RX,
-                                          MAX_SRC_DIR_LEN) == 0)) &&
-           (is_port_in_src_set(mirror, port_row))) {
+      if ((rc == CMD_SUCCESS) && (is_port_in_src_set(mirror, port_row))) {
 
          rc = update_src_port (mirror, port_row, true);
       }
 
-      if ((rc == CMD_SUCCESS) &&
-          /* remove interface dst/tx on null (both) or 'tx' */
-          ((direction == NULL) || (strncmp(direction, SRC_DIR_TX,
-                                          MAX_SRC_DIR_LEN) == 0)) &&
-           (is_port_in_dst_set(mirror, port_row))) {
+      if ((rc == CMD_SUCCESS) && (is_port_in_dst_set(mirror, port_row))) {
 
          rc = update_dst_port (mirror, port_row, true);
       }
@@ -957,6 +974,7 @@ output_iface_exec(const char* iface_name, bool delete)
    const struct ovsrec_port *port_row = NULL;
    struct ovsdb_idl_txn *txn = NULL;
    enum ovsdb_idl_txn_status txn_status;
+   bool active = false;
 
 
    /* a null interface is valid for delete case */
@@ -988,18 +1006,26 @@ output_iface_exec(const char* iface_name, bool delete)
       /* if active mirror, no mirroring w/out destination/output. shutdown */
       if ((mirror->active != NULL) && (*mirror->active == true)) {
 
-         bool active = 0;
+         /* initially false 'active' used to shutdown mirror in db */
          ovsrec_mirror_set_active (mirror, &active, 1);
+
+         /* now repurpose 'active' to flag that this session *had* been active */
+         active = true;
       }
 
-      ovsrec_mirror_set_output_port(mirror, NULL);
-      vty_out (vty, "Destination interface removed, mirror session %s shutdown%s",
+      if (mirror->output_port) {
+         ovsrec_mirror_set_output_port(mirror, NULL);
+      }
+
+      if (active) {
+         vty_out (vty, "Destination interface removed, mirror session %s shutdown%s",
                                                                   mirror->name,
                                                                    VTY_NEWLINE);
+      }
 
    } else {
 
-      port_row = is_iface_a_port(iface_name);
+      port_row = is_iface_valid(iface_name);
       if (port_row == NULL) {
 
          vty_out (vty, "Invalid interface %s%s", iface_name, VTY_NEWLINE);
@@ -1335,8 +1361,8 @@ DEFUN (cli_show_a_mirror,
        cli_show_a_mirror_cmd,
       "show mirror MIRROR",
       SHOW_STR
-      "Port mirror"
-      "Name of existing mirror session\n")
+      MIRROR_HELPSTR
+      MIRROR_SESSION_NAME_HELPSTR)
 {
 
    if (argc != 1) {
@@ -1368,13 +1394,14 @@ DEFUN (cli_mirror_source_iface_dir,
 
 }
 
-DEFUN (cli_mirror_no_source_iface_dir,
-       cli_mirror_no_source_iface_dir_cmd,
-       "no source interface INTERFACE {rx|tx}",
+DEFUN (cli_mirror_no_source_iface,
+       cli_mirror_no_source_iface_cmd,
+       "no source interface INTERFACE {both|rx|tx}",
        NO_STR
        SRC_HELPSTR
        IFACE_HELPSTR
        IFACE_NAME_HELPSTR
+       SRC_DIR_BOTH_HELPSTR
        SRC_DIR_RX_HELPSTR
        SRC_DIR_TX_HELPSTR)
 {
@@ -1383,14 +1410,7 @@ DEFUN (cli_mirror_no_source_iface_dir,
       return 1;
    }
 
-
-   if (argv[1] != NULL) {
-      return source_iface_exec((const char*)argv[0], (const char*)argv[1], true);
-   } else if (argv[2] != NULL) {
-      return source_iface_exec((const char*)argv[0], (const char*)argv[2], true);
-   } else {
-      return source_iface_exec((const char*)argv[0], NULL, true);
-   }
+   return source_iface_exec((const char*)argv[0], NULL, true);
 
 }
 
@@ -1491,7 +1511,7 @@ mirror_vty_init(void)
     install_element(MIRROR_NODE, &cli_mirror_no_output_iface_cmd);
 
     install_element(MIRROR_NODE, &cli_mirror_source_iface_dir_cmd);
-    install_element(MIRROR_NODE, &cli_mirror_no_source_iface_dir_cmd);
+    install_element(MIRROR_NODE, &cli_mirror_no_source_iface_cmd);
 
     install_element(MIRROR_NODE, &cli_mirror_shutdown_cmd);
     install_element(MIRROR_NODE, &cli_mirror_no_shutdown_cmd);
