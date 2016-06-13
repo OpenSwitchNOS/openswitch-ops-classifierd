@@ -262,11 +262,11 @@ cli_show_mirror_exec (const char *mirror_arg)
                      vty_out(vty, " Source: interface %s tx%s", dst_port->name, VTY_NEWLINE);
                   }
                }
+            }
 
-               if (both_array) {
-                  free (both_array);
-                  both_array = NULL;
-               }
+            if (both_array) {
+               free (both_array);
+               both_array = NULL;
             }
 
             vty_out(vty, " Destination: interface %s%s", (mirror->output_port ?
@@ -391,25 +391,18 @@ update_bridge_mirrors (struct ovsrec_mirror *mirror_row, bool delete)
    struct ovsrec_mirror** mirrors = NULL;
    int i, j, n_mirrors = 0;
 
-   default_bridge_row = ovsrec_bridge_first(idl);
-   if (default_bridge_row != NULL)
-   {
-      OVSREC_BRIDGE_FOR_EACH(bridge_row, idl)
-      {
-         if (strncmp(bridge_row->name, DEFAULT_BRIDGE_NAME,
-                              MAX_BR_OR_VRF_NAME_LEN) == 0)
-         {
-            default_bridge_row = (struct ovsrec_bridge*)bridge_row;
-            break;
-         }
+   OVSREC_BRIDGE_FOR_EACH(bridge_row, idl) {
+      if (strcmp(bridge_row->name, DEFAULT_BRIDGE_NAME) == 0) {
+          default_bridge_row = bridge_row;
+          break;
       }
+   }
 
-      if (default_bridge_row == NULL)
-      {
-         VLOG_DBG("Couldn't find default bridge. Function=%s, Line=%d", __func__, __LINE__);
-         vty_out(vty, "Failed to update the bridge%s", VTY_NEWLINE);
-         return false;
-      }
+   if (default_bridge_row == NULL) {
+       VLOG_DBG("Couldn't find default bridge. Function=%s, Line=%d",
+                __func__, __LINE__);
+       vty_out(vty, "Failed to update the bridge%s", VTY_NEWLINE);
+       return false;
    }
 
    /* more or less? */
@@ -808,8 +801,7 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
 
       if ((rc == CMD_SUCCESS) &&
           /* remove interface src/rx on null (both) or 'rx' */
-          ((direction == NULL) || (strncmp(direction, SRC_DIR_RX,
-                                          MAX_SRC_DIR_LEN) == 0)) &&
+          ((direction == NULL) || (strcmp(direction, SRC_DIR_RX) == 0)) &&
            (is_port_in_src_set(mirror, port_row))) {
 
          rc = update_src_port (mirror, port_row, true);
@@ -817,8 +809,7 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
 
       if ((rc == CMD_SUCCESS) &&
           /* remove interface dst/tx on null (both) or 'tx' */
-          ((direction == NULL) || (strncmp(direction, SRC_DIR_TX,
-                                          MAX_SRC_DIR_LEN) == 0)) &&
+          ((direction == NULL) || (strcmp(direction, SRC_DIR_TX) == 0)) &&
            (is_port_in_dst_set(mirror, port_row))) {
 
          rc = update_dst_port (mirror, port_row, true);
@@ -845,14 +836,13 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
       }
 
       /* add operation for tx/both */
-      if ((strncmp(direction, SRC_DIR_TX, MAX_SRC_DIR_LEN) == 0) ||
-          (strncmp(direction, SRC_DIR_BOTH, MAX_SRC_DIR_LEN) == 0)) {
+      if ((strcmp(direction, SRC_DIR_TX) == 0) ||
+          (strcmp(direction, SRC_DIR_BOTH) == 0)) {
 
          /* first, if tx/dst only, and this port exist in rx/src, remove it
           * (implicit replace/remove)
           */
-         if ((rc == CMD_SUCCESS) && (strncmp(direction, SRC_DIR_TX,
-                                             MAX_SRC_DIR_LEN) == 0) &&
+         if ((rc == CMD_SUCCESS) && (strcmp(direction, SRC_DIR_TX) == 0) &&
                             (is_port_in_src_set(mirror, port_row))) {
 
                rc = update_src_port (mirror, port_row, true);
@@ -882,14 +872,13 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
       }
 
       /* add operation for rx/both */
-      if ((strncmp(direction, SRC_DIR_RX, MAX_SRC_DIR_LEN) == 0) ||
-          (strncmp(direction, SRC_DIR_BOTH, MAX_SRC_DIR_LEN) == 0)) {
+      if ((strcmp(direction, SRC_DIR_RX) == 0) ||
+          (strcmp(direction, SRC_DIR_BOTH) == 0)) {
 
          /* first, if rx/src only, and this port exist in tx/dst, remove it
           * (implicit replace/remove)
           */
-         if ((rc == CMD_SUCCESS) && (strncmp(direction, SRC_DIR_RX,
-                                             MAX_SRC_DIR_LEN) == 0) &&
+         if ((rc == CMD_SUCCESS) && (strcmp(direction, SRC_DIR_RX) == 0) &&
                             (is_port_in_dst_set(mirror, port_row))) {
 
             rc = update_dst_port (mirror, port_row, true);

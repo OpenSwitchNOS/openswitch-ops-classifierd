@@ -173,10 +173,10 @@ qos_get_schedule_algorithm(char *db_algorithm)
     algorithm = ALGORITHM_STRICT;
 
     if (db_algorithm) {
-        if (!strncmp(db_algorithm, OVSREC_QUEUE_ALGORITHM_STRICT, 8)) {
+        if (!strcmp(db_algorithm, OVSREC_QUEUE_ALGORITHM_STRICT)) {
             algorithm = ALGORITHM_STRICT;
         }
-        else if (!strncmp(db_algorithm, OVSREC_QUEUE_ALGORITHM_DWRR, 8)) {
+        else if (!strcmp(db_algorithm, OVSREC_QUEUE_ALGORITHM_DWRR)) {
             algorithm = ALGORITHM_DWRR;
         }
     }
