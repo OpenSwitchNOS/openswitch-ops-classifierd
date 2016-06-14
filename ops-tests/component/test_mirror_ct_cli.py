@@ -23,6 +23,7 @@ import time
 import syslog
 from pytest import raises
 from topology_lib_vtysh.exceptions import UnknownVtyshException
+from topology_lib_vtysh.exceptions import TcamResourcesException
 
 TOPOLOGY = """
 # +-------+
@@ -470,6 +471,24 @@ def case_21_mirror_session_with_destination_lag_succeeds():
     with ops1.libs.vtysh.Configure() as ctx:
         ctx.no_mirror_session('bar')
 
+def case_22_add_mirror_non_system_source_interface_fails():
+    with raises(TcamResourcesException):
+        with ops1.libs.vtysh.ConfigMirrorSession("non_system") as ctx:
+            out = ctx.source_interface('bridge_normal',"tx")
+            assert 'Invalid interface' in out
+
+    with ops1.libs.vtysh.Configure() as ctx:
+        ctx.no_mirror_session("non_system ")
+
+def case_23_add_mirror_non_system_destination_interface_fails():
+    with raises(UnknownVtyshException):
+        with ops1.libs.vtysh.ConfigMirrorSession("non_system") as ctx:
+            out = ctx.destination_interface('bridge_normal')
+            assert 'Invalid interface' in out
+
+    with ops1.libs.vtysh.Configure() as ctx:
+        ctx.no_mirror_session("non_system ")
+
 def test_mirror_ct_cli(topology, setup):
     case_1_activate_ms_foo_succeeds()
     case_2_add_second_source_to_active_mirror_session_foo_succeeds()
@@ -492,3 +511,5 @@ def test_mirror_ct_cli(topology, setup):
     case_19_create_lag_succeeds()
     case_20_mirror_session_with_source_lag_succeeds()
     case_21_mirror_session_with_destination_lag_succeeds()
+    case_22_add_mirror_non_system_source_interface_fails()
+    case_23_add_mirror_non_system_destination_interface_fails()
