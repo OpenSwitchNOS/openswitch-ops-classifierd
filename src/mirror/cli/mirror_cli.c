@@ -844,6 +844,18 @@ source_iface_exec(const char* iface_name, const char* direction, bool delete)
          rc = CMD_ERR_NOTHING_TODO;
       }
 
+      /* Validate that only system interfaces are allowed. */
+      int i;
+      for (i = 0; i < port_row->n_interfaces; i++) {
+          if ((rc == CMD_SUCCESS) && (strncmp(port_row->interfaces[i]->type,
+                  OVSREC_INTERFACE_TYPE_SYSTEM,
+                  MAX_MIRROR_SESSION_NAME_LEN) != 0)) {
+              vty_out (vty, "Cannot add source, interface %s is not a system interface.%s",
+                      port_row->name, VTY_NEWLINE);
+              rc = CMD_ERR_NOTHING_TODO;
+          }
+      }
+
       /* add operation for tx/both */
       if ((strncmp(direction, SRC_DIR_TX, MAX_SRC_DIR_LEN) == 0) ||
           (strncmp(direction, SRC_DIR_BOTH, MAX_SRC_DIR_LEN) == 0)) {
@@ -1017,6 +1029,19 @@ output_iface_exec(const char* iface_name, bool delete)
                                                                    VTY_NEWLINE);
          cli_do_config_abort(txn);
          return CMD_ERR_NOTHING_TODO;
+      }
+
+      /* Validate that only system interfaces are allowed. */
+      int i;
+      for (i = 0; i < port_row->n_interfaces; i++) {
+          if ((strncmp(port_row->interfaces[i]->type,
+                  OVSREC_INTERFACE_TYPE_SYSTEM,
+                  MAX_MIRROR_SESSION_NAME_LEN) != 0)) {
+              vty_out (vty, "Cannot add source, interface %s is not a system interface.%s",
+                      port_row->name, VTY_NEWLINE);
+              cli_do_config_abort(txn);
+              return CMD_ERR_NOTHING_TODO;
+          }
       }
 
       /* could be a first time add/inactive mirror update, or active change.
