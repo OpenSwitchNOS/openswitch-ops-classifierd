@@ -1326,9 +1326,9 @@ DEFUN (cli_reset_access_list_applied_all,
 DEFUN (cli_reset_access_list_applied,
        cli_reset_access_list_applied_cmd,
 #ifdef OPS_CLS_VLAN_ACL_SUPPORT
-       "reset access-list applied (interface) ID { ip | in }",
-#else
        "reset access-list applied (interface|vlan) ID { ip | in }",
+#else
+       "reset access-list applied (interface) ID { ip | in }",
 #endif
        ACL_RESET_STR
        ACL_STR
