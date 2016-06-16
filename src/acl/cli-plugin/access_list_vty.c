@@ -1191,14 +1191,13 @@ ALIAS (cli_no_access_list_entry,
  * Action routine for showing specific applications of ACLs
  */
 DEFUN (cli_show_access_list_applied, cli_show_access_list_applied_cmd,
-       "show access-list (interface|vlan) ID { ip | in | commands | configuration }",
+       "show access-list (interface|vlan) ID { ip | commands | configuration }",
        SHOW_STR
        ACL_STR
        ACL_INTERFACE_STR
        ACL_VLAN_STR
        ACL_INTERFACE_ID_STR
        ACL_IP_STR
-       ACL_IN_STR
        ACL_CLI_CMD_STR
        ACL_CFG_STR
       )
@@ -1214,21 +1213,73 @@ DEFUN (cli_show_access_list_applied, cli_show_access_list_applied_cmd,
                           CONST_CAST(char*,argv[1]),  /* interface id */
                           CONST_CAST(char*,type_str), /* acl_type */
                           NULL,                       /* acl_name */
-                          CONST_CAST(char*,argv[3]),  /* direction */
-                          CONST_CAST(char*,argv[4]),  /* commands */
-                          CONST_CAST(char*,argv[5])); /* configuration */
+                          NULL,                       /* direction */
+                          CONST_CAST(char*,argv[3]),  /* commands */
+                          CONST_CAST(char*,argv[4])); /* configuration */
+}
+
+/**
+ * Action routine for showing specific applications of ACLs
+ */
+DEFUN (cli_show_access_list_ip_dir_applied, cli_show_access_list_ip_dir_applied_cmd,
+       "show access-list (interface|vlan) ID ip (in|out) { commands | configuration }",
+       SHOW_STR
+       ACL_STR
+       ACL_INTERFACE_STR
+       ACL_VLAN_STR
+       ACL_INTERFACE_ID_STR
+       ACL_IP_STR
+       ACL_IN_STR
+       ACL_OUT_STR
+       ACL_CLI_CMD_STR
+       ACL_CFG_STR
+      )
+{
+    return cli_print_acls(CONST_CAST(char*,argv[0]),  /* interface type */
+                          CONST_CAST(char*,argv[1]),  /* interface id */
+                          "ipv4",                     /* acl_type */
+                          NULL,                       /* acl_name */
+                          CONST_CAST(char*,argv[2]),  /* direction */
+                          CONST_CAST(char*,argv[3]),  /* commands */
+                          CONST_CAST(char*,argv[4])); /* configuration */
+}
+
+/**
+ * Action routine for showing specific applications of ACLs
+ */
+DEFUN (cli_show_access_list_dir_applied, cli_show_access_list_dir_applied_cmd,
+       "show access-list (interface|vlan) ID (in|out) { commands | configuration }",
+       SHOW_STR
+       ACL_STR
+       ACL_INTERFACE_STR
+       ACL_VLAN_STR
+       ACL_INTERFACE_ID_STR
+       ACL_IN_STR
+       ACL_OUT_STR
+       ACL_CLI_CMD_STR
+       ACL_CFG_STR
+      )
+{
+    return cli_print_acls(CONST_CAST(char*,argv[0]),  /* interface type */
+                          CONST_CAST(char*,argv[1]),  /* interface id */
+                          NULL,                       /* acl_type */
+                          NULL,                       /* acl_name */
+                          CONST_CAST(char*,argv[2]),  /* direction */
+                          CONST_CAST(char*,argv[3]),  /* commands */
+                          CONST_CAST(char*,argv[4])); /* configuration */
 }
 
 /**
  * Action routine for applying an ACL to an interface
  */
 DEFUN (cli_apply_access_list, cli_apply_access_list_cmd,
-       "apply access-list (ip) NAME (in)",
+       "apply access-list (ip) NAME (in|out)",
        APPLY_STR
        ACL_STR
        ACL_IP_STR
        ACL_NAME_STR
        ACL_IN_STR
+       ACL_OUT_STR
       )
 {
     const char vlan_str[] = "vlan";
@@ -1262,13 +1313,14 @@ DEFUN (cli_apply_access_list, cli_apply_access_list_cmd,
  * Action routine for un-applying an ACL from an interface
  */
 DEFUN (cli_no_apply_access_list, cli_no_apply_access_list_cmd,
-       "no apply access-list (ip) NAME (in)",
+       "no apply access-list (ip) NAME (in|out)",
        NO_STR
        APPLY_STR
        ACL_STR
        ACL_IP_STR
        ACL_NAME_STR
        ACL_IN_STR
+       ACL_OUT_STR
       )
 {
     const char vlan_str[] = "vlan";
@@ -1349,9 +1401,9 @@ DEFUN (cli_reset_access_list_applied,
 /**
  * Action routine for showing ACL statistics on a specified interface
  */
-DEFUN (cli_show_access_list_hitcounts,
-       cli_show_access_list_hitcounts_cmd,
-       "show access-list hitcounts (ip) NAME (interface|vlan) ID { in }",
+DEFUN (cli_show_access_list_hitcounts_dir,
+       cli_show_access_list_hitcounts_dir_cmd,
+       "show access-list hitcounts (ip) NAME (interface|vlan) ID (in|out)",
        SHOW_STR
        ACL_STR
        ACL_HITCOUNTS_STR
@@ -1361,6 +1413,7 @@ DEFUN (cli_show_access_list_hitcounts,
        ACL_VLAN_STR
        ACL_INTERFACE_ID_STR
        ACL_IN_STR
+       ACL_OUT_STR
       )
 {
     const char ipv4_str[] = "ipv4";
@@ -1375,6 +1428,36 @@ DEFUN (cli_show_access_list_hitcounts,
                                     CONST_CAST(char*,argv[2]),  /* interface type */
                                     CONST_CAST(char*,argv[3]),  /* interface id */
                                     CONST_CAST(char*,argv[4])); /* direction */
+}
+
+/**
+ * Action routine for showing ACL statistics on a specified interface
+ */
+DEFUN (cli_show_access_list_hitcounts,
+       cli_show_access_list_hitcounts_cmd,
+       "show access-list hitcounts (ip) NAME (interface|vlan) ID",
+       SHOW_STR
+       ACL_STR
+       ACL_HITCOUNTS_STR
+       ACL_IP_STR
+       ACL_NAME_STR
+       ACL_INTERFACE_STR
+       ACL_VLAN_STR
+       ACL_INTERFACE_ID_STR
+      )
+{
+    const char ipv4_str[] = "ipv4";
+    const char *type_str;
+    if (argv[0] && !strcmp(argv[0], "ip")) {
+        type_str = ipv4_str;
+    } else {
+        type_str = argv[0];
+    }
+    return cli_print_acl_statistics(CONST_CAST(char*,type_str), /* type */
+                                    CONST_CAST(char*,argv[1]),  /* name */
+                                    CONST_CAST(char*,argv[2]),  /* interface type */
+                                    CONST_CAST(char*,argv[3]),  /* interface id */
+                                    NULL);                      /* direction */
 }
 
 /**
@@ -1409,8 +1492,8 @@ DEFUN (cli_show_access_list_hitcounts_all,
  */
 DEFUN (cli_clear_access_list_hitcounts,
        cli_clear_access_list_hitcounts_cmd,
-       "clear access-list hitcounts (ip) NAME (interface|vlan) ID { in }",
-       SHOW_STR
+       "clear access-list hitcounts (ip) NAME (interface|vlan) ID (in|out)",
+       CLEAR_STR
        ACL_STR
        ACL_HITCOUNTS_STR
        ACL_IP_STR
@@ -1419,6 +1502,7 @@ DEFUN (cli_clear_access_list_hitcounts,
        ACL_VLAN_STR
        ACL_INTERFACE_ID_STR
        ACL_IN_STR
+       ACL_OUT_STR
       )
 {
     const char ipv4_str[] = "ipv4";
@@ -1442,19 +1526,18 @@ DEFUN (cli_clear_access_list_hitcounts,
  */
 DEFUN (cli_clear_access_list_hitcounts_all,
        cli_clear_access_list_hitcounts_all_cmd,
-       "clear access-list hitcounts all { in }",
+       "clear access-list hitcounts all",
        CLEAR_STR
        ACL_STR
        ACL_HITCOUNTS_STR
        ACL_ALL_STR
-       ACL_IN_STR
       )
 {
     return cli_clear_acl_statistics(NULL,                       /* type */
                                     NULL,                       /* name */
                                     NULL,                       /* interface type */
                                     NULL,                       /* interface id */
-                                    CONST_CAST(char*,argv[0])); /* direction */
+                                    NULL); /* direction */
 }
 
 /**
@@ -1543,6 +1626,10 @@ access_list_vty_init(void)
 
     install_element(ENABLE_NODE, &cli_show_access_list_applied_cmd);
     install_element(VIEW_NODE, &cli_show_access_list_applied_cmd);
+    install_element(ENABLE_NODE, &cli_show_access_list_ip_dir_applied_cmd);
+    install_element(VIEW_NODE, &cli_show_access_list_ip_dir_applied_cmd);
+    install_element(ENABLE_NODE, &cli_show_access_list_dir_applied_cmd);
+    install_element(VIEW_NODE, &cli_show_access_list_dir_applied_cmd);
 
     install_element(INTERFACE_NODE, &cli_apply_access_list_cmd);
     install_element(INTERFACE_NODE, &cli_no_apply_access_list_cmd);
@@ -1552,8 +1639,10 @@ access_list_vty_init(void)
     install_element(VLAN_NODE, &cli_no_apply_access_list_cmd);
 
     install_element(ENABLE_NODE, &cli_show_access_list_hitcounts_cmd);
+    install_element(ENABLE_NODE, &cli_show_access_list_hitcounts_dir_cmd);
     install_element(ENABLE_NODE, &cli_show_access_list_hitcounts_all_cmd);
     install_element(VIEW_NODE, &cli_show_access_list_hitcounts_cmd);
+    install_element(VIEW_NODE, &cli_show_access_list_hitcounts_dir_cmd);
     install_element(VIEW_NODE, &cli_show_access_list_hitcounts_all_cmd);
     install_element(ENABLE_NODE, &cli_clear_access_list_hitcounts_cmd);
     install_element(ENABLE_NODE, &cli_clear_access_list_hitcounts_all_cmd);
