@@ -32,6 +32,7 @@
 #include <linux/mpls.h>
 #include <linux/llc.h>
 
+#include "acl_db_util.h"
 #include "acl_log.h"
 #include "acl_parse.h"
 #include "acl_port.h"
@@ -860,7 +861,7 @@ acl_log_get_entry_index(struct acl *acl, struct pkt_info *key, uint8_t *in_cos,
 
     for (i = 0; i < acl->ovsdb_row->n_cur_aces; i++) {
         if (acl_log_entry_match(
-                    &acl->cfg_pi[ACL_CFG_V4_IN].entries[i].entry_fields,
+                    &acl->cfg_pi[ACL_CFG_PORT_V4_IN].entries[i].entry_fields,
                     key, in_cos)) {
             *index = i;
             return true;
@@ -1146,7 +1147,12 @@ acl_log_run(struct run_blk_params *blk_params)
         if (ACL_LOG_INGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
             acl_port = acl_port_lookup(pkt_buff.pkt_info.ingress_port_name);
             if (acl_port) {
-                acl = acl_port->port_map[ACL_CFG_V4_IN].hw_acl;
+                acl = acl_port->port_map[ACL_CFG_PORT_V4_IN].hw_acl;
+            }
+        } else if (ACL_LOG_EGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
+            acl_port = acl_port_lookup(pkt_buff.pkt_info.egress_port_name);
+            if (acl_port) {
+                acl = acl_port->port_map[ACL_CFG_PORT_V4_OUT].hw_acl;
             }
         }
 
@@ -1225,12 +1231,16 @@ acl_log_run(struct run_blk_params *blk_params)
             }
             if (ACL_LOG_INGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
                 ds_put_format(&msg, "port %s, ", pkt_buff.pkt_info.ingress_port_name);
+            } else if (ACL_LOG_EGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
+                ds_put_format(&msg, "port %s, ", pkt_buff.pkt_info.egress_port_name);
             }
         }
 
-        /* Note: currently only ingress ACLs are supported. This code will
-         * have to be updated when egress ACLs are also supported. */
-        ds_put_format(&msg, "direction %s", "in");
+        if (ACL_LOG_INGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
+            ds_put_format(&msg, "direction %s", "in");
+        } else if (ACL_LOG_EGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
+            ds_put_format(&msg, "direction %s", "out");
+        }
 
         VLOG_INFO("%s", ds_cstr_ro(&msg));
         ds_destroy(&msg);
