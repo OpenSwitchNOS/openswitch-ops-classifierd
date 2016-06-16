@@ -147,11 +147,13 @@ void print_acl_tabular(const struct ovsrec_acl *acl_row,
                        const char *configuration);
 
 /**
- * Print inbound IPv4 statistics for any ACLs applied to a given Port
+ * Print inbound or outbound IPv4 statistics for any ACLs applied to a given Port
  *
+ * @param acl_db   Pointer to the @see acl_db_util structure
  * @param port_row Pointer to Port row
  */
-void print_port_aclv4_in_statistics(const struct ovsrec_port *port_row);
+void print_port_aclv4_statistics(const struct acl_db_util *acl_db,
+                                   const struct ovsrec_port *port_row);
 
 /**
  * Print inbound IPv4 statistics for any ACLs applied to a given VLAN
