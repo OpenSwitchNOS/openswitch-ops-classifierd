@@ -31,6 +31,7 @@
 #include <command.h>
 #include <vtysh.h>
 
+#include "acl_db_util.h"
 #include <acl_parse.h>
 #include <ops-cls-asic-plugin.h>
 #include <ops_cls_status_msgs.h>

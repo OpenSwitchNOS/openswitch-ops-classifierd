@@ -31,6 +31,7 @@
 #include <vtysh.h>
 #include <vtysh_ovsdb_config.h>
 
+#include "acl_db_util.h"
 #include <acl_parse.h>
 
 #include "access_list_vty_util.h"

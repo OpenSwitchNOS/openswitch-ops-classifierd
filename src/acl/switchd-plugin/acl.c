@@ -20,6 +20,7 @@
 #include "openvswitch/vlog.h"
 #include "ofproto/ofproto-provider.h"
 #include "ops-cls-asic-plugin.h"
+#include "acl_db_util.h"
 #include "acl_parse.h"
 #include "acl_ofproto.h"
 #include "reconfigure-blocks.h"
