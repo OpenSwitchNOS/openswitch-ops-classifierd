@@ -158,10 +158,12 @@ cli_show_mirror_running_config_callback(void *p_private)
          }
       }
 
-      if (both_array) {
-         free (both_array);
-         both_array = NULL;
-      }
+      free (both_array);
+      /* This is necessary since an alloc/free may occur for each loop
+       * iteration, but freeing does not clear the pointer which would
+       * infer a buffer when none is there.
+       */
+      both_array = NULL;
 
       /* active/no shutdown */
       if (mirror->active && (*mirror->active == true)) {
@@ -206,8 +208,8 @@ cli_show_mirror_exec (const char *mirror_arg)
             /* print mirror detail */
             vty_out(vty, " Mirror Session: %s%s", mirror->name, VTY_NEWLINE);
 
-            mstate = smap_get (&mirror->mirror_status, MIRROR_CONFIG_OPERATION_STATE);
-            vty_out(vty, " Status: %s%s", (mstate ? mstate : MIRROR_CONFIG_STATE_SHUTDOWN),
+            mstate = smap_get (&mirror->mirror_status, MIRROR_STATUS_MAP_KEY_OPERATION_STATE);
+            vty_out(vty, " Status: %s%s", (mstate ? mstate : MIRROR_STATUS_MAP_STATE_SHUTDOWN),
                                                             VTY_NEWLINE);
 
             /* an array to flag which select_dst_ports are found to be 'both'
@@ -216,8 +218,6 @@ cli_show_mirror_exec (const char *mirror_arg)
 
                both_array = calloc(mirror->n_select_dst_port, sizeof *both_array);
                if (both_array == NULL) {
-                  VLOG_DBG("Failed to allocate memory for mirror array. Function=%s, Line=%d", __func__, __LINE__);
-                  vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
                   return CMD_WARNING;
                }
             }
@@ -304,9 +304,9 @@ cli_show_mirror_exec (const char *mirror_arg)
                          "------------- --------------%s", VTY_NEWLINE);
          }
 
-         mstate = smap_get (&mirror->mirror_status, MIRROR_CONFIG_OPERATION_STATE);
+         mstate = smap_get (&mirror->mirror_status, MIRROR_STATUS_MAP_KEY_OPERATION_STATE);
          vty_out(vty, "%-63s %-14s%s", mirror->name,
-                      (mstate ? mstate : MIRROR_CONFIG_STATE_SHUTDOWN), VTY_NEWLINE);
+                      (mstate ? mstate : MIRROR_STATUS_MAP_STATE_SHUTDOWN), VTY_NEWLINE);
 
       }
 
@@ -320,7 +320,7 @@ cli_show_mirror_exec (const char *mirror_arg)
       } else {
             vty_out(vty, "Invalid mirror session '%s'%s", mirror_arg, VTY_NEWLINE);
       }
-      return CMD_ERR_NOTHING_TODO;
+      return CMD_OVSDB_FAILURE;
    }
 
    return CMD_SUCCESS;
@@ -422,8 +422,6 @@ update_bridge_mirrors (struct ovsrec_mirror *mirror_row, bool delete)
    /* build new bridge row mirrors map */
    mirrors = calloc(n_mirrors, sizeof(*default_bridge_row->mirrors));
    if (mirrors == NULL) {
-      VLOG_DBG("Failed to allocate memory for mirror array. Function=%s, Line=%d", __func__, __LINE__);
-      vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
       return false;
    }
 
@@ -620,8 +618,6 @@ update_dst_port (const struct ovsrec_mirror *mirror,
 
    ports = calloc(n_ports, sizeof(*mirror->select_dst_port));
    if (ports == NULL) {
-      VLOG_DBG("Failed to allocate memory for port array. Function=%s, Line=%d", __func__, __LINE__);
-      vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
       return CMD_WARNING;
    }
 
@@ -671,8 +667,6 @@ update_src_port (const struct ovsrec_mirror *mirror,
 
    ports = calloc(n_ports, sizeof(*mirror->select_src_port));
    if (ports == NULL) {
-      VLOG_DBG("Failed to allocate memory for port array. Function=%s, Line=%d", __func__, __LINE__);
-      vty_out(vty, "Error, out of memory%s", VTY_NEWLINE);
       return CMD_WARNING;
    }
 
@@ -957,6 +951,7 @@ output_iface_exec(const char* iface_name, bool delete)
    const struct ovsrec_port *port_row = NULL;
    struct ovsdb_idl_txn *txn = NULL;
    enum ovsdb_idl_txn_status txn_status;
+   bool active = false;
 
 
    /* a null interface is valid for delete case */
@@ -988,14 +983,22 @@ output_iface_exec(const char* iface_name, bool delete)
       /* if active mirror, no mirroring w/out destination/output. shutdown */
       if ((mirror->active != NULL) && (*mirror->active == true)) {
 
-         bool active = 0;
+         /* initially false 'active' used to shutdown mirror in db */
          ovsrec_mirror_set_active (mirror, &active, 1);
+
+         /* now repurpose 'active' to flag that this session *had* been active */
+         active = true;
       }
 
-      ovsrec_mirror_set_output_port(mirror, NULL);
-      vty_out (vty, "Destination interface removed, mirror session %s shutdown%s",
+      if (mirror->output_port) {
+         ovsrec_mirror_set_output_port(mirror, NULL);
+      }
+
+      if (active) {
+         vty_out (vty, "Destination interface removed, mirror session %s shutdown%s",
                                                                   mirror->name,
                                                                    VTY_NEWLINE);
+      }
 
    } else {
 
@@ -1103,7 +1106,7 @@ is_a_src_iface_an_active_dest(const struct ovsrec_mirror* this_mirror)
             if (strncmp (dst_port->name, mirror->output_port->name,
                                             INTERFACE_NAMSIZ) == 0) {
                vty_out (vty, "Interface (%s) already in use as destination in active session %s%s",
-                                                                src_port->name,
+                                                                dst_port->name,
                                                       mirror->name,VTY_NEWLINE);
                return true;
             }
@@ -1335,8 +1338,8 @@ DEFUN (cli_show_a_mirror,
        cli_show_a_mirror_cmd,
       "show mirror MIRROR",
       SHOW_STR
-      "Port mirror"
-      "Name of existing mirror session\n")
+      MIRROR_HELPSTR
+      MIRROR_SESSION_NAME_HELPSTR)
 {
 
    if (argc != 1) {

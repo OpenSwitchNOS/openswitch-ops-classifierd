@@ -56,7 +56,6 @@
 #define ACL_CFG_STR "Display user-specified configuration\n"
 #define ACL_HITCOUNTS_STR "Hit counts (statistics)\n"
 #define ACL_IN_STR "Inbound (ingress) traffic\n"
-#define ACL_APPLY_STR "Apply a configuration record\n"
 #define ACL_IP_STR "Internet Protocol v4 (IPv4)\n"
 #define ACL_INTERFACE_STR "Specify interface\n"
 #define ACL_INTERFACE_NAME_STR "Interface Name\n"
@@ -64,6 +63,8 @@
 #define ACL_VLAN_STR "Specify VLAN\n"
 #define ACL_VLAN_ID_STR "VLAN ID\n"
 #define ACL_ALL_STR "All access-lists\n"
+#define ACL_RESET_STR "Reset configuration\n"
+#define ACL_APPLIED_STR "Applied configuration record\n"
 
 /* Command strings (cmdstr) and Help strings (helpstr) used in vtysh DEFUNs */
 #define ACE_SEQ_CMDSTR "<1-" ACL_NUM_TO_STR(ACE_SEQ_MAX) "> "

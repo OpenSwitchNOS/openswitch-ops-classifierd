@@ -170,6 +170,44 @@ DEFUN (cli_show_access_list_type_name,
 }
 
 /**
+ * Action routine for resetting all ACLs to active configuration
+ */
+DEFUN (cli_reset_access_list_all,
+       cli_reset_access_list_all_cmd,
+       "reset access-list all",
+       ACL_RESET_STR
+       ACL_STR
+       ACL_ALL_STR
+       )
+{
+    return cli_reset_acls(NULL,  /* acl_type */
+                          NULL); /* acl_name */
+}
+
+/**
+ * Action routine for resetting specified ACL to active configuration
+ */
+DEFUN (cli_reset_access_list,
+       cli_reset_access_list_cmd,
+       "reset access-list (ip) NAME",
+       ACL_RESET_STR
+       ACL_STR
+       ACL_IP_STR
+       ACL_NAME_STR
+       )
+{
+    const char ipv4_str[] = "ipv4";
+    const char *type_str;
+    if (argv[0] && !strcmp(argv[0], "ip")) {
+        type_str = ipv4_str;
+    } else {
+        type_str = argv[0];
+    }
+    return cli_reset_acls(type_str,                   /* acl_type */
+                          CONST_CAST(char*,argv[1])); /* acl_name */
+}
+
+/**
  * Action routine for resequencing an ACL
  */
 DEFUN (cli_access_list_resequence,
@@ -1186,7 +1224,7 @@ DEFUN (cli_show_access_list_applied, cli_show_access_list_applied_cmd,
  */
 DEFUN (cli_apply_access_list, cli_apply_access_list_cmd,
        "apply access-list (ip) NAME (in)",
-       ACL_APPLY_STR
+       APPLY_STR
        ACL_STR
        ACL_IP_STR
        ACL_NAME_STR
@@ -1226,7 +1264,7 @@ DEFUN (cli_apply_access_list, cli_apply_access_list_cmd,
 DEFUN (cli_no_apply_access_list, cli_no_apply_access_list_cmd,
        "no apply access-list (ip) NAME (in)",
        NO_STR
-       ACL_APPLY_STR
+       APPLY_STR
        ACL_STR
        ACL_IP_STR
        ACL_NAME_STR
@@ -1257,6 +1295,55 @@ DEFUN (cli_no_apply_access_list, cli_no_apply_access_list_cmd,
                            type_str,                     /* type */
                            CONST_CAST(char*,argv[1]),    /* name */
                            CONST_CAST(char*,argv[2]));   /* direction */
+}
+
+/**
+ * Action routine for resetting all ACLs applied in active configuration
+ */
+DEFUN (cli_reset_access_list_applied_all,
+       cli_reset_access_list_applied_all_cmd,
+       "reset access-list applied all",
+       ACL_RESET_STR
+       ACL_STR
+       ACL_APPLIED_STR
+       ACL_ALL_STR
+       )
+{
+    return cli_reset_applied_acls(NULL,  /* interface type */
+                                  NULL,  /* interface id */
+                                  NULL,  /* type */
+                                  NULL); /* direction */
+}
+
+/**
+ * Action routine for resetting specified ACLs applied in active configuration
+ */
+DEFUN (cli_reset_access_list_applied,
+       cli_reset_access_list_applied_cmd,
+       "reset access-list applied (interface|vlan) ID { ip | in }",
+       ACL_RESET_STR
+       ACL_STR
+       ACL_APPLIED_STR
+       ACL_INTERFACE_STR
+       ACL_VLAN_STR
+       ACL_INTERFACE_ID_STR
+       ACL_IP_STR
+       ACL_IN_STR
+       )
+{
+    const char ipv4_str[] = "ipv4";
+    const char *type_str;
+
+    if (argv[2] && !strcmp(argv[2], "ip")) {
+        type_str = ipv4_str;
+    } else {
+        type_str = argv[0];
+    }
+
+    return cli_reset_applied_acls(CONST_CAST(char*,argv[0]),  /* interface type */
+                                  CONST_CAST(char*,argv[1]),  /* interface id */
+                                  type_str,                   /* type */
+                                  CONST_CAST(char*,argv[3])); /* direction */
 }
 
 /**
@@ -1414,6 +1501,10 @@ access_list_vty_init(void)
     install_element(CONFIG_NODE, &cli_access_list_cmd);
     install_element(CONFIG_NODE, &cli_no_access_list_cmd);
     install_element(CONFIG_NODE, &cli_access_list_resequence_cmd);
+    install_element(CONFIG_NODE, &cli_reset_access_list_all_cmd);
+    install_element(CONFIG_NODE, &cli_reset_access_list_cmd);
+    install_element(CONFIG_NODE, &cli_reset_access_list_applied_all_cmd);
+    install_element(CONFIG_NODE, &cli_reset_access_list_applied_cmd);
 
     install_element(ENABLE_NODE, &cli_show_access_list_cmd);
     install_element(ENABLE_NODE, &cli_show_access_list_type_cmd);
