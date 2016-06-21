@@ -1191,11 +1191,17 @@ ALIAS (cli_no_access_list_entry,
  * Action routine for showing specific applications of ACLs
  */
 DEFUN (cli_show_access_list_applied, cli_show_access_list_applied_cmd,
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        "show access-list (interface|vlan) ID { ip | in | commands | configuration }",
+#else
+       "show access-list (interface) ID { ip | in | commands | configuration }",
+#endif
        SHOW_STR
        ACL_STR
        ACL_INTERFACE_STR
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        ACL_VLAN_STR
+#endif
        ACL_INTERFACE_ID_STR
        ACL_IP_STR
        ACL_IN_STR
@@ -1319,12 +1325,18 @@ DEFUN (cli_reset_access_list_applied_all,
  */
 DEFUN (cli_reset_access_list_applied,
        cli_reset_access_list_applied_cmd,
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        "reset access-list applied (interface|vlan) ID { ip | in }",
+#else
+       "reset access-list applied (interface) ID { ip | in }",
+#endif
        ACL_RESET_STR
        ACL_STR
        ACL_APPLIED_STR
        ACL_INTERFACE_STR
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        ACL_VLAN_STR
+#endif
        ACL_INTERFACE_ID_STR
        ACL_IP_STR
        ACL_IN_STR
@@ -1350,14 +1362,20 @@ DEFUN (cli_reset_access_list_applied,
  */
 DEFUN (cli_show_access_list_hitcounts,
        cli_show_access_list_hitcounts_cmd,
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        "show access-list hitcounts (ip) NAME (interface|vlan) ID { in }",
+#else
+       "show access-list hitcounts (ip) NAME (interface) ID { in }",
+#endif
        SHOW_STR
        ACL_STR
        ACL_HITCOUNTS_STR
        ACL_IP_STR
        ACL_NAME_STR
        ACL_INTERFACE_STR
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        ACL_VLAN_STR
+#endif
        ACL_INTERFACE_ID_STR
        ACL_IN_STR
       )
@@ -1408,14 +1426,20 @@ DEFUN (cli_show_access_list_hitcounts_all,
  */
 DEFUN (cli_clear_access_list_hitcounts,
        cli_clear_access_list_hitcounts_cmd,
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        "clear access-list hitcounts (ip) NAME (interface|vlan) ID { in }",
+#else
+       "clear access-list hitcounts (ip) NAME (interface) ID { in }",
+#endif
        SHOW_STR
        ACL_STR
        ACL_HITCOUNTS_STR
        ACL_IP_STR
        ACL_NAME_STR
        ACL_INTERFACE_STR
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
        ACL_VLAN_STR
+#endif
        ACL_INTERFACE_ID_STR
        ACL_IN_STR
       )
@@ -1545,8 +1569,10 @@ access_list_vty_init(void)
 
     install_element(INTERFACE_NODE, &cli_apply_access_list_cmd);
     install_element(INTERFACE_NODE, &cli_no_apply_access_list_cmd);
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
     install_element(VLAN_NODE, &cli_apply_access_list_cmd);
     install_element(VLAN_NODE, &cli_no_apply_access_list_cmd);
+#endif
 
     install_element(ENABLE_NODE, &cli_show_access_list_hitcounts_cmd);
     install_element(ENABLE_NODE, &cli_show_access_list_hitcounts_all_cmd);
@@ -1612,6 +1638,7 @@ cli_post_init (void)
         return;
     }
 
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
     /* Register vlan context show running-configuration command */
     retval = install_show_run_config_subcontext(
                     e_vtysh_vlan_context,
@@ -1624,4 +1651,5 @@ cli_post_init (void)
         assert(0);
         return;
     }
+#endif
 }

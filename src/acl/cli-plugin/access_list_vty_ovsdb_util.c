@@ -26,7 +26,6 @@
  ***************************************************************************/
 
 #include <vswitch-idl.h>
-#include <ovsdb-idl.h>
 
 #include <openvswitch/vlog.h>
 #include <dynamic-string.h>
