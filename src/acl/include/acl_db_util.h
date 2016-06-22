@@ -72,12 +72,19 @@ struct acl_db_util {
                             size_t n_cfg_version);
     void (*set_cfg_status)(const struct ovsrec_port *,
                             const struct smap *cfg_status);
-    void(*set_clear_statistics_requested) (const struct ovsrec_port *,
+    void (*set_clear_statistics_requested) (const struct ovsrec_port *,
                                    const int64_t *stats_clear_requested,
                                    size_t n_stats_clear_requested);
-    void(*set_clear_statistics_performed) (const struct ovsrec_port *,
+    void (*set_clear_statistics_performed) (const struct ovsrec_port *,
                                    const int64_t *stats_clear_performed,
                                    size_t n_stats_clear_performed);
+    void (*status_setkey) (const struct ovsrec_port *,
+                            char *status_str,
+                            char *details);
+    void (*set_statistics) (const struct ovsrec_port *,
+                            const int64_t *key_aclv4_in_statistics,
+                            const int64_t *value_aclv4_in_statistics,
+                            size_t n_aclv4_in_statistics);
 };
 
 enum acl_db_util_index {
@@ -92,7 +99,6 @@ enum acl_db_util_index {
     ACL_CFG_MAX_VLAN_TYPES = ACL_CFG_VLAN_V4_OUT,
 };
 
-//extern struct acl_db_util acl_db_accessor[ACL_CFG_MAX_TYPES];
 extern struct acl_db_util acl_db_accessor[ACL_CFG_NUM_OF_TYPES];
 
 /**
@@ -185,13 +191,11 @@ void acl_db_util_set_cfg(const struct acl_db_util *acl_db,
  * @param[in] acl_db        - Pointer to the @see acl_db_utl structure
  * @param[in] port          - Pointer to the port row
  * @param[in] cfg_version   - Pointer to cfg version value
- * @param[in] n_cfg_version - Number of cfg_verion value, expected to be 1
  */
 void
 acl_db_util_set_cfg_version(const struct acl_db_util *acl_db,
                              const struct ovsrec_port *port,
-                             const int64_t *cfg_version,
-                             size_t n_cfg_version);
+                             const int64_t *cfg_version);
 /**
  * Sets the cfg_status column of a given ovsrec_port. This function
  * is called after the feature plugin has called the asic plugin API.
@@ -251,4 +255,18 @@ acl_db_util_get_clear_statistics_requested(const struct acl_db_util *acl_db,
 int64_t
 acl_db_util_get_clear_statistics_performed(const struct acl_db_util *acl_db,
                                            const struct ovsrec_port *port);
+
+/**
+ * Gets the clear statistics performed column of a given ovsrec_port
+ *
+ * @param[in] acl_db - Pointer to the @see acl_db_utl structure
+ * @param[in] port   - Pointer to the port row
+ * @param[in] status - Pointer to the status key string
+ * @param[in] detail - Pointer to the detail string
+ */
+void
+acl_db_util_status_setkey(const struct acl_db_util *acl_db,
+                                            const struct ovsrec_port *port,
+                                            char *status,
+                                            char *detail);
 #endif  /* __ACL_DB_UTIL_H__ */

@@ -67,7 +67,11 @@ struct acl_db_util acl_db_accessor[ACL_CFG_NUM_OF_TYPES];
     acl_db_accessor[idx].set_clear_statistics_requested = \
                           ovsrec_##table##_set_##base##_statistics_clear_requested; \
     acl_db_accessor[idx].set_clear_statistics_performed = \
-                          ovsrec_##table##_set_##base##_statistics_clear_performed;
+                          ovsrec_##table##_set_##base##_statistics_clear_performed; \
+    acl_db_accessor[idx].status_setkey = \
+                          ovsrec_##table##_update_##base##_status_setkey; \
+    acl_db_accessor[idx].set_statistics = \
+                          ovsrec_##table##_set_##base##_statistics;
 
 
 void
@@ -182,10 +186,9 @@ acl_db_util_set_cfg(const struct acl_db_util *acl_db,
 void
 acl_db_util_set_cfg_version(const struct acl_db_util *acl_db,
                              const struct ovsrec_port *port,
-                             const int64_t *cfg_version,
-                             size_t n_cfg_version)
+                             const int64_t *cfg_version)
 {
-    (*acl_db->set_cfg_version)(port, cfg_version, n_cfg_version);
+    (*acl_db->set_cfg_version)(port, cfg_version, 1);
 }
 
 void
@@ -205,9 +208,10 @@ acl_db_util_set_clear_statistics_requested(const struct acl_db_util *acl_db,
 }
 
 void
-acl_db_util_set_clear_statistics_performed(const struct acl_db_util *acl_db,
+acl_db_util_status_setkey(const struct acl_db_util *acl_db,
                                             const struct ovsrec_port *port,
-                                            const int64_t clear_stats_ack_id)
+                                            char *status,
+                                            char *detail)
 {
-    (*acl_db->set_clear_statistics_performed)(port, &clear_stats_ack_id, 1);
+    (*acl_db->status_setkey)(port, status, detail);
 }

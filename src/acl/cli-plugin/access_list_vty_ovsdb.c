@@ -929,7 +929,7 @@ cli_apply_acl (const char *interface_type,
             } else {
                 pending_cfg_version = 0;
             }
-            acl_db_util_set_cfg_version(db_acc, port_row, &pending_cfg_version, 1);
+            acl_db_util_set_cfg_version(db_acc, port_row, &pending_cfg_version);
         } else {
             vty_out(vty, "%% Unsupported ACL type or direction%s", VTY_NEWLINE);
             cli_do_config_abort(transaction);

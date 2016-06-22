@@ -159,15 +159,15 @@ acl_port_map_set_cfg_status(struct acl_port_map *acl_port_map,
 
     snprintf(version, OPS_CLS_VERSION_STR_MAX_LEN,
              "%" PRId64"", row->aclv4_in_cfg_version[0]);
-    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_VERSION_STR,
-                                              version);
-    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_STATE_STR,
-                                              state);
+    acl_db_util_status_setkey(acl_port_map->acl_db, row,
+                                OPS_CLS_STATUS_VERSION_STR, version);
+    acl_db_util_status_setkey(acl_port_map->acl_db, row,
+                                OPS_CLS_STATUS_STATE_STR, state);
     snprintf(code_str, OPS_CLS_CODE_STR_MAX_LEN, "%u", code);
-    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_CODE_STR,
-                                              code_str);
-    ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_MSG_STR,
-                                              details);
+    acl_db_util_status_setkey(acl_port_map->acl_db, row,
+                                OPS_CLS_STATUS_CODE_STR, code_str);
+    acl_db_util_status_setkey(acl_port_map->acl_db, row,
+                                OPS_CLS_STATUS_MSG_STR, details);
 }
 
 /**************************************************************************//**
