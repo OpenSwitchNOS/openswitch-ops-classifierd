@@ -76,14 +76,37 @@ struct acl_db_util {
                             size_t n_cfg_version);
     void (*set_cfg_status)(const struct ovsrec_port *,
                             const struct smap *cfg_status);
-    void(*set_clear_statistics_requested) (const struct ovsrec_port *,
+    void (*set_clear_statistics_requested) (const struct ovsrec_port *,
                                    const int64_t *stats_clear_requested,
                                    size_t n_stats_clear_requested);
-    void(*set_clear_statistics_performed) (const struct ovsrec_port *,
+    void (*set_clear_statistics_performed) (const struct ovsrec_port *,
                                    const int64_t *stats_clear_performed,
                                    size_t n_stats_clear_performed);
+    void (*status_setkey) (const struct ovsrec_port *,
+                            char *status_str,
+                            char *details);
+    void (*set_statistics) (const struct ovsrec_port *,
+                            const int64_t *key_aclv4_in_statistics,
+                            const int64_t *value_aclv4_in_statistics,
+                            size_t n_aclv4_in_statistics);
 };
 
+/**
+ * Index into the acl_db_accessor.  When adding new types be sure to keep
+ * all port types together and all VLAN types together because for loops are
+ * used to iterate through each port type and other for loops are used to
+ * iterate through each VLAN type.  Below is an example of a for loop that is
+ * used abundantly in the cli, ops-classifierd, and ops-switchd pugins to
+ * iterate through all port types in a port row:
+ *
+ *     for(int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
+ *         if(acl_db_util_get_cfg(&acl_db_accessor[i], port_row)) {
+ *             Do something...
+ *         } else {
+ *             Do something else...
+ *         }
+ *     }
+ */
 enum acl_db_util_index {
     ACL_CFG_PORT_V4_IN = 0,
     ACL_CFG_PORT_V4_OUT,
@@ -95,6 +118,9 @@ enum acl_db_util_index {
     ACL_CFG_MIN_VLAN_TYPES = ACL_CFG_VLAN_V4_IN,
     ACL_CFG_MAX_VLAN_TYPES = ACL_CFG_VLAN_V4_OUT,
 };
+
+#define ACL_CFG_NUM_PORT_TYPES (ACL_CFG_MAX_PORT_TYPES - ACL_CFG_MIN_PORT_TYPES + 1)
+#define ACL_CFG_NUM_VLAN_TYPES (ACL_CFG_MAX_VLAN_TYPES - ACL_CFG_MIN_VLAN_TYPES + 1)
 
 extern struct acl_db_util acl_db_accessor[ACL_CFG_NUM_OF_TYPES];
 
@@ -232,7 +258,6 @@ void acl_db_util_set_cfg(const struct acl_db_util *acl_db,
  * @param[in] acl_db        - Pointer to the @see acl_db_utl structure
  * @param[in] port          - Pointer to the port row
  * @param[in] cfg_version   - Pointer to cfg version value
- * @param[in] n_cfg_version - Number of cfg_verion value, expected to be 1
  */
 void
 acl_db_util_set_cfg_version(const struct acl_db_util *acl_db,
@@ -298,4 +323,36 @@ acl_db_util_get_clear_statistics_requested(const struct acl_db_util *acl_db,
 int64_t
 acl_db_util_get_clear_statistics_performed(const struct acl_db_util *acl_db,
                                            const struct ovsrec_port *port);
+
+/**
+ * Gets the clear statistics performed column of a given ovsrec_port
+ *
+ * @param[in] acl_db - Pointer to the @see acl_db_utl structure
+ * @param[in] port   - Pointer to the port row
+ * @param[in] status - Pointer to the status key string
+ * @param[in] detail - Pointer to the detail string
+ */
+void
+acl_db_util_status_setkey(const struct acl_db_util *acl_db,
+                                            const struct ovsrec_port *port,
+                                            char *status,
+                                            char *detail);
+
+/**
+ * Sets the statistics performed column of a given ovsrec_port "port" to the
+ * map with keys "key_statistics" and values "value_statistics" with
+ * "n_statisitics" entries.
+ *
+ * @param[in] acl_db           - Pointer to the @see acl_db_utl structure
+ * @param[in] port             - Pointer to the port row
+ * @param[in] key_statistics   - Pointer to the status key string
+ * @param[in] value_statistics - Pointer to the detail string
+ * @param[in] n_statistics     - Pointer to the detail string
+ */
+void
+acl_db_util_set_statistics(const struct acl_db_util *acl_db,
+                                            const struct ovsrec_port *port,
+                                            const int64_t *key_statistics,
+                                            const int64_t *value_statistics,
+                                            size_t n_statistics);
 #endif  /* __ACL_DB_UTIL_H__ */

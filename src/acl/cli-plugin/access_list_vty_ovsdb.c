@@ -1288,6 +1288,7 @@ cli_print_acl_statistics (const char *acl_type,
     /* Port (unfortunately called "interface" in the CLI) */
     } else if (interface_type && !strcmp(interface_type, "interface")) {
         int i;
+        bool applied = false;
 
         /* Get Port row */
         port_row = get_port_by_name(interface_id);
@@ -1300,13 +1301,20 @@ cli_print_acl_statistics (const char *acl_type,
             if((direction == NULL) || !strcmp(direction, acl_db_accessor[i].direction_str)) {
                 const struct ovsrec_acl *cur_acl_row_applied = acl_db_util_get_applied(&acl_db_accessor[i], port_row);
                 if (cur_acl_row_applied && (cur_acl_row_applied == acl_row)) {
-                    vty_out(vty, "Statistics for ACL %s (%s):%s", acl_row->name, acl_row->list_type, VTY_NEWLINE);
+
+                    /* Print the title only once on the first applied acl that is found */
+                    if(applied == false) {
+                        vty_out(vty, "Statistics for ACL %s (%s):%s", acl_row->name, acl_row->list_type, VTY_NEWLINE);
+                        applied = true;
+                    }
+
                     print_port_aclv4_statistics(&acl_db_accessor[i], port_row);
-                } else {
-                    vty_out(vty, "%% Specified ACL not applied to interface%s", VTY_NEWLINE);
-                    return CMD_ERR_NOTHING_TODO;
                 }
             }
+        }
+        if (applied == false) {
+            vty_out(vty, "%% Specified ACL not applied to interface%s", VTY_NEWLINE);
+            return CMD_ERR_NOTHING_TODO;
         }
     /* VLAN */
     } else if (interface_type && !strcmp(interface_type, "vlan")) {
