@@ -33,6 +33,9 @@
 #ifndef _ACCESS_LIST_VTY_H
 #define _ACCESS_LIST_VTY_H
 
+/* Disable VLAN ACL commands since switchd does not support them yet */
+#undef OPS_CLS_VLAN_ACL_SUPPORT
+
 /* Misc constants */
 #define MAX_ACL_NAME_LENGTH 65 /**< 64 character name + NULL-terminator */
 #define IP_VER_STR_LEN 5       /**< "ipv{4|6}" + NULL-terminator */
@@ -59,7 +62,11 @@
 #define ACL_IP_STR "Internet Protocol v4 (IPv4)\n"
 #define ACL_INTERFACE_STR "Specify interface\n"
 #define ACL_INTERFACE_NAME_STR "Interface Name\n"
+#ifdef OPS_CLS_VLAN_ACL_SUPPORT
 #define ACL_INTERFACE_ID_STR "Identifier (Interface Name or VLAN ID)\n"
+#else
+#define ACL_INTERFACE_ID_STR "Identifier (Interface Name)\n"
+#endif
 #define ACL_VLAN_STR "Specify VLAN\n"
 #define ACL_VLAN_ID_STR "VLAN ID\n"
 #define ACL_ALL_STR "All access-lists\n"
