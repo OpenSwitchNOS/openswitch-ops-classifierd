@@ -649,7 +649,7 @@ cli_print_acls (const char *interface_type,
                         if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(acl_db_util_get_applied(&acl_db_accessor[i], port_row))) {
                             aces_cur_cfg_mismatch = true;
                         }
-                    } else if (acl_db_util_get_cfg(&acl_db_accessor[i], port_row) == acl_row) {
+                    } else if (configuration && acl_db_util_get_cfg(&acl_db_accessor[i], port_row) == acl_row) {
                         print_acl_apply_commands("interface", port_row->name, acl_db_accessor[i].direction_str,
                                 acl_db_util_get_cfg(&acl_db_accessor[i], port_row));
                         if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(acl_db_util_get_cfg(&acl_db_accessor[i], port_row))) {
@@ -669,7 +669,7 @@ cli_print_acls (const char *interface_type,
                     if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(vlan_row->aclv4_in_applied)) {
                         aces_cur_cfg_mismatch = true;
                     }
-                } else if (vlan_row->aclv4_in_cfg == acl_row) {
+                } else if (configuration && vlan_row->aclv4_in_cfg == acl_row) {
                     print_acl_apply_commands("vlan", vlan_id_str, "in", vlan_row->aclv4_in_cfg);
                     if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(vlan_row->aclv4_in_cfg)) {
                         aces_cur_cfg_mismatch = true;
