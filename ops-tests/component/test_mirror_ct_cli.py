@@ -17,7 +17,7 @@
 
 import re
 
-import pytest
+from pytest import mark, fixture
 from copy import deepcopy
 import time
 
@@ -43,7 +43,7 @@ p3 = None
 p4 = None
 switch_ip = None
 
-@pytest.fixture(scope="module")
+@fixture(scope="module")
 def setup(topology):
     global ops1
     ops1 = topology.get("ops1")
@@ -445,7 +445,8 @@ def case_23_add_mirror_non_system_destination_interface_fails():
     ops1(format('no mirror session non_system'))
     ops1(format('end'))
 
-@pytest.mark.skipif(True, reason="Once all pd/pi mirror code has been merged, enable this.")
+@mark.gate
+@mark.skipif(True, reason="Once all pd/pi mirror code has been merged, enable this.")
 def test_mirror_ct_cli(topology, setup):
     case_1_activate_ms_foo_succeeds()
     case_2_add_second_source_to_active_mirror_session_foo_succeeds()
