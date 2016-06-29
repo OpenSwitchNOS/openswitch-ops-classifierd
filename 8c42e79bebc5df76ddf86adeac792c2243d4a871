@@ -1,0 +1,8 @@
+Code-Review+2: Gary Wassermann <gary.wassermann@hpe.com>
+Verified+2: Gary Wassermann <gary.wassermann@hpe.com>
+Workflow+1: Gary Wassermann <gary.wassermann@hpe.com>
+Submitted-by: Gary Wassermann <gary.wassermann@hpe.com>
+Submitted-at: Wed, 29 Jun 2016 15:57:57 +0000
+Reviewed-on: https://review.openswitch.net/11028
+Project: openswitch/ops-classifierd
+Branch: refs/heads/feature/acl
