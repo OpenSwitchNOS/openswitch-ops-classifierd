@@ -36,6 +36,7 @@ TOPOLOGY = """
 """
 
 
+@mark.gate
 @mark.test_id(10402)
 def test_ace_parameters(topology, step):
     """

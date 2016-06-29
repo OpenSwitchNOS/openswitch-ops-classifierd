@@ -37,6 +37,7 @@ TOPOLOGY = """
 """
 
 
+@mark.gate
 @mark.test_id(10403)
 def test_ace_apply(topology, step):
     step('################ Introduce delay in ACE ###########')

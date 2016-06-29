@@ -43,6 +43,7 @@ p3 = None
 p4 = None
 switch_ip = None
 
+@pytest.mark.gate
 @pytest.fixture(scope="module")
 def setup(topology):
     global ops1
@@ -445,6 +446,7 @@ def case_23_add_mirror_non_system_destination_interface_fails():
     ops1(format('no mirror session non_system'))
     ops1(format('end'))
 
+@pytest.mark.gate
 @pytest.mark.skipif(True, reason="Once all pd/pi mirror code has been merged, enable this.")
 def test_mirror_ct_cli(topology, setup):
     case_1_activate_ms_foo_succeeds()
