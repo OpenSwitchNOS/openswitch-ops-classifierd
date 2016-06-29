@@ -689,7 +689,7 @@ acl_port_new(struct port *port, unsigned int seqno,
     struct acl_port *acl_port = xzalloc(sizeof *acl_port);
 
     /* setup my port_map to know about me and which acl_port_map they represent */
-    for (int i = 0; i < ACL_CFG_NUM_OF_TYPES; ++i) {
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_construct(&acl_port->port_map[i], acl_port, i);
     }
 
@@ -714,7 +714,7 @@ acl_port_delete(const char *port_name)
                                                          port_name);
 
     /* cleanup my port_map */
-    for (int i = 0; i < ACL_CFG_NUM_OF_TYPES; ++i) {
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_destruct(&port->port_map[i]);
     }
 
@@ -740,7 +740,7 @@ acl_port_cfg_create(struct port *port, unsigned int seqno,
     struct acl_port *acl_port = acl_port_new(port, seqno,
                                              interface_flags);
 
-    for (int i = 0; i < ACL_CFG_NUM_OF_TYPES; ++i) {
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_cfg_create(&acl_port->port_map[i], port, ofproto);
     }
 
@@ -760,7 +760,7 @@ acl_port_cfg_update(struct acl_port *acl_port, struct port *port,
                     struct ofproto *ofproto)
 {
     VLOG_DBG("PORT %s changed", acl_port->port->name);
-    for (int i = 0; i < ACL_CFG_NUM_OF_TYPES; ++i) {
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_cfg_update(&acl_port->port_map[i], port, ofproto);
     }
 }
@@ -778,7 +778,7 @@ acl_port_cfg_delete(struct acl_port* acl_port, struct port *port,
                     struct ofproto *ofproto)
 {
     VLOG_DBG("PORT %s deleted", port->name);
-    for (int i = 0; i < ACL_CFG_NUM_OF_TYPES; ++i) {
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_cfg_delete(&acl_port->port_map[i], port, ofproto);
     }
 }
@@ -913,7 +913,7 @@ acl_callback_port_stats_get(struct stats_blk_params *sblk,
         return;
     }
     /* Get statistics for this port if needed */
-    for (int i = 0; i < ACL_CFG_NUM_OF_TYPES; i++) {
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_stats_get(&acl_port->port_map[i], br->ofproto);
     }
 }
