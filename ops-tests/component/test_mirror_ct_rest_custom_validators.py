@@ -613,6 +613,7 @@ def case_add_active_mirror_foo_empty_lag_fails():
 
     rest_get_fails(mirror_name)
 
+@pytest.mark.gate
 def test_mirror_ct_rest_custom_validators(topology, setup):
     case_1_activate_ms_foo_succeeds()
     case_2_add_second_source_to_active_ms_foo_succeeds()
