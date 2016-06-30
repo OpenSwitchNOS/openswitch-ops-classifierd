@@ -36,8 +36,9 @@ VLOG_DEFINE_THIS_MODULE(acl_daemon_ports);
 static bool
 acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
 {
-    bool hw_ready_state = false;
+    bool hw_ready_state = true;
     const char *status  = NULL;
+    int i;
 
     ovs_assert(port_row);
 
@@ -47,25 +48,31 @@ acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
      */
     /* @todo: need to handle multiple acls to the port
      */
-    if(!port_row->aclv4_in_cfg) {
-        VLOG_DBG("port %s: ACL not configured \n", port_row->name);
-        /* set hw_ready_state on the interface */
-        hw_ready_state = true;
-    } else {
-        /* ACL is configured on this port so verify if
-         * ACL is applied successfully in hw or not
-         */
-        status =
-            smap_get((const struct smap *)&port_row->aclv4_in_status,
-                     OPS_CLS_STATUS_CODE_STR);
-        VLOG_DBG("port %s: ACL %s configured, apply status %s \n",
-                  port_row->name, port_row->aclv4_in_cfg->name,
-                  status);
-        if(strtoul(status,NULL,10) == OPS_CLS_STATUS_SUCCESS) {
-            /* set hw_ready_state  */
-            hw_ready_state = true;
-        }
-    } /* end if !aclv4_in_applied */
+    for (i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
+        bool acl_is_ready = false;
+        acl_row = acl_db_util_get_cfg(&acl_db_accessor[i], port_row);
+        if(!acl_row) {
+            VLOG_DBG("port %s: ACL not configured \n", port_row->name);
+            /* set hw_ready_state on the interface */
+            acl_is_ready = true;
+        } else {
+            /* ACL is configured on this port so verify if
+             * ACL is applied successfully in hw or not
+             */
+            status =
+                smap_get(acl_db_util_get_cfg_status(&acl_db_accessor[i],
+                                                    port_row),
+                         OPS_CLS_STATUS_CODE_STR);
+            VLOG_DBG("port %s: ACL %s configured, apply status %s \n",
+                      port_row->name, acl_row->name,
+                      status);
+            if(strtoul(status,NULL,10) == OPS_CLS_STATUS_SUCCESS) {
+                /* set hw_ready_state  */
+                acl_is_ready = true;
+            }
+        } /* end if !applied */
+        hw_ready_state &= acl_is_ready;
+    }
 
     return hw_ready_state;
 }
@@ -167,10 +174,13 @@ acl_lag_port_reconfigure(const struct ovsrec_port *port_row)
 
     VLOG_DBG("%s: lag port name: %s\n",__FUNCTION__,port_row->name);
 
-    if(port_row->aclv4_in_applied) {
+    if(port_row->aclv4_in_applied || port_row->aclv4_out_applied) {
         VLOG_ERR("ACLs are not supported on LAG port,"
                  "port name:  %s, ACL name: %s\n",
-                  port_row->name, port_row->aclv4_in_applied->name);
+                  port_row->name,
+                  port_row->aclv4_in_applied ?
+                    port_row->aclv4_in_applied->name :
+                    port_row->aclv4_out_applied->name);
         return rc;
     }
 
