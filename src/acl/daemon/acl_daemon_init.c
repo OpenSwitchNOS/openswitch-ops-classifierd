@@ -38,6 +38,7 @@ acl_ovsdb_init(struct ovsdb_idl *idl)
     /* Monitor the following columns, marking them read-only. */
     ovsdb_idl_add_column(idl, &ovsrec_port_col_name);
     ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_in_status);
+    ovsdb_idl_add_column(idl, &ovsrec_port_col_aclv4_out_status);
     /* @todo: we may need a column to monitor per interface ACL
      * applied status, especially for LAGs
      */
