@@ -205,18 +205,7 @@ acl_port_map_update_cfg_internal(struct acl_port_map *acl_port_map,
     const struct ovsrec_acl *ovsdb_acl =
         acl_db_util_get_cfg(acl_port_map->acl_db, acl_port_map->parent->ovsdb_row);
     if (!ovsdb_acl) {
-        acl = NULL;
-        if (acl_port_map->hw_acl) {
-            rc = call_ofproto_ops_cls_remove(acl_port_map->hw_acl,
-                                             port,
-                                             ofproto,
-                                             &interface_info,
-                                             acl_port_map->acl_db->direction,
-                                             &status);
-            method_called =  OPS_CLS_STATUS_MSG_OP_REMOVE_STR;
-        } else {
-            /* Nothing to delete in PD for this ACL_PORT_MAP */
-        }
+        return;
     } else {
         acl  = acl_lookup_by_uuid(&ovsdb_acl->header_.uuid);
         if (!acl) {

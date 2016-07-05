@@ -478,6 +478,55 @@ struct ops_cls_plugin_interface {
                             enum ops_cls_direction          direction,
                             struct ops_cls_pd_status        *pd_status);
 
+    /**
+     * API from switchd platform independent layer to platform dependent layer
+     * to specify the lag port that needs to be updated when a member interface
+     * goes through a state transition or is moving in or out of the lag.
+     * For general cases such as apply ACL to a lag or remove ACL from a lag
+     * are handled by apply and remove API.
+     *
+     * All pointer arguments reference objects whose lifetimes are not
+     * guaranteed to outlast this call. If you want to remember them for
+     * later, you must make a copy.
+     *
+     * Success or failure is all or nothing.  Status must be
+     * returned for the switch interface passed in pd_status parameter.
+     *
+     * @param[in]   list_id         - uuid of classifier list
+     * @param[in]   list_name       - name of the classifier list
+     * @param[in]   list_type       - classifier list type
+     * @param[in]   ofproto         - ofproto of bridge containing
+     *                                desired switch interface
+     * @param[in]   aux             - opaque key to desired switch interface
+     *                                used with ofproto to get
+     *                                ofproto_bundle
+     * @param[in]   ofp_port        - The lag member interface number to be
+                                      update
+     * @param[in]   action          - Action to be taken. This could be apply
+     *                                or remove
+     * @param[in]   interface_info  - interface information necessary for
+     *                                programming hw (e.g. L3 only, port, vlan)
+     * @param[in]   direction       - direction in which the list
+     *                                should be removed
+     * @param[out]  pd_status       - pointer to struct pre-allocated by
+     *                                calling function
+     * @retval      0               - if list successfully added to hw
+     * @retval      !=0             - otherwise and updates
+     *                                pd_status
+     *
+     */
+    int (*ofproto_ops_cls_lag_update)(const struct uuid         *list_id,
+                            const char                      *list_name,
+                            enum ops_cls_type               list_type,
+                            struct ofproto                  *ofproto,
+                            void                            *aux,
+                            ofp_port_t                      ofp_port,
+                            int                             action,
+                            struct ops_cls_interface_info   *interface_info,
+                            enum ops_cls_direction          direction,
+                            struct ops_cls_pd_status        *pd_status);
+
+
 
     /**
      * API from switchd platform independent layer to platform dependent layer
