@@ -736,6 +736,7 @@ acl_port_check_and_set_active_lag(struct acl_port *acl_port)
             break;
         }
     }
+
     if (all_members_inactive) {
         acl_port->lag_members_active = false;
     } else {
@@ -851,7 +852,7 @@ acl_port_lag_iface_reconfigure_list_update(
  * @param[out] iface_list  - port interfaces list
  *****************************************************************************/
 static void
-acl_port_lag_iface_list_element_add(struct acl_port *acl_port,
+acl_port_lag_iface_list_element_add(struct acl_port    *acl_port,
                                     struct iface       *iface)
 {
     if ((acl_port == NULL) || (iface == NULL)) {
@@ -891,7 +892,7 @@ acl_port_lag_iface_list_element_add(struct acl_port *acl_port,
  * @param[out]  iface_list  - port interfaces list
  *****************************************************************************/
 static void
-acl_port_lag_iface_list_create(struct acl_port     *acl_port)
+acl_port_lag_iface_list_create(struct acl_port *acl_port)
 {
     struct iface *iface = NULL;
 
@@ -903,6 +904,7 @@ acl_port_lag_iface_list_create(struct acl_port     *acl_port)
     LIST_FOR_EACH(iface, port_elem, &acl_port->port->ifaces) {
         acl_port_lag_iface_list_element_add(acl_port, iface);
     }
+
     acl_port_check_and_set_active_lag(acl_port);
 }
 
@@ -1106,7 +1108,6 @@ acl_port_lag_iface_list_add(struct port     *port,
     }
     acl_port_check_and_set_active_lag(acl_port);
 }
-
 
 
 /**************************************************************************//**
