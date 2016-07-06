@@ -32,6 +32,13 @@
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_port);
 
+#define ACL_PORT_LAG_NAME_PREFIX "lag"
+#define ACL_PORT_LAG_NAME_PREFIX_LENGTH 3
+
+#define ACL_PORT_IS_LAG(port)    ((strncmp(port->name,                   \
+                                   ACL_PORT_LAG_NAME_PREFIX,             \
+                                   ACL_PORT_LAG_NAME_PREFIX_LENGTH) == 0) ? true : false)
+
 /*************************************************************
  * acl_port_reconfigure_lag_iface structure
  *************************************************************/
@@ -1288,6 +1295,565 @@ acl_port_lag_ifaces_reconfigure(struct blk_params *blk_params)
 
 
 /**************************************************************************//**
+ * This function deletes lag port ifaces list, which needed
+ * reconfiguration
+ *
+ * @param[in] iface_list  - Lag port interfaces list
+ *****************************************************************************/
+static void
+acl_port_lag_iface_reconfigure_list_delete(struct ovs_list *iface_list)
+{
+    struct acl_port_reconfigure_lag_iface *iface_element      = NULL;
+    struct acl_port_reconfigure_lag_iface *iface_element_next = NULL;
+
+    if ((iface_list == NULL) || (list_is_empty(iface_list))) {
+        return;
+    }
+
+    LIST_FOR_EACH_SAFE(iface_element, iface_element_next, lag_iface_node,
+                       iface_list)
+    {
+        list_remove(&iface_element->lag_iface_node);
+        free(iface_element);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function removes a interface element from a lag port
+ * interface list
+ *
+ * @param[in] iface_element  - interface element to be
+ *                             removed
+ *****************************************************************************/
+static void
+acl_port_lag_iface_list_element_remove(
+    struct acl_port_interface *iface_element)
+{
+    if (iface_element == NULL) {
+        return;
+    }
+
+    if (!smap_is_empty(&iface_element->hw_bond_config)) {
+        smap_destroy(&iface_element->hw_bond_config);
+    }
+    list_remove(&iface_element->iface_node);
+    free(iface_element);
+}
+
+
+/**************************************************************************//**
+ * This function deletes a list of interfaces for a lag port
+ * from the acl_port
+ *
+ * @param[in] iface_list  - port interfaces list
+ *****************************************************************************/
+static void
+acl_port_lag_iface_list_delete(struct ovs_list *iface_list)
+{
+    struct acl_port_interface *iface_element      = NULL;
+    struct acl_port_interface *iface_element_next = NULL;
+
+    if ((iface_list == NULL) || (list_is_empty(iface_list))) {
+        return;
+    }
+
+    LIST_FOR_EACH_SAFE(iface_element, iface_element_next, iface_node,
+                       iface_list)
+    {
+        acl_port_lag_iface_list_element_remove(iface_element);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function updates the list of lag port interfaces that
+ * need to be reconfigured
+ *
+ * @param[in]  ofp_port                   - Lag port that needs
+ *                                          to be updated
+ * @param[in]  action                     - Action to be
+ *                                          performed on this
+ *                                          lag iface
+ * @param[out] reconfgure_lag_iface_list  - Lag port interfaces
+ *                                          list
+ *****************************************************************************/
+static void
+acl_port_lag_iface_reconfigure_list_update(
+    ofp_port_t ofp_port,
+    int action,
+    struct ovs_list *reconfigure_iface_list)
+{
+    if ((reconfigure_iface_list == NULL)) {
+        return;
+    }
+
+    struct acl_port_reconfigure_lag_iface *iface_element =
+            xzalloc(sizeof(struct acl_port_reconfigure_lag_iface));
+
+    iface_element->port_number = ofp_port;
+    iface_element->action = action;
+    list_push_back(reconfigure_iface_list, &iface_element->lag_iface_node);
+}
+
+
+/**************************************************************************//**
+ * This function adds the iface element to a list of interfaces
+ * for a lag port
+ *
+ * @param[in]  iface       - Pointer to @see struct iface
+ * @param[out] iface_list  - port interfaces list
+ *****************************************************************************/
+static void
+acl_port_lag_iface_list_element_add(struct iface       *iface,
+                                    struct ovs_list    *iface_list
+)
+{
+    if ((iface == NULL) || (iface_list == NULL)){
+        return;
+    }
+
+    struct acl_port_interface *iface_element =
+            xzalloc(sizeof(struct acl_port_interface));
+
+    if (!smap_is_empty(&iface->cfg->hw_bond_config)) {
+        smap_init(&iface_element->hw_bond_config);
+        smap_clone(&iface_element->hw_bond_config,
+                   &iface->cfg->hw_bond_config);
+    }
+    else {
+        VLOG_DBG("hw_bond_config not set for %s iface", iface->name);
+    }
+
+    iface_element->ofp_port = iface->ofp_port;
+    list_push_back(iface_list, &iface_element->iface_node);
+}
+
+
+/**************************************************************************//**
+ * This function creates a list of interfaces for a lag port in
+ * the acl_port
+ *
+ * @param[in]   port        - Pointer to @see struct port
+ * @param[out]  iface_list  - port interfaces list
+ *****************************************************************************/
+static void
+acl_port_lag_iface_list_create(struct port     *port,
+                               struct ovs_list *iface_list)
+{
+    struct iface *iface = NULL;
+
+    if ((port == NULL) || (iface_list == NULL)) {
+        return;
+    }
+
+    LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+        acl_port_lag_iface_list_element_add(iface, iface_list);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function checks if the rx and tx states in
+ * hw_bond_config changed for the lag port ifaces. If there is a
+ * state change for a lag port iface, it updates the
+ * reconfiguration lag port ifaces list with the transitioned
+ * iface, along with the action to be performed. The new state
+ * is copied to the ifaces list maintained in acl_port
+ *
+ * @param[in]  port                        - Pointer to @see
+ *                                           struct port
+ * @param[out] acl_port                    - Pointer to @see
+ *                                           struct acl_port
+ * @param[out] reconfigure_ifaces_list     - list containing
+ *                                           lag ports that need
+ *                                           reconfiguration
+ *****************************************************************************/
+static void
+acl_port_lag_iface_state_transition_check(
+    struct port     *port,
+    struct acl_port *acl_port,
+    struct ovs_list *reconfigure_ifaces_list)
+{
+    struct iface *iface = NULL;
+    struct acl_port_interface *acl_port_iface = NULL;
+    bool acl_port_iface_rx = false;
+    bool acl_port_iface_tx = false;
+    bool port_iface_rx = false;
+    bool port_iface_tx = false;
+
+    if ((port == NULL) || (acl_port == NULL) ||
+        (reconfigure_ifaces_list == NULL)) {
+        return;
+    }
+
+    LIST_FOR_EACH(acl_port_iface, iface_node, &acl_port->port_ifaces) {
+        if (smap_is_empty(&acl_port_iface->hw_bond_config)) {
+            continue;
+        }
+        LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+            if (smap_is_empty(&iface->cfg->hw_bond_config)) {
+                continue;
+            }
+            if ((acl_port_iface != NULL) &&
+                (iface != NULL) &&
+                (acl_port_iface->ofp_port == iface->ofp_port)) {
+                acl_port_iface_rx = smap_get_bool(
+                     &acl_port_iface->hw_bond_config,
+                     INTERFACE_HW_BOND_CONFIG_MAP_RX_ENABLED,
+                     false);
+                acl_port_iface_tx = smap_get_bool(
+                     &acl_port_iface->hw_bond_config,
+                     INTERFACE_HW_BOND_CONFIG_MAP_TX_ENABLED,
+                     false);
+                port_iface_rx = smap_get_bool(
+                         &iface->cfg->hw_bond_config,
+                         INTERFACE_HW_BOND_CONFIG_MAP_RX_ENABLED,
+                         false);
+                port_iface_tx = smap_get_bool(
+                         &iface->cfg->hw_bond_config,
+                         INTERFACE_HW_BOND_CONFIG_MAP_TX_ENABLED,
+                         false);
+
+                if ((acl_port_iface_rx) && (acl_port_iface_tx))
+                {
+                    if ((!port_iface_rx) && (!port_iface_tx)) {
+
+                        /* The hw_bond_config state of iface changed.
+                           So update the state of corresponding iface
+                           maintained in the acl_port */
+                        smap_clone(&acl_port_iface->hw_bond_config,
+                                   &iface->cfg->hw_bond_config);
+
+                        /* Update the reconfiguration list with iface
+                           whose state transitioned */
+                        acl_port_lag_iface_reconfigure_list_update(
+                                           acl_port_iface->ofp_port,
+                                           OPS_CLS_LAG_MEMBER_INTF_DEL,
+                                           reconfigure_ifaces_list);
+                    }
+                }
+                else if ((!acl_port_iface_rx) && (!acl_port_iface_tx)) {
+                    if ((port_iface_rx) && (port_iface_tx)) {
+
+                        /* The hw_bond_config state of iface changed.
+                           So update the state of corresponding iface
+                           maintained in the acl_port */
+                        smap_clone(&acl_port_iface->hw_bond_config,
+                                   &iface->cfg->hw_bond_config);
+
+                        /* Update the reconfiguration list with iface
+                           whose state transitioned */
+                        acl_port_lag_iface_reconfigure_list_update(
+                                           acl_port_iface->ofp_port,
+                                           OPS_CLS_LAG_MEMBER_INTF_ADD,
+                                           reconfigure_ifaces_list);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+/**************************************************************************//**
+ * This function removes a lag port interface from the internal
+ * list (maintained in acl_port). It then updates the lag port
+ * interfaces list, that need to be reconfigured, along with the
+ * action to be performed on it
+ *
+ * @param[in]  port                        - Pointer to @see
+ *                                           struct port
+ * @param[out] acl_port                    - Pointer to @see
+ *                                           struct acl_port
+ * @param[out] reconfigure_ifaces_list     - list containing
+ *                                           lag ports ifaces
+ *                                           that need
+ *                                           reconfiguration
+ *****************************************************************************/
+static void
+acl_port_lag_iface_list_remove(struct port     *port,
+                               struct acl_port *acl_port,
+                               struct ovs_list *reconfigure_ifaces_list)
+{
+    struct iface *iface = NULL;
+    struct acl_port_interface *acl_port_iface = NULL;
+    bool iface_in_list = false;
+
+    if ((port == NULL) || (acl_port == NULL) ||
+        (reconfigure_ifaces_list == NULL)) {
+        return;
+    }
+
+    LIST_FOR_EACH(acl_port_iface, iface_node, &acl_port->port_ifaces) {
+        iface_in_list = false;
+        LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+            if ((acl_port_iface != NULL) &&
+                (iface != NULL) &&
+                (acl_port_iface->ofp_port == iface->ofp_port)) {
+                iface_in_list = true;
+                break;
+            }
+        }
+        if ((!iface_in_list) &&
+            (acl_port_iface != NULL)) {
+
+            /* Update the reconfiguration list with iface removed */
+            acl_port_lag_iface_reconfigure_list_update(
+                                           acl_port_iface->ofp_port,
+                                           OPS_CLS_LAG_MEMBER_INTF_DEL,
+                                           reconfigure_ifaces_list);
+
+            /* An existing iface got removed from this lag port. So remove it
+               from the list of ifaces maintained in acl_port, corresponding
+               to the lag port */
+            acl_port_lag_iface_list_element_remove(acl_port_iface);
+        }
+    }
+}
+
+
+/**************************************************************************//**
+ * This function adds a new lag port interface to the internal
+ * list (maintained in acl_port). It then updates the lag port
+ * interfaces list, that need to be reconfigured, along with the
+ * action to be performed on it
+ *
+ * @param[in]  port                        - Pointer to @see
+ *                                           struct port
+ * @param[out] acl_port                    - Pointer to @see
+ *                                           struct acl_port
+ * @param[out] reconfigure_ifaces_list     - list containing
+ *                                           lag port ifaces
+ *                                           that need
+ *                                           reconfiguration
+ *****************************************************************************/
+static void
+acl_port_lag_iface_list_add(struct port     *port,
+                            struct acl_port *acl_port,
+                            struct ovs_list *reconfigure_ifaces_list)
+{
+    struct iface *iface = NULL;
+    struct acl_port_interface *acl_port_iface = NULL;
+    bool iface_in_list = false;
+
+    if ((port == NULL) || (acl_port == NULL) ||
+        (reconfigure_ifaces_list == NULL)) {
+        return;
+    }
+
+    LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+        iface_in_list = false;
+        LIST_FOR_EACH(acl_port_iface, iface_node, &acl_port->port_ifaces) {
+            if ((iface != NULL) &&
+                (acl_port_iface != NULL) &&
+                (iface->ofp_port == acl_port_iface->ofp_port)) {
+                iface_in_list = true;
+                break;
+            }
+        }
+        if ((!iface_in_list) &&
+            (iface != NULL)) {
+
+            /* A new iface got added to this lag port. So add it to the
+               the list of ifaces maintained in acl_port corresponding
+               to this lag port */
+            acl_port_lag_iface_list_element_add(iface, &acl_port->port_ifaces);
+
+            /* Update the reconfiguration list with this new iface */
+            acl_port_lag_iface_reconfigure_list_update(
+                              iface->ofp_port,
+                              OPS_CLS_LAG_MEMBER_INTF_ADD,
+                              reconfigure_ifaces_list);
+        }
+    }
+}
+
+
+/**************************************************************************//**
+ * This function checks if the lag port ifaces needs to be
+ * reconfigured, either based on changes to current lag port
+ * ifaces (Add/Remove) list or based on hw_bond_config state
+ * transition. All the lag port ifaces that need
+ * reconfiguration are populated in the reconfiguration list
+ *
+ * @param[in]  port                        - Pointer to @see
+ *                                           struct port
+ * @param[out]  acl_port                   - Pointer to @see
+ *                                           struct acl_port
+ * @param[out] reconfigure_ifaces_list     - list containing
+ *                                           lag ports that need
+ *                                           reconfiguration
+ *****************************************************************************/
+static void
+acl_port_lag_iface_reconfigure_list_build(
+    struct port        *port,
+    struct acl_port    *acl_port,
+    struct ovs_list    *reconfigure_ifaces_list)
+{
+
+    if ((port == NULL) || (acl_port == NULL) ||
+        (reconfigure_ifaces_list == NULL)) {
+        return;
+    }
+
+    if ((list_size(&acl_port->port_ifaces) == 0) &&
+        (list_size(&port->ifaces) == 0)) {
+        return;
+    }
+
+    if (list_size(&acl_port->port_ifaces) == list_size(&port->ifaces)) {
+        /* NOTE: Here two cases are possible as listed below */
+
+        /* iface are same so check if the hw_bond_config state
+           transition happened */
+        acl_port_lag_iface_state_transition_check(port, acl_port,
+                                                  reconfigure_ifaces_list);
+        if (list_size(reconfigure_ifaces_list) == 0) {
+            /* There are no state transitions. So if any new ifaces
+               got added and existing ifaces got removed, update the
+               reconfiguration iface list accordingly */
+            acl_port_lag_iface_list_add(port, acl_port,
+                                       reconfigure_ifaces_list);
+
+            acl_port_lag_iface_list_remove(port, acl_port,
+                                       reconfigure_ifaces_list);
+        }
+    }
+    else if (list_size(&port->ifaces) > list_size(&acl_port->port_ifaces)) {
+        acl_port_lag_iface_list_add(port, acl_port,
+                                    reconfigure_ifaces_list);
+    } else {
+        acl_port_lag_iface_list_remove(port, acl_port,
+                                       reconfigure_ifaces_list);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function processes the lag ifaces reconfiguration. It
+ * builds the list of ifaces that need reconfiguration and calls
+ * the function to perform the necessary action
+ *
+ * @param[in] port         - Pointer to @see struct port
+ * @param[in] acl_port     - Pointer to @see struct acl_port
+ * @param[in] ofproto      - Pointer to @see struct ofproto
+ *****************************************************************************/
+static void
+acl_port_lag_ifaces_process_reconfiguration(struct port     * port,
+                                            struct acl_port * acl_port,
+                                            struct ofproto  * ofproto)
+{
+    struct ovs_list reconfigure_ifaces_list;
+
+    if ((port == NULL) || (acl_port == NULL) || (ofproto == NULL)) {
+        return;
+    }
+
+    list_init(&reconfigure_ifaces_list);
+
+    /* Build the list of lag port ifaces that need to
+       be reconfigured in PD */
+    acl_port_lag_iface_reconfigure_list_build(port,
+                                              acl_port,
+                                              &reconfigure_ifaces_list);
+
+    VLOG_DBG("Number of lag ifaces to reconfigure: %zu \n",
+              list_size(&reconfigure_ifaces_list));
+
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
+        if (acl_db_util_get_cfg(&acl_db_accessor[i], port->cfg)) {
+            acl_port_map_cfg_update(&acl_port->port_map[i], port,
+                                    ofproto,
+                                    &reconfigure_ifaces_list);
+        }
+    }
+
+    acl_port_lag_iface_reconfigure_list_delete(&reconfigure_ifaces_list);
+}
+
+
+/**************************************************************************//**
+ * This function checks if any ifaces within a lag port, are
+ * modified. If yes, it processes the lag port reconfiguration
+ *
+ * @param[in] blk_params - Pointer to the block parameters structure
+ * @param[in] br         - Pointer to @see struct bridge
+ *****************************************************************************/
+static void
+acl_port_lag_ifaces_reconfigure_bridge(struct blk_params *blk_params,
+                                       struct bridge *br)
+{
+    struct port *port = NULL;
+    struct acl_port *acl_port = NULL;
+    struct iface *iface = NULL;
+    bool port_iface_modified = false;
+
+    if ((blk_params == NULL) || (br == NULL)) {
+        return;
+    }
+
+    HMAP_FOR_EACH(port, hmap_node, &br->ports) {
+        if (ACL_PORT_IS_LAG(port)) {
+            acl_port = acl_port_lookup(port->name);
+            if (acl_port == NULL) {
+                continue;
+            }
+            LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+                if (OVSREC_IDL_IS_ROW_MODIFIED(iface->cfg,
+                                               blk_params->idl_seqno)) {
+                    port_iface_modified = true;
+                    break;
+                }
+            }
+
+            /* Call the function that processes the modification
+               in lag iface column */
+            if (port_iface_modified) {
+                acl_port_lag_ifaces_process_reconfiguration(port, acl_port,
+                                                    br->ofproto);
+            }
+        }
+    }
+}
+
+
+/**************************************************************************//**
+ * Reconfigure function for lag port reconfigure operation. This
+ * function is called from reconfigure_init callback, when @see
+ * bridge_reconfigure() is called from switchd. This function
+ * will look for all lag port ifaces that are modified and
+ * reconfigure ACL on such ifaces
+ *
+ * @param[in] blk_params - Pointer to the block parameters structure
+ *****************************************************************************/
+void
+acl_port_lag_ifaces_reconfigure(struct blk_params *blk_params)
+{
+    struct bridge *br = NULL;
+    struct vrf *vrf = NULL;
+
+    if (blk_params == NULL) {
+        return;
+    }
+
+    HMAP_FOR_EACH(br, node, blk_params->all_bridges) {
+        if (br->ofproto == NULL) {
+            continue;
+        }
+        acl_port_lag_ifaces_reconfigure_bridge(blk_params, br);
+    }
+
+    HMAP_FOR_EACH(vrf, node, blk_params->all_vrfs) {
+        if ((vrf->up == NULL) || (vrf->up->ofproto == NULL)) {
+            continue;
+        }
+        acl_port_lag_ifaces_reconfigure_bridge(blk_params, vrf->up);
+    }
+}
+
+
+/**************************************************************************//**
  * This function creates an acl_port when the port is seen for the first time
  * by ACL feature plugin. This function sets up all possible acl-port
  * configuration types as defined in @see acl_db_accessor global array.
@@ -1390,7 +1956,7 @@ void acl_callback_port_delete(struct blk_params *blk_params)
             acl_port_delete(del_port->name);
         }
         else {
-            if ((strncmp(del_port->name, "lag", 3) == 0) &&
+            if ((ACL_PORT_IS_LAG(del_port)) &&
                 (port_cfg->n_interfaces == 0))
             {
                 /* This indicates that last interface in lag port
@@ -1476,7 +2042,8 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
                    ACL applied and one of the ifaces is no longer part of
                    the lag port, then ACL needs to be unapplied to that
                    iface*/
-                if (strncmp(port->name, "lag", 3) == 0) {
+
+                if (ACL_PORT_IS_LAG(port)) {
                     acl_port_lag_iface_reconfigure_list_build(
                                                port,
                                                acl_port,
@@ -1543,7 +2110,7 @@ acl_callback_port_update(struct blk_params *blk_params)
     }
     else {
         /* check if it is a lag port */
-        if (strncmp(blk_params->port->name, "lag", 3) == 0) {
+        if (ACL_PORT_IS_LAG(blk_params->port)) {
             acl_port_lag_ifaces_process_reconfiguration(blk_params->port, acl_port,
                                                         blk_params->ofproto);
         }
