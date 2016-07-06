@@ -52,14 +52,14 @@ p4 = None
 ec = 0
 lp = [0] * 65
 qp = []
-rslt = []
 dscpmap = []
 queprof = []
 cosmap = []
-pcpmap = "dscp"
+qos_trust = "dscp"
 opstop = False
 # Outbound packets per priority
-qsize = [2, 4, 8, 16, 32, 64, 128, 256]
+# qsize = [2, 4, 8, 16, 32, 64, 128, 256]
+qsize = [1, 1, 1, 1, 1, 1, 1, 1]
 # Cumulative totals expected per queue
 qmarkup = [0] * 8
 # Code Points and Priorities (PCP):
@@ -71,7 +71,8 @@ pcprangea = [7, 5, 3, 1]
 # cprange1b = [0x10, 0x18, 0x28, 0x38]
 cprange1b = [8, 24, 40, 56]
 pcprangeb = [6, 4, 2, 0]
-cprange1c = [0x0, 0x20, 0x40, 0x60, 0x10, 0x18, 0x28, 0x38]
+# cprange1c = [0x0, 0x20, 0x40, 0x60, 0x10, 0x18, 0x28, 0x38]
+cprange1c = [8, 24, 40, 56, 6, 4, 2, 0]
 pcprangec = [0, 1, 2, 3, 4, 5, 6, 7]
 # special test ipv4 0-31
 cprange2a = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
@@ -81,6 +82,7 @@ cprange2a = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 cprange2b = [32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
              46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
              60, 61, 62, 63]
+pcpthrees = [3, 3, 3, 3]
 pcpsevens = [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
              7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
              7, 7]
@@ -115,7 +117,7 @@ hs3:1 -- ops1:3
 hs4:1 -- ops1:4
 """
 
-logfile = 'mirror_test.log'
+logfile = 'qos_test.log'
 
 # ------------------------------------------------------------
 # Network Globals
@@ -228,7 +230,7 @@ def parsepri(f1):
 #  Parse code points from dscp-map or cos-map
 # ------------------------------------------------------------
 def parse_cp(f1):
-    global pcpmap
+    global qos_trust
     out = []
     buff = []
     for c in f1:
@@ -244,6 +246,7 @@ def parse_cp(f1):
     hdroffset = 2
     i = hdroffset
     k = 0
+    rslt = []
     while True:
         line1 = out[i]
         fields1 = line1.strip().split()
@@ -251,9 +254,9 @@ def parse_cp(f1):
         # skip header, get code point values
         if i > 1:
             k += 1
-        if (pcpmap == "dscp") and k > 63:
+        if (qos_trust == "dscp") and k > 63:
             break
-        if (pcpmap == "cos") and k > 7:
+        if (qos_trust == "cos") and k > 7:
             break
         i += 1
     return rslt
@@ -291,7 +294,7 @@ def setup_topo1(topology):
     assert hs2 is not None
     assert hs3 is not None
 
-    # Setup the switch ports for mirror testing
+    # Setup the switch ports for qos testing
     p1 = ops1.ports['1']
     p2 = ops1.ports['2']
     p3 = ops1.ports['3']
@@ -534,29 +537,33 @@ def parse_qprofile(f1):
 
 
 # ------------------------------------------------------------
-#  Get Queue Markup
+#  Update Queue Markup List
 #     Updates qmarkup list of queue totals based on profile
 #     and DSCP Map
 #     Updates global qmarkup
 # ------------------------------------------------------------
-def get_que(cp, pcp, pktsize):
+def update_qmarkup_list(cp, pcp, pkts):
     global dscpmap
     global cosmap
     global queprof
     global qmarkup
-    global pcpmap
+    global qos_trust
     if dscpmap is False:
-        print("read maps from swith")
+        print("read maps from switch")
         dscpmap = opstop('show qos dscp-map', shell='vtysh')
         cosmap = opstop('show qos cos-map', shell='vtysh')
-    if pcpmap == "dscp":
+    if qos_trust == "dscp":
         # use dscp-map and cp arg for code-point
         list1 = dscpmap
     else:
-        if pcpmap == "cos":
+        if qos_trust == "cos":
             # use cos-map and pcp for code-point
             list1 = cosmap
             cp = pcp
+        else:
+            # Trust none
+            print("TRUST NONE")
+            return qmarkup
 
     list2 = queprof
     rslt = qmarkup
@@ -569,17 +576,22 @@ def get_que(cp, pcp, pktsize):
     for m in range(0, cplen):
         cpval = int(codepoints[m][0])
         if (cpval == cp):
+            # print("found cp ", cp, cplen)
             # lookup expected local priority
             pri = int(codepoints[m][1])
+            # print("lookup pri ", pri, prlen)
             # lookup asssigned queue from profile
             # (typically 1:1 with pcp)
             for i in range(0, prlen):
-                if (cp == int(qprof[i][1])):
+                if (pri == int(qprof[i][1])):
                     q = qprof[i][0]
-                    print("MATCH ", cp, " PRI = ", pri, " Q"+q)
-                    set_trace()
-                    pkt = qsize[int(q)-1]
-                    rslt[int(q)] += pkt
+                    if qos_trust == "dscp":
+                        print("DSCP MATCH ", cp, " PRI = ", pri, " Q"+q,
+                              " pkt=", pkts)
+                    else:
+                        print("COS MATCH ", cp, " PRI = ", pri, " Q"+q,
+                              " pkt=", pkts)
+                    rslt[int(q)] += pkts
                     break
             break
     qmarkup = rslt
@@ -589,7 +601,7 @@ def get_que(cp, pcp, pktsize):
 #
 # Send QoS non-IP Layer 2 prioritized packet
 #     Data Set C
-#        args: topology, source direction, code points, priorities
+#        args: topology, source direction, code points, pcp list
 # ------------------------------------------------------------
 def send_streamc(topology, s, d, cplist, pcplist):
     global dscpmap
@@ -599,9 +611,6 @@ def send_streamc(topology, s, d, cplist, pcplist):
     ops1 = topology.get('ops1')
     src = s['topology']
     dst = d['topology']
-
-    # get qmarkup
-    # get_queue(cplist)
 
     # Get destination Host 4 MAC address
     eth = dst.ports['1']
@@ -637,7 +646,7 @@ def send_streamc(topology, s, d, cplist, pcplist):
         pcp = pcplist[n]
         dot1qp['prio'] = pcp
         # update qmarkup
-        get_que(cp, pcp, pktsize)
+        update_qmarkup_list(cp, pcp, pktsize)
         # send packet
         print("Send Set C >>> non-IP Packet Prio=" + str(pcp))
         result = src.libs.scapy.sendp('Eth/Dot1Q',
@@ -651,15 +660,13 @@ def send_streamc(topology, s, d, cplist, pcplist):
 # Send Differentiated Services Code Point (DSCP) packets
 #     Send Layer 3 ICMP packet with code points for each priority
 #     Data Set B
-#        args: topology, source direction, code points, priorities
+#        args: topology, source direction, code points, pcp list
 # ------------------------------------------------------------
 def send_streamb(topology, s, d, cplist, pcplist):
     global dscpmap
     global queprof
     global qsize
     sys.stderr.close()
-    # get qmarkup
-    # get_queue(cplist)
 
     src = s['topology']
     dst = d['topology']
@@ -695,7 +702,7 @@ def send_streamb(topology, s, d, cplist, pcplist):
         dot1qp['prio'] = pcp
         pktsize = qsize[pcp]
         # update qmarkup
-        get_que(cp, pcp, pktsize)
+        update_qmarkup_list(cp, pcp, pktsize)
         ifc = "iface=" + "\'" + eth + "\'" + ",count="+str(pktsize)
         # send packet
         print("Send Set B >>> IP Packet code point=" + str(cp))
@@ -719,8 +726,6 @@ def send_streamb_ipv6(topology, s, d, cplist, pcplist):
     global dscpmap
     global queprof
     global qsize
-    # get qmarkup
-    # get_queue(cplist)
 
     # Send IPv6 steam
     # start scapy on src host
@@ -758,7 +763,7 @@ def send_streamb_ipv6(topology, s, d, cplist, pcplist):
         dot1qp['prio'] = pcp
         pktsize = qsize[pcp]
         # update qmarkup
-        get_que(cp, pcp, pktsize)
+        update_qmarkup_list(cp, pcp, pktsize)
         ifc = "iface=" + "\'" + eth + "\'" + ",count="+str(pktsize)
         # send packet
         print("Send Set B >>> IPv6 Packet code point=" + str(cp))
@@ -782,8 +787,6 @@ def send_streama(topology, s, d, cplist, pcplist):
     global queprof
     global qsize
     sys.stderr.close()
-    # get qmarkup
-    # get_queue(cplist)
 
     src = s['topology']
     dst = d['topology']
@@ -823,7 +826,7 @@ def send_streama(topology, s, d, cplist, pcplist):
         dot1qp['prio'] = pcp
         pktsize = qsize[pcp]
         # update qmarkup
-        get_que(cp, pcp, pktsize)
+        update_qmarkup_list(cp, pcp, pktsize)
         ifc = "iface=" + "\'" + eth + "\'" + ",count="+str(qsize[pcp])
         # send packet
         print("Send Set A >>> IP Packet code point=" + str(cp))
@@ -854,8 +857,6 @@ def send_streama_ipv6(topology, s, d, cplist, pcplist):
     global queprof
     global qsize
     sys.stderr.close()
-    # get qmarkup
-    # get_queue(cplist)
 
     src = s['topology']
     # dst = d['topology']
@@ -883,7 +884,7 @@ def send_streama_ipv6(topology, s, d, cplist, pcplist):
         dot1qp['prio'] = pcp
         pktsize = qsize[pcp]
         # updae qmarkup
-        get_que(cp, pcp, pktsize)
+        update_qmarkup_list(cp, pcp, pktsize)
         ifc = "iface=" + "\'" + eth + "\'" + ",count="+str(pktsize)
         # send ipv6 packet
         print("Send Set A >>> IPv6 Packet code point=" + str(cp))
@@ -969,7 +970,8 @@ def qcmp(f1, f2, prilist):
             if (int(fields2[2]) <= int(fields1[2])):
                 delta1 = int(fields1[2]) - int(fields1[2])
                 if (delta1 < delta0):
-                    return False
+                    pass
+                #   return False
             j += 1
         if j > 7:
             break
@@ -980,7 +982,7 @@ def qcmp(f1, f2, prilist):
 # Queue Test (main)
 # ------------------------------------------------------------
 @mark.test_id(10300)
-def test_qos_trust(topology):
+def test_qos(topology):
     """
     Test that a vlan configuration is functional with a OpenSwitch switch.
     """
@@ -1016,7 +1018,7 @@ def test_qos_trust(topology):
     global qmarkup
     global dscpmap
     global queprof
-    global pcpmap
+    global qos_trust
     global cosmap
 
     # Setup topology 1
@@ -1134,7 +1136,7 @@ def test_qos_trust(topology):
     # ----------------------------------------
     # Essential parse of maps and profiles
     # ----------------------------------------
-    pcpmap = "dscp"
+    qos_trust = "dscp"
     assert not ops1('configure terminal', shell='vtysh')
     assert not ops1('no qos trust dscp', shell='vtysh')
     assert not ops1('end', shell='vtysh')
@@ -1155,15 +1157,21 @@ def test_qos_trust(topology):
     assert not ops1('end', shell='vtysh')
     print("::: queue_profile ", queprof)
 
-    # get_queue([0x0, 0x20, 0x40, 0x60, 0x10, 0x18, 0x28, 0x38])
-    # test cs2, pcp5, pksize=1
+    # update_qmarkup_list test cs2, pcp5, pksize=1
+    # DSCP check
     qmarkup = [0] * 8
-    pcpmap = "dscp"
-    get_que(16, 5, 1)
+    qos_trust = "dscp"
+    update_qmarkup_list(16, 5, 1)
+    qos_trust = "none"
+    update_qmarkup_list(16, 5, 1)
+    print("::: qmarkup ", qmarkup)
 
+    # CoS check
     qmarkup = [0] * 8
-    pcpmap = "cos"
-    get_que(16, 5, 1)
+    qos_trust = "cos"
+    update_qmarkup_list(16, 5, 1)
+    update_qmarkup_list(16, 5, 1)
+    print("::: qmarkup ", qmarkup)
     set_trace()
 
     print("##################################################")
@@ -1188,7 +1196,7 @@ def test_qos_trust(topology):
     print("##################################################")
     sleep(10)
     logger.info('===== CASE 1 - Validate Trust None & DSCP  =====')
-    pcpmap = "dscp"
+    qos_trust = "dscp"
     print("####### Configure ports")
     assert not ops1('configure terminal', shell='vtysh')
     assert not ops1('interface ' + p1, shell='vtysh')
@@ -1228,6 +1236,7 @@ def test_qos_trust(topology):
     print("##########################################")
     # Initialize qmarkup before stream
     qmarkup = [0] * 8
+    qos_trust = "none"
     send_streamb(topology, hs1, hs2, cprange1a, pcprangea)
     send_streamb_ipv6(topology, hs1, hs2, cprange1b, pcprangeb)
     rslt1 = qmarkup
@@ -1236,6 +1245,7 @@ def test_qos_trust(topology):
     print("####### Send packet set B from H2 to H1")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "dscp"
     send_streamb(topology, hs2, hs1, cprange1a, pcprangea)
     send_streamb_ipv6(topology, hs2, hs1, cprange1b, pcprangeb)
     rslt2 = qmarkup
@@ -1244,6 +1254,7 @@ def test_qos_trust(topology):
     print("####### Send packet set A from H3 to H4")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "none"
     send_streama(topology, hs3, hs4, cprange1a, pcprangea)
     send_streama_ipv6(topology, hs3, hs4, cprange1b, pcprangeb)
     rslt3 = qmarkup
@@ -1252,6 +1263,7 @@ def test_qos_trust(topology):
     print("####### Send packet set A from H4 to H3")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "dscp"
     send_streama(topology, hs4, hs3, cprange1a, pcprangea)
     send_streama_ipv6(topology, hs4, hs3, cprange1b, pcprangeb)
     rslt4 = qmarkup
@@ -1288,9 +1300,9 @@ def test_qos_trust(topology):
     print("##########################################")
     # egress on H2
     if (qcmp(q2, q2a, rslt2) is False):
-        print("PASS -- queues did NOT increase on " + p2)
-    else:
         print("FAIL -- queues increased on " + p2)
+    else:
+        print("PASS -- queues did NOT increase on " + p2)
 
     print("##########################################")
     print("####### Compare H3 before and after")
@@ -1322,7 +1334,6 @@ def test_qos_trust(topology):
     logger.info('===== CASE 2 - Validate changing DSCP Map =====')
     print("##################################################")
     sleep(10)
-    pcpmap = "dscp"
 
     # Save default DSCP Map for subsequent tests
     dscpmap = ops1('show qos dscp-map', shell='vtysh')
@@ -1342,7 +1353,7 @@ def test_qos_trust(topology):
         assert not ops1('qos dscp-map ' + str(cp) + ' local-priority 3',
                         shell='vtysh')
     assert not ops1('end', shell='vtysh')
-    ops1('show qos dscp-map', shell='vtysh')
+    dscpmap = ops1('show qos dscp-map', shell='vtysh')
     # ================================================
     #  Send packets for priority 3 only
     # ================================================
@@ -1359,6 +1370,7 @@ def test_qos_trust(topology):
     print("####### Send packet set B from H2 to H1")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "dscp"
     send_streamb(topology, hs2, hs1, cprange1a, pcprangea)
     send_streamb_ipv6(topology, hs2, hs1, cprange1b, pcprangeb)
     rslt1 = qmarkup
@@ -1367,6 +1379,7 @@ def test_qos_trust(topology):
     print("####### Send packet set A from H4 to H3")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "dscp"
     send_streama(topology, hs4, hs3, cprange1a, pcprangea)
     send_streama_ipv6(topology, hs4, hs3, cprange1b, pcprangeb)
     rslt2 = qmarkup
@@ -1415,7 +1428,7 @@ def test_qos_trust(topology):
     print("##################################################")
     print("CASE 3 - Verify QoS Trust None & CoS")
     print("##################################################")
-    pcpmap = "cos"
+    qos_trust = "cos"
     sleep(10)
     logger.info('===== CASE 3 - Validate Trust None CoS  =====')
     print("####### Configure ports")
@@ -1457,6 +1470,7 @@ def test_qos_trust(topology):
     print("##########################################")
     # Initialize qmarkup before stream
     qmarkup = [0] * 8
+    qos_trust = "none"
     send_streamb(topology, hs1, hs2, cprange1a, pcprangea)
     send_streamb_ipv6(topology, hs1, hs2, cprange1b, pcprangeb)
     rslt1 = qmarkup
@@ -1465,6 +1479,7 @@ def test_qos_trust(topology):
     print("####### Send packet set B from H2 to H1")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "cos"
     send_streamb(topology, hs2, hs1, cprange1a, pcprangea)
     send_streamb_ipv6(topology, hs2, hs1, cprange1b, pcprangeb)
     rslt2 = qmarkup
@@ -1473,6 +1488,7 @@ def test_qos_trust(topology):
     print("####### Send packet set C from H3 to H4")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "none"
     send_streamc(topology, hs3, hs4, cprange1c, pcprangec)
     rslt3 = qmarkup
 
@@ -1480,6 +1496,7 @@ def test_qos_trust(topology):
     print("####### Send packet set C from H4 to H3")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "cos"
     send_streamc(topology, hs4, hs3, cprange1c, pcprangec)
     rslt4 = qmarkup
 
@@ -1508,9 +1525,9 @@ def test_qos_trust(topology):
     print("####### Compare H4 before and after")
     print("##########################################")
     if (qcmp(q4, q4a, rslt4) is False):
-        print("PASS -- queues did NOT increase on " + p4)
-    else:
         print("FAIL -- queues increased on " + p4)
+    else:
+        print("PASS -- queues did NOT increase on " + p4)
 
     # On ports 1 & 3, each egress queue has incremented by the expected
     # amount depending on the packets’ PCP & queue profile
@@ -1519,18 +1536,18 @@ def test_qos_trust(topology):
     print("expect increase on interface " + p1 + " all queues")
     print("##########################################")
     if (qcmp(q1, q1a, rslt1) is False):
-        print("PASS -- queues did NOT increase on " + p1)
-    else:
         print("FAIL -- queues increased on " + p1)
+    else:
+        print("PASS -- queues did NOT increase on " + p1)
 
     print("##########################################")
     print("####### Compare H3 before and after")
     print("expect increase on interface " + p3 + " all queues")
     print("##########################################")
     if (qcmp(q3, q3a, rslt3) is False):
-        print("PASS -- queues did NOT increase on " + p3)
-    else:
         print("FAIL -- queues increased on " + p3)
+    else:
+        print("PASS -- queues did NOT increase on " + p3)
 
     logger.info('==== END CASE 3 ====')
     sleep(10)
@@ -1548,7 +1565,7 @@ def test_qos_trust(topology):
         assert not ops1('qos cos-map ' + str(cp) + ' local-priority 3',
                         shell='vtysh')
     assert not ops1('end', shell='vtysh')
-    ops1('show qos cos-map', shell='vtysh')
+    cosmap = ops1('show qos cos-map', shell='vtysh')
     vlan_result = ops1('show vlan 100')
     q1 = ops1('show interface ' + p1 + " queues")
     q2 = ops1('show interface ' + p2 + " queues")
@@ -1559,16 +1576,18 @@ def test_qos_trust(topology):
     print("####### Send packet set B from H2 to H1")
     print("##########################################")
     qmarkup = [0] * 8
-    send_streamb(topology, hs2, hs1, cprange1a, pcprangea)
-    send_streamb_ipv6(topology, hs2, hs1, cprange1b, pcprangeb)
+    qos_trust = "cos"
+    send_streamb(topology, hs2, hs1, cprange1a, pcpthrees)
+    send_streamb_ipv6(topology, hs2, hs1, cprange1b, pcpthrees)
     rslt2 = qmarkup
 
     print("##########################################")
     print("####### Send packet set A from H4 to H3")
     print("##########################################")
     qmarkup = [0] * 8
-    send_streama(topology, hs4, hs3, cprange1a, pcprangea)
-    send_streama_ipv6(topology, hs4, hs3, cprange1b, pcprangeb)
+    qos_trust = "cos"
+    send_streama(topology, hs4, hs3, cprange1a, pcpthrees)
+    send_streama_ipv6(topology, hs4, hs3, cprange1b, pcpthrees)
     rslt4 = qmarkup
     sleep(10)
 
@@ -1607,7 +1626,7 @@ def test_qos_trust(topology):
     logger.info('===== CASE 5 - Validate changing DSCP Map =====')
     print("##################################################")
     sleep(10)
-    pcpmap = "dscp"
+    qos_trust = "dscp"
     # Configure trust
     print("===== Configure trust ======")
     assert not ops1('configure terminal', shell='vtysh')
@@ -1636,7 +1655,7 @@ def test_qos_trust(topology):
         assert not ops1('qos dscp-map ' + str(i) + ' local-priority ' +
                         str(p0), shell='vtysh')
     assert not ops1('end', shell='vtysh')
-    ops1('show qos dscp-map', shell='vtysh')
+    dscpmap = ops1('show qos dscp-map', shell='vtysh')
     print("######## Create Queue Profile ########")
     print("##########################################")
     print("####### Read and save all queue statistics")
@@ -1655,6 +1674,7 @@ def test_qos_trust(topology):
     print("####### Send packet set B' from H1 to H2")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "none"
     send_streamb(topology, hs1, hs2, cprange2a, pcpsevens)
     send_streamb_ipv6(topology, hs1, hs2, cprange2b, pcpsevens)
     rslt1 = qmarkup
@@ -1663,6 +1683,7 @@ def test_qos_trust(topology):
     print("####### Send packet set B' from H2 to H1")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "dscp"
     send_streamb(topology, hs2, hs1, cprange2a, pcpsevens)
     send_streamb_ipv6(topology, hs2, hs1, cprange2b, pcpsevens)
     rslt2 = qmarkup
@@ -1671,6 +1692,7 @@ def test_qos_trust(topology):
     print("####### Send packet set A from H3 to H4")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "none"
     send_streama(topology, hs3, hs4, cprange2a, pcpsevens)
     send_streama_ipv6(topology, hs3, hs4, cprange2b, pcpsevens)
     rslt3 = qmarkup
@@ -1679,6 +1701,7 @@ def test_qos_trust(topology):
     print("####### Send packet set A from H4 to H3")
     print("##########################################")
     qmarkup = [0] * 8
+    qos_trust = "dscp"
     send_streama(topology, hs4, hs3, cprange2a, pcpsevens)
     send_streama_ipv6(topology, hs4, hs3, cprange2b, pcpsevens)
     rslt4 = qmarkup
@@ -1719,9 +1742,9 @@ def test_qos_trust(topology):
         print("FAIL -- queues increased on " + p3)
 
     if (qcmp(q3, q3a, rslt3) is False):
-        print("PASS -- queues did NOT increase on " + p3)
-    else:
         print("FAIL -- queues increased on " + p3)
+    else:
+        print("PASS -- queues did NOT increase on " + p3)
 
     logger.info('==== END CASE 5 ====')
     sleep(10)
