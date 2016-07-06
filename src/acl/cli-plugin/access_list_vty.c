@@ -1308,7 +1308,8 @@ DEFUN (cli_no_apply_access_list, cli_no_apply_access_list_cmd,
 
     if (vty->node == VLAN_NODE) {
         interface_type_str = vlan_str;
-    } else if (vty->node == INTERFACE_NODE) {
+    } else if (vty->node == INTERFACE_NODE ||
+               vty->node == LINK_AGGREGATION_NODE) {
         interface_type_str = interface_str;
     } else {
         interface_type_str = NULL;
