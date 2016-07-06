@@ -27,9 +27,30 @@
 #include "acl_ofproto.h"
 #include "acl_log.h"
 #include "ops_cls_status_msgs.h"
+#include "openswitch-idl.h"
 
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_port);
+
+/*************************************************************
+ * acl_port_interface structure
+ *
+ * This is stored in a list inside acl_port.
+ *************************************************************/
+ struct acl_port_updated_lag_ifaces {
+     struct ovs_list lag_iface_node;
+
+     /*OpenFlow port number */
+     ofp_port_t port_number;
+
+     /* action to be performed */
+     int action;
+};
+
+struct acl_port_reconfigure_lag_ifaces {
+    /* List of "struct acl_port_updated_lag_ifaces's. */
+    struct ovs_list lag_ifaces;
+};
 
 static void
 acl_port_map_stats_get(struct acl_port_map *acl_port_map,
@@ -172,6 +193,62 @@ acl_port_map_set_cfg_status(struct acl_port_map *acl_port_map,
                                               code_str);
     ovsrec_port_update_aclv4_in_status_setkey(row, OPS_CLS_STATUS_MSG_STR,
                                               details);
+}
+
+/**************************************************************************//**
+ * This function calls asic plugin API calls for the update acl
+ * port operation.
+ *
+ * @param[in] acl_port_map - Pointer to the acl_port_map
+ * @param[in] port         - Pointer to @see struct port
+ * @param[in] ofproto      - Pointer to @see struct ofproto
+ * @param[in] port_number  - Port Number
+ *****************************************************************************/
+static void
+acl_port_map_update_lag_cfg_internal(struct acl_port_map *acl_port_map,
+                                     struct port *port,
+                                     struct ofproto *ofproto,
+                                     ofp_port_t port_number,
+                                     int action)
+{
+    struct ops_cls_pd_status status;
+    struct ops_cls_interface_info interface_info;
+    struct acl *acl = NULL;
+    int rc = 0;
+
+    memset(&status, 0, sizeof status);
+
+    ops_cls_interface_info_construct(&interface_info,
+                                     acl_port_map->parent, port);
+
+    const struct ovsrec_acl *ovsdb_acl =
+        acl_db_util_get_cfg(acl_port_map->acl_db, acl_port_map->parent->ovsdb_row);
+    if (ovsdb_acl == NULL) {
+        return;
+    }
+
+    acl = acl_lookup_by_uuid(&ovsdb_acl->header_.uuid);
+    if (acl == NULL) {
+        ovs_assert(0);
+    }
+
+    if (acl_port_map->hw_acl == acl) {
+        rc = call_ofproto_cls_lag_update(
+                            acl,
+                            port,
+                            ofproto,
+                            port_number,
+                            action,
+                            &interface_info,
+                            acl_port_map->acl_db->direction,
+                            &status);
+        if (rc == 0) {
+        /* status_str will be empty string ("") on success */
+        acl_port_map_set_cfg_status(acl_port_map, port->cfg,
+                                    OPS_CLS_STATE_APPLIED_STR,
+                                    status.status_code, "");
+        }
+    }
 }
 
 /**************************************************************************//**
@@ -659,6 +736,342 @@ acl_show_ports(struct unixctl_conn *conn, int argc, const char *argv[],
 
 
 /**************************************************************************//**
+ * This function deletes a list of interfaces for a lag port
+ * that is reconfigured
+ *
+ * @param[in] iface_list  - port interfaces list
+ *
+ *****************************************************************************/
+static void
+acl_port_reconfigure_lag_ifaces_list_delete(struct ovs_list *iface_list)
+{
+    struct acl_port_updated_lag_ifaces *iface_element      = NULL;
+    struct acl_port_updated_lag_ifaces *iface_element_next = NULL;
+
+    if ((iface_list == NULL) || (list_is_empty(iface_list))) {
+        return;
+    }
+
+    LIST_FOR_EACH_SAFE(iface_element, iface_element_next, lag_iface_node,
+                       iface_list)
+    {
+        list_remove(&iface_element->lag_iface_node);
+        free(iface_element);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function removes a interface element from an lag port
+ * interface list
+ *
+ * @param[in] iface_element  - lag port interfaces element to be
+ *                             removed
+ *****************************************************************************/
+static void
+acl_port_interface_list_element_remove(struct acl_port_interface *iface_element)
+{
+    if (iface_element == NULL) {
+        return;
+    }
+
+    if (!smap_is_empty(&iface_element->hw_bond_config)) {
+        smap_destroy(&iface_element->hw_bond_config);
+    }
+    list_remove(&iface_element->iface_node);
+    free(iface_element);
+}
+
+
+/**************************************************************************//**
+ * This function deletes a list of interfaces for a lag port
+ *
+ * @param[in] iface_list  - port interfaces list
+ *
+ *****************************************************************************/
+static void
+acl_port_interface_list_delete(struct ovs_list *iface_list)
+{
+    struct acl_port_interface *iface_element      = NULL;
+    struct acl_port_interface *iface_element_next = NULL;
+
+    if ((iface_list == NULL) || (list_is_empty(iface_list))) {
+        return;
+    }
+
+    LIST_FOR_EACH_SAFE(iface_element, iface_element_next, iface_node,
+                       iface_list)
+    {
+        acl_port_interface_list_element_remove(iface_element);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function updates the list of lag port interfaces that
+ * need to be reconfigured
+ *
+ * @param[in]  ofp_port                   - Lag port that needs
+ *                                          to be updated
+ * @param[in]  action                     - Action to be
+ *                                          performed on this
+ *                                          lag iface
+ * @param[out] reconfgure_lag_iface_list  - Lag port interfaces
+ *                                          list
+ *****************************************************************************/
+static void
+acl_port_update_reconfigure_lag_iface_list(
+    ofp_port_t ofp_port,
+    int action,
+    struct ovs_list *reconfgure_lag_iface_list)
+{
+    if ((reconfgure_lag_iface_list == NULL)) {
+        return;
+    }
+
+    struct acl_port_updated_lag_ifaces *iface_element =
+            xzalloc(sizeof(struct acl_port_updated_lag_ifaces));
+
+    iface_element->port_number = ofp_port;
+    iface_element->action = action;
+    list_push_back(reconfgure_lag_iface_list, &iface_element->lag_iface_node);
+}
+
+
+/**************************************************************************//**
+ * This function adds the iface list element to a list of
+ * interfaces for a lag port
+ *
+ * @param[in]  iface       - Pointer to @see struct iface
+ * @param[out] iface_list  - port interfaces list
+ *
+ *****************************************************************************/
+static void
+acl_port_interface_list_element_add(struct iface    *iface,
+                                    struct ovs_list *iface_list)
+{
+    if ((iface == NULL) || (iface_list == NULL)){
+        return;
+    }
+
+    struct acl_port_interface *iface_element =
+            xzalloc(sizeof(struct acl_port_interface));
+
+    if (!smap_is_empty(&iface->cfg->hw_bond_config)) {
+        smap_init(&iface_element->hw_bond_config);
+        smap_clone(&iface_element->hw_bond_config,
+                   &iface->cfg->hw_bond_config);
+    }
+    else {
+        VLOG_DBG("hw_bond_config not set for %s iface", iface->name);
+    }
+
+    iface_element->ofp_port = iface->ofp_port;
+    list_push_back(iface_list, &iface_element->iface_node);
+}
+
+
+/**************************************************************************//**
+ * This function creates a list of interfaces for a lag port
+ *
+ * @param[in]   port       - Pointer to @see struct port
+ * @param[out] iface_list  - port interfaces list
+ *
+ *****************************************************************************/
+static void
+acl_port_interface_list_create(struct port     *port,
+                               struct ovs_list *iface_list)
+{
+    struct iface *iface = NULL;
+
+    if ((port == NULL) || (iface_list == NULL)) {
+        return;
+    }
+
+    LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+        acl_port_interface_list_element_add(iface, iface_list);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function removes a lag port interface from the internal
+ * list. It then updates the list of lag port interfaces that
+ * need to be reconfigured
+ *
+ * @param[in]   port       - Pointer to @see struct port
+ * @param[out] iface_list  - Port interfaces list
+ * @param[out] ofp_port    - Port number added or removed
+ *
+ *****************************************************************************/
+static void
+acl_port_interface_list_remove(struct port     *port,
+                               struct ovs_list *iface_list,
+                               struct ovs_list *reconfigure_lag_ifaces_list)
+{
+    struct iface *iface = NULL;
+    struct acl_port_interface *acl_port_iface = NULL;
+    bool iface_in_list = false;
+
+    if ((port == NULL) || (iface_list == NULL) ||
+        (reconfigure_lag_ifaces_list == NULL)) {
+        return;
+    }
+
+    LIST_FOR_EACH(acl_port_iface, iface_node, iface_list) {
+        iface_in_list = false;
+        LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+            if (acl_port_iface->ofp_port == iface->ofp_port) {
+                iface_in_list = true;
+                break;
+            }
+        }
+        if (!iface_in_list) {
+            acl_port_update_reconfigure_lag_iface_list(
+                                           acl_port_iface->ofp_port,
+                                           OPS_CLS_LAG_MEMBER_INTF_DEL,
+                                           reconfigure_lag_ifaces_list);
+            acl_port_interface_list_element_remove(acl_port_iface);
+        }
+    }
+}
+
+
+/**************************************************************************//**
+ * This function adds a lag port interface to the internal list.
+ * It then updates the list of lag port interfaces that need to
+ * be reconfigured
+ *
+ * @param[in]   port                          - Pointer to @see
+ *                                              struct port
+ * @param[out] iface_list                     - Port interfaces
+ *                                              list
+ * @param[out] reconfigure_lag_ifaces_list    - Port number
+ *                                              added or removed
+ *****************************************************************************/
+static void
+acl_port_interface_list_add(struct port     *port,
+                            struct ovs_list *iface_list,
+                            struct ovs_list *reconfigure_lag_ifaces_list)
+{
+    struct iface *iface = NULL;
+    struct acl_port_interface *acl_port_iface = NULL;
+    bool iface_in_list = false;
+
+    if ((port == NULL) || (iface_list == NULL) ||
+        (reconfigure_lag_ifaces_list == NULL)) {
+        return;
+    }
+
+    LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+        iface_in_list = false;
+        LIST_FOR_EACH(acl_port_iface, iface_node, iface_list) {
+            if (iface->ofp_port == acl_port_iface->ofp_port) {
+                iface_in_list = true;
+                break;
+            }
+        }
+        if (!iface_in_list) {
+            acl_port_interface_list_element_add(iface, iface_list);
+            acl_port_update_reconfigure_lag_iface_list(
+                              iface->ofp_port,
+                              OPS_CLS_LAG_MEMBER_INTF_ADD,
+                              reconfigure_lag_ifaces_list);
+        }
+    }
+}
+
+
+/**************************************************************************//**
+ * This function adds a lag port interface to the internal list.
+ * It then updates the list of lag port interfaces that need to
+ * be reconfigured
+ *
+ * @param[in]   port                          - Pointer to @see
+ *                                              struct port
+ * @param[out] iface_list                     - Port interfaces
+ *                                              list
+ * @param[out] reconfigure_lag_ifaces_list    - Port number
+ *                                              added or removed
+ *****************************************************************************/
+static void
+acl_port_interface_list_create_and_add(
+                struct port     *port,
+                struct ovs_list *iface_list,
+                struct ovs_list *reconfigure_lag_ifaces_list)
+{
+    struct iface *iface = NULL;
+
+    if ((port == NULL) || (iface_list == NULL) ||
+        (reconfigure_lag_ifaces_list == NULL)) {
+        return;
+    }
+
+    /* create the lag port iface internal list */
+    acl_port_interface_list_create(port, iface_list);
+
+    /* add the new list to the reconfigured list */
+    LIST_FOR_EACH(iface, port_elem, &port->ifaces) {
+        acl_port_update_reconfigure_lag_iface_list(
+                              iface->ofp_port,
+                              OPS_CLS_LAG_MEMBER_INTF_ADD,
+                              reconfigure_lag_ifaces_list);
+    }
+}
+
+
+/**************************************************************************//**
+ * This function checks if the lag port ifaces needs to be
+ * reconfigured, based on changes to current list of lag port
+ * ifaces (Add/remove) or based on hw_bond_config state
+ * transition
+ *
+ * @param[in]  port                      - Pointer to @see
+ *       struct port
+ * @param[in]  iface_list                - Port interfaces list
+ * @param[out] reconfigure_lag_ifaces    - Lags ports that need
+ *       reconfiguration
+ *
+ *****************************************************************************/
+static void
+acl_port_process_lag_ifaces_reconfiguration(
+    struct port     *port,
+    struct ovs_list *acl_port_iface_list,
+    struct ovs_list *reconfigure_lag_ifaces_list)
+{
+
+    if ((port == NULL) || (acl_port_iface_list == NULL) ||
+        (reconfigure_lag_ifaces_list == NULL)) {
+        return;
+    }
+
+    /* check if internal list is empty. If yes, just add all the
+       incoming lag port ifaces */
+    if ((list_size(acl_port_iface_list) == 0) &&
+        (list_size(&port->ifaces) > 0)){
+        acl_port_interface_list_create_and_add(port, acl_port_iface_list,
+                                               reconfigure_lag_ifaces_list);
+    }
+    else if (list_size(acl_port_iface_list) == list_size(&port->ifaces)) {
+        /* NOTE: Here three cases are possible as listed below */
+        /* check if any existing ifaces got removed and the new ifaces
+           got added */
+        /* iface are same but the hw_bond_config state transition happened */
+        /* Nothing to do */
+    }
+    else if (list_size(&port->ifaces) > list_size(acl_port_iface_list)) {
+        acl_port_interface_list_add(port, acl_port_iface_list,
+                                    reconfigure_lag_ifaces_list);
+    }
+    else
+    {
+        acl_port_interface_list_remove(port, acl_port_iface_list,
+                                       reconfigure_lag_ifaces_list);
+    }
+}
+
+
+/**************************************************************************//**
  * This function creates an acl_port when the port is seen for the first time
  * by ACL feature plugin. This function sets up all possible acl-port
  * configuration types as defined in @see acl_db_accessor global array.
@@ -686,6 +1099,14 @@ acl_port_new(struct port *port, unsigned int seqno,
     acl_port->interface_flags |= interface_flags;
     acl_port->ovsdb_row = port->cfg;
     acl_port->delete_seqno = seqno;
+
+    list_init(&acl_port->port_ifaces);
+
+    /* TODO: Create iface list only for lag ports?? */
+    if (list_size(&port->ifaces) > 0) {
+        acl_port_interface_list_create(port, &acl_port->port_ifaces);
+    }
+
     shash_add_assert(&all_ports, port->name, acl_port);
     return acl_port;
 }
@@ -706,6 +1127,9 @@ acl_port_delete(const char *port_name)
     for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_destruct(&port->port_map[i]);
     }
+
+    /* cleanup port interfaces list */
+    acl_port_interface_list_delete(&port->port_ifaces);
 
     free(port);
 }
@@ -751,6 +1175,30 @@ acl_port_cfg_update(struct acl_port *acl_port, struct port *port,
     VLOG_DBG("PORT %s changed", acl_port->port->name);
     for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
         acl_port_map_cfg_update(&acl_port->port_map[i], port, ofproto);
+    }
+}
+
+/**************************************************************************//**
+ * This function wraps @see acl_port_map_cfg_lag_update()
+ * function and calls it for each ACL that is applied to the
+ *
+ * @param[in] acl_port     - Pointer to @see struct acl_port
+ * @param[in] port         - Pointer to @see struct port
+ * @param[in] ofproto      - Pointer to @see struct ofproto
+ * @param[in] ofp_port     - Port number
+ *****************************************************************************/
+static void
+acl_port_cfg_lag_update(struct acl_port *acl_port, struct port *port,
+                        struct ofproto *ofproto, ofp_port_t port_number,
+                        int action)
+{
+    if ((acl_port == NULL) || (port == NULL) || (ofproto == NULL)) {
+        return;
+    }
+
+    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
+        acl_port_map_update_lag_cfg_internal(&acl_port->port_map[i], port,
+                                             ofproto, port_number, action);
     }
 }
 
@@ -822,9 +1270,9 @@ acl_port_unapply_if_needed(struct acl *acl)
 
 void acl_callback_port_reconfigure(struct blk_params *blk_params)
 {
-    struct acl_port *acl_port;
-    struct port *port = NULL;
-    struct bridge *br;
+    struct acl_port            *acl_port;
+    struct port                *port = NULL;
+    struct bridge              *br;
 
     /* Find the bridge to work with */
     if (blk_params->br) {
@@ -838,6 +1286,69 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
         if (OVSREC_IDL_IS_ROW_MODIFIED(port->cfg, blk_params->idl_seqno)) {
             acl_port = acl_port_lookup(port->name);
             if (acl_port) {
+                /* In case of a lag port, need to check if there is any
+                   transition in the hw_bond_config state */
+                if (strncmp(port->name, "lag", 3) == 0) {
+
+                    struct acl_port_reconfigure_lag_ifaces reconfigure_lag_ifaces;
+                    struct acl_port_updated_lag_ifaces * updated_lag_iface;
+
+                    list_init(&reconfigure_lag_ifaces.lag_ifaces);
+
+                    acl_port_process_lag_ifaces_reconfiguration(port,
+                                                                &acl_port->port_ifaces,
+                                                                &reconfigure_lag_ifaces.lag_ifaces);
+
+                    if (list_size(&reconfigure_lag_ifaces.lag_ifaces) > 0) {
+                        LIST_FOR_EACH(updated_lag_iface, lag_iface_node,
+                                      &reconfigure_lag_ifaces.lag_ifaces) {
+                            acl_port_cfg_lag_update(acl_port,
+                                                    port,
+                                                    blk_params->ofproto,
+                                                    updated_lag_iface->port_number,
+                                                    updated_lag_iface->action);
+                        }
+                        acl_port_reconfigure_lag_ifaces_list_delete(
+                                         &reconfigure_lag_ifaces.lag_ifaces);
+                    }
+#if 0
+                    LIST_FOR_EACH(acl_port_iface, iface_node, &acl_port->port_ifaces) {
+                        LIST_FOR_EACH(port_iface, port_elem, &port->ifaces) {
+                            if (acl_port_iface->ofp_port ==
+                                port_iface->ofp_port) {
+                                if ((smap_get_bool(
+                                      &acl_port_iface->hw_bond_config,
+                                      INTERFACE_HW_BOND_CONFIG_MAP_RX_ENABLED,
+                                      false))
+                                        &&
+                                    (!smap_get_bool(
+                                      &port_iface->cfg->hw_bond_config,
+                                      INTERFACE_HW_BOND_CONFIG_MAP_RX_ENABLED,
+                                      false))
+                                        &&
+                                    (smap_get_bool(
+                                     &acl_port_iface->hw_bond_config,
+                                     INTERFACE_HW_BOND_CONFIG_MAP_TX_ENABLED,
+                                     false))
+                                       &&
+                                    (!smap_get_bool(
+                                     &port_iface->cfg->hw_bond_config,
+                                     INTERFACE_HW_BOND_CONFIG_MAP_TX_ENABLED,
+                                     false))) {
+                                           if (port->cfg->aclv4_in_cfg) {
+                                               /* call the new PD API */
+                                               acl_port_cfg_lag_update(
+                                                    acl_port,
+                                                    port,
+                                                    blk_params->ofproto,
+                                                    acl_port_iface->ofp_port);
+                                    }
+                                }
+                            }
+                        }
+                    }
+#endif /* if 0 */
+                }
                 if (port->cfg->aclv4_in_cfg) {
                     /* Reconfigure ACL */
                     acl_port->ovsdb_row = port->cfg;
