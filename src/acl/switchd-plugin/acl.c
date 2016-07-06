@@ -518,4 +518,10 @@ acl_reconfigure_init(struct blk_params *blk_params)
             }
         }
     }
+
+    /* If the iface(s) in a lag port is shut, the processing needed to
+       reconfigure the port is done here. For example, if the lag port
+       has an ACL applied and one of the ifaces is shut, the ACL needs
+       to unapplied to that iface */
+    acl_port_lag_ifaces_reconfigure(blk_params);
 }
