@@ -563,7 +563,10 @@ def update_qmarkup_list(cp, pcp, pkts):
         else:
             # Trust none
             print("TRUST NONE")
-            return qmarkup
+            rslt = qmarkup
+            # Update Q1
+            rslt[1] += pkts
+            return rslt
 
     list2 = queprof
     rslt = qmarkup
@@ -1749,4 +1752,126 @@ def test_qos(topology):
     logger.info('==== END CASE 5 ====')
     sleep(10)
     print('==== END CASE 5 ====')
+    # set_trace()
+    print("##################################################")
+    print("CASE 6 - Trust with LAGG")
+    print("expect Only the egress port queue has incremented")
+    print("##########################################")
+    logger.info('===== CASE 6 - Set Trust with LAG =====')
+    print("##################################################")
+    sleep(10)
+    qos_trust = "dscp"
+    # Configure trust
+    print("===== Configure trust and LAGG ======")
+    assert not ops1('configure terminal', shell='vtysh')
+    assert not ops1('interface lag 10', shell='vtysh')
+    assert not ops1('qos trust cos', shell='vtysh')
+    assert not ops1('interface ' + p1, shell='vtysh')
+    assert not ops1('qos trust none', shell='vtysh')
+    assert not ops1('interface  ' + p2, shell='vtysh')
+    assert not ops1('lag 10', shell='vtysh')
+    assert not ops1('end', shell='vtysh')
+    assert not ops1('configure terminal', shell='vtysh')
+    assert not ops1('interface ' + p3, shell='vtysh')
+    assert not ops1('qos trust none', shell='vtysh')
+    assert not ops1('end', shell='vtysh')
+    assert not ops1('configure terminal', shell='vtysh')
+    assert not ops1('interface ' + p4, shell='vtysh')
+    assert not ops1('lag 10', shell='vtysh')
+    assert not ops1('end', shell='vtysh')
+    assert not ops1('end', shell='vtysh')
+    ops1('show running-config', shell='vtysh')
+    print("######## Create Queue Profile ########")
+    print("##########################################")
+    print("####### Read and save all queue statistics")
+    print("##########################################")
+    q1 = ops1('show interface ' + p1 + " queues")
+    q2 = ops1('show interface ' + p2 + " queues")
+    q3 = ops1('show interface ' + p3 + " queues")
+    q4 = ops1('show interface ' + p4 + " queues")
+
+    print(q1, q2, q3, q4)
+    # ================================================
+    #  Send packets
+    # ================================================
+    # ================================================
+    print("##########################################")
+    print("####### Send packet set B' from H1 to H2")
+    print("##########################################")
+    qmarkup = [0] * 8
+    qos_trust = "none"
+    send_streamb(topology, hs1, hs2, cprange1a, pcprangea)
+    send_streamb_ipv6(topology, hs1, hs2, cprange1b, pcprangeb)
+    rslt1 = qmarkup
+
+    print("##########################################")
+    print("####### Send packet set B' from H2 to H1")
+    print("##########################################")
+    qmarkup = [0] * 8
+    qos_trust = "cos"
+    send_streamb(topology, hs2, hs1, cprange1a, pcprangea)
+    send_streamb_ipv6(topology, hs2, hs1, cprange1b, pcprangeb)
+    rslt2 = qmarkup
+
+    print("##########################################")
+    print("####### Send packet set A from H3 to H4")
+    print("##########################################")
+    qmarkup = [0] * 8
+    qos_trust = "none"
+    send_streama(topology, hs3, hs4, cprange1a, pcprangea)
+    send_streama_ipv6(topology, hs3, hs4, cprange1b, pcprangeb)
+    rslt3 = qmarkup
+
+    print("##########################################")
+    print("####### Send packet set A from H4 to H3")
+    print("##########################################")
+    qmarkup = [0] * 8
+    qos_trust = "cos"
+    send_streama(topology, hs4, hs3, cprange1a, pcprangea)
+    send_streama_ipv6(topology, hs4, hs3, cprange1b, pcprangeb)
+    rslt4 = qmarkup
+
+    print("##########################################")
+    print("####### Read new queue statistics H1 and H2")
+    print("##########################################")
+    sleep(10)
+    q1a = ops1('show interface ' + p1 + " queues")
+    q2a = ops1('show interface ' + p2 + " queues")
+
+    print("##########################################")
+    print("####### Read new queue statistics H3 and H4")
+    print("##########################################")
+    q3a = ops1('show interface ' + p3 + " queues")
+    q4a = ops1('show interface ' + p4 + " queues")
+
+    print("##########################################")
+    print("####### Compare H1 before and after")
+    print("expect increase on interface " + p1 + " all queues")
+    print("##########################################")
+    # On port 2 only egress port queue incremented per AF31
+    if (qcmp(q2, q2a, rslt2) is False):
+        print("FAIL -- queues did NOT increase on " + p1)
+    else:
+        print("PASS -- queues increased on " + p1)
+
+    # On port 4 only egress port queue incremented per AF31
+    if (qcmp(q4, q4a, rslt4) is False):
+        print("FAIL -- queues did NOT increase on " + p1)
+    else:
+        print("PASS -- queues increased on " + p1)
+
+    # On port 1&3 each egress port queue per priorities
+    if (qcmp(q1, q1a, rslt1) is False):
+        print("PASS -- queues did NOT increase on " + p3)
+    else:
+        print("FAIL -- queues increased on " + p3)
+
+    if (qcmp(q3, q3a, rslt3) is False):
+        print("FAIL -- queues increased on " + p3)
+    else:
+        print("PASS -- queues did NOT increase on " + p3)
+
+    logger.info('==== END CASE 6 ====')
+    sleep(10)
+    print('==== END CASE 6 ====')
     # set_trace()
