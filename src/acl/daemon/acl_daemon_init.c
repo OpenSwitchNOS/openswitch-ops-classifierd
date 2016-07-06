@@ -22,6 +22,7 @@
  ***************************************************************************/
 #include <openvswitch/vlog.h>
 #include <vswitch-idl.h>
+#include "acl_db_util.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_daemon_init);
 
@@ -58,6 +59,7 @@ acl_ovsdb_init(struct ovsdb_idl *idl)
     ovsdb_idl_omit_alert(idl, &ovsrec_acl_col_in_progress_version);
     ovsdb_idl_omit_alert(idl, &ovsrec_interface_col_hw_status);
 
+    acl_db_util_init();
 } /* acl_ovsdb_init */
 
 
