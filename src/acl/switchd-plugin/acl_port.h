@@ -25,6 +25,21 @@
 #include "acl_db_util.h"
 
 /*************************************************************
+ * acl_port_interface structure
+ *
+ * This is stored in a list inside acl_port.
+ *************************************************************/
+ struct acl_port_interface {
+     struct ovs_list iface_node;
+
+     /* hw_bond_config */
+     struct smap     hw_bond_config;
+
+     /* OpenFlow port number. */
+     ofp_port_t      ofp_port;
+ };
+
+/*************************************************************
  * acl_port_map structures
  *
  * This is stored in an arrary inside acl_port.
@@ -59,6 +74,7 @@ struct acl_port {
 
     const struct ovsrec_port *ovsdb_row;
     unsigned int       delete_seqno; /* mark/sweep to identify deleted */
+    struct ovs_list port_ifaces;    /* List of "struct acl_port_interface's. */
 };
 
 /**************************************************************************//**
@@ -131,4 +147,14 @@ void acl_port_debug_init(void);
  *****************************************************************************/
 void acl_port_unapply_if_needed(struct acl *acl);
 
+/**************************************************************************//**
+ * Reconfigure function for lag port reconfigure operation. This
+ * function is called from reconfigure_init callback, when @see
+ * bridge_reconfigure() is called from switchd. This function
+ * will look for all lag port ifaces that are modified and
+ * reconfigure ACL on such ifaces
+ *
+ * @param[in] blk_params - Pointer to the block parameters structure
+ *****************************************************************************/
+void acl_port_lag_ifaces_reconfigure(struct blk_params *blk_params);
 #endif  /* __SWITCHD__PLUGIN__ACL_PORT_H__ */
