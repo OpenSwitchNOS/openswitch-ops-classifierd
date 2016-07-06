@@ -32,6 +32,13 @@
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_port);
 
+#define ACL_PORT_LAG_NAME_PREFIX "lag"
+#define ACL_PORT_LAG_NAME_PREFIX_LENGTH 3
+
+#define ACL_PORT_IS_LAG(port)    ((strncmp(port->name,                   \
+                                   ACL_PORT_LAG_NAME_PREFIX,             \
+                                   ACL_PORT_LAG_NAME_PREFIX_LENGTH) == 0) ? true : false)
+
 /*************************************************************
  * acl_port_reconfigure_lag_iface structure
  *************************************************************/
@@ -729,6 +736,7 @@ acl_port_check_and_set_active_lag(struct acl_port *acl_port)
             break;
         }
     }
+
     if (all_members_inactive) {
         acl_port->lag_members_active = false;
     } else {
@@ -844,7 +852,7 @@ acl_port_lag_iface_reconfigure_list_update(
  * @param[out] iface_list  - port interfaces list
  *****************************************************************************/
 static void
-acl_port_lag_iface_list_element_add(struct acl_port *acl_port,
+acl_port_lag_iface_list_element_add(struct acl_port    *acl_port,
                                     struct iface       *iface)
 {
     if ((acl_port == NULL) || (iface == NULL)) {
@@ -884,7 +892,7 @@ acl_port_lag_iface_list_element_add(struct acl_port *acl_port,
  * @param[out]  iface_list  - port interfaces list
  *****************************************************************************/
 static void
-acl_port_lag_iface_list_create(struct acl_port     *acl_port)
+acl_port_lag_iface_list_create(struct acl_port *acl_port)
 {
     struct iface *iface = NULL;
 
@@ -896,6 +904,7 @@ acl_port_lag_iface_list_create(struct acl_port     *acl_port)
     LIST_FOR_EACH(iface, port_elem, &acl_port->port->ifaces) {
         acl_port_lag_iface_list_element_add(acl_port, iface);
     }
+
     acl_port_check_and_set_active_lag(acl_port);
 }
 
@@ -1099,7 +1108,6 @@ acl_port_lag_iface_list_add(struct port     *port,
     }
     acl_port_check_and_set_active_lag(acl_port);
 }
-
 
 
 /**************************************************************************//**
@@ -1390,7 +1398,7 @@ void acl_callback_port_delete(struct blk_params *blk_params)
             acl_port_delete(del_port->name);
         }
         else {
-            if ((strncmp(del_port->name, "lag", 3) == 0) &&
+            if ((ACL_PORT_IS_LAG(del_port)) &&
                 (port_cfg->n_interfaces == 0))
             {
                 /* This indicates that last interface in lag port
@@ -1476,7 +1484,8 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
                    ACL applied and one of the ifaces is no longer part of
                    the lag port, then ACL needs to be unapplied to that
                    iface*/
-                if (strncmp(port->name, "lag", 3) == 0) {
+
+                if (ACL_PORT_IS_LAG(port)) {
                     acl_port_lag_iface_reconfigure_list_build(
                                                port,
                                                acl_port,
@@ -1543,7 +1552,7 @@ acl_callback_port_update(struct blk_params *blk_params)
     }
     else {
         /* check if it is a lag port */
-        if (strncmp(blk_params->port->name, "lag", 3) == 0) {
+        if (ACL_PORT_IS_LAG(blk_params->port)) {
             acl_port_lag_ifaces_process_reconfiguration(blk_params->port, acl_port,
                                                         blk_params->ofproto);
         }
