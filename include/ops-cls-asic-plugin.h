@@ -273,6 +273,12 @@ struct ops_cls_list_entry_match_fields
 #define  OPS_CLS_ACTION_COUNT   0x00000008 /**< Count action flag  */
 
 /**
+ * LAG Update actions
+ */
+#define  OPS_CLS_LAG_MEMBER_INTF_ADD  0x00000001 /**< Add a lag member */
+#define  OPS_CLS_LAG_MEMBER_INTF_DEL  0x00000002 /**< Remove a lag member */
+
+/**
  * Classifier List Entry Action Structure
  */
 struct ops_cls_list_entry_actions
@@ -515,9 +521,7 @@ struct ops_cls_plugin_interface {
      *                                pd_status
      *
      */
-    int (*ofproto_ops_cls_lag_update)(const struct uuid         *list_id,
-                            const char                      *list_name,
-                            enum ops_cls_type               list_type,
+    int (*ofproto_ops_cls_lag_update)(struct ops_cls_list   *list,
                             struct ofproto                  *ofproto,
                             void                            *aux,
                             ofp_port_t                      ofp_port,
