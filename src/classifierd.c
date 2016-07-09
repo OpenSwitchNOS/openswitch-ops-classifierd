@@ -185,8 +185,12 @@ main(int argc, char *argv[])
     unixctl_command_register("exit", "", 0, 0, ops_classifierd_exit, &exiting);
 
     /* Create the IDL cache of the dB at ovsdb_sock. */
-    classifierd_init(ovsdb_sock);
-    free(ovsdb_sock);
+    if (ovsdb_sock != NULL) {
+        classifierd_init(ovsdb_sock);
+        free(ovsdb_sock);
+    } else {
+        exit(EXIT_FAILURE);
+    }
 
     /* Notify parent of startup completion. */
     daemonize_complete();
