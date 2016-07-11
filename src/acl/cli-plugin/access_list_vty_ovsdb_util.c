@@ -26,7 +26,6 @@
  ***************************************************************************/
 
 #include <vswitch-idl.h>
-#include <ovsdb-idl.h>
 
 #include <openvswitch/vlog.h>
 #include <dynamic-string.h>
@@ -42,6 +41,7 @@
 #include <ops_cls_status_msgs.h>
 
 #include "access_list_vty_util.h"
+#include "access_list_vty_ovsdb_util.h"
 
 /** Create logging module */
 VLOG_DEFINE_THIS_MODULE(vtysh_access_list_cli_ovsdb_util);
@@ -49,32 +49,62 @@ VLOG_DEFINE_THIS_MODULE(vtysh_access_list_cli_ovsdb_util);
 /** Utilize OVSDB interface code generated from schema */
 extern struct ovsdb_idl *idl;
 
+/**
+ * @todo This is not a very performant way to get a row by index columns.
+ *       Initially it was the only way to do so; replace with something
+ *       more efficient.
+ */
 const struct ovsrec_acl *
 get_acl_by_type_name(const char *acl_type, const char *acl_name)
 {
-    const struct ovsrec_acl acl = {.list_type = (char *) acl_type,
-                                   .name      = (char *) acl_name};
-    struct ovsdb_idl_index_cursor cursor;
-    ovsdb_idl_initialize_cursor(idl, &ovsrec_table_acl, "by_ACL_list_type_and_name", &cursor);
-    return ovsrec_acl_index_find(&cursor, &acl);
+    const static struct ovsrec_acl *acl;
+
+    OVSREC_ACL_FOR_EACH(acl, idl) {
+        if ((!strcmp(acl->list_type, acl_type)) &&
+            (!strcmp(acl->name, acl_name))) {
+            return (struct ovsrec_acl *) acl;
+        }
+    }
+
+    return NULL;
 }
 
+/**
+ * @todo This is not a very performant way to get a row by indexed columns.
+ *       Initially it was the only way to do so; replace with something
+ *       more efficient.
+ */
 const struct ovsrec_port *
 get_port_by_name(const char *name)
 {
-    const struct ovsrec_port port = {.name = (char *) name};
-    struct ovsdb_idl_index_cursor cursor;
-    ovsdb_idl_initialize_cursor(idl, &ovsrec_table_port, "by_Port_name", &cursor);
-    return ovsrec_port_index_find(&cursor, &port);
+    const static struct ovsrec_port *port;
+
+    OVSREC_PORT_FOR_EACH(port, idl) {
+        if (!strcmp(port->name, name)) {
+            return (struct ovsrec_port *) port;
+        }
+    }
+
+    return NULL;
 }
 
+/**
+ * @todo This is not a very performant way to get a row by indexed columns.
+ *       Initially it was the only way to do so; replace with something
+ *       more efficient.
+ */
 const struct ovsrec_vlan *
 get_vlan_by_id_str(const char *id_str)
 {
-    const struct ovsrec_vlan vlan = {.id = strtoul(id_str, NULL, 0)};
-    struct ovsdb_idl_index_cursor cursor;
-    ovsdb_idl_initialize_cursor(idl, &ovsrec_table_vlan, "by_VLAN_id", &cursor);
-    return ovsrec_vlan_index_find(&cursor, &vlan);
+    const static struct ovsrec_vlan *vlan;
+
+    OVSREC_VLAN_FOR_EACH(vlan, idl) {
+        if (vlan->id == strtoul(id_str, NULL, 0)) {
+            return (struct ovsrec_vlan *) vlan;
+        }
+    }
+
+    return NULL;
 }
 
 /**
@@ -381,7 +411,30 @@ print_vlan_aclv4_in_statistics(const struct ovsrec_vlan *vlan_row)
     }
 }
 
-bool aces_cur_cfg_equal (const struct ovsrec_acl *acl_row)
+void
+print_acl_mismatch_warning(const char *acl_name, const char *commands)
+{
+    if (commands) {
+        vty_out(vty,
+                "! access-list %s %s%s"
+                "! %s%s",
+                acl_name,
+                ACL_MISMATCH_WARNING,
+                VTY_NEWLINE,
+                ACL_MISMATCH_HINT_RESET,
+                VTY_NEWLINE);
+    } else {
+        vty_out(vty,
+                "%% Warning: %s %s%s",
+                acl_name, ACL_MISMATCH_WARNING, VTY_NEWLINE);
+        vty_out(vty,
+                "%%          %s%s",
+                ACL_MISMATCH_HINT_RESET, VTY_NEWLINE);
+    }
+}
+
+bool
+aces_cur_cfg_equal(const struct ovsrec_acl *acl_row)
 {
     /* Compare number of entries */
     if (acl_row->n_cur_aces != acl_row->n_cfg_aces) {
