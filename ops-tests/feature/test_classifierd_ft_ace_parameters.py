@@ -23,7 +23,6 @@ from pytest import mark
 from re import search
 import pytest
 from topology_lib_vtysh import exceptions
-import time
 
 TOPOLOGY = """
 # +--------+
@@ -39,15 +38,6 @@ TOPOLOGY = """
 
 @mark.test_id(10402)
 def test_ace_parameters(topology, step):
-    step('################ Introduce delay in ACE ###########')
-    step('################ creation in case docker ###############')
-    step('################ is not up for > 45 seconds ###############')
-
-    # Temporarily adding a sleep time at boot up to ensure switchd
-    # deamonizing completely. Will remove sleep when test framework
-    # implements switchd deamonizing checking
-    time.sleep(60)
-
     """
     Adding ACL entries
 
