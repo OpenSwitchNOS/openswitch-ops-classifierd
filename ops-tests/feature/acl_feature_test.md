@@ -1,4 +1,4 @@
-# ACL Component Test Cases
+# ACL Feature Test Cases
 
 ## Contents
 - [Verify ACL CLI](#verify_acl_cli)
