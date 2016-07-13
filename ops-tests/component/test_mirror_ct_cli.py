@@ -17,7 +17,7 @@
 
 import re
 
-import pytest
+from pytest import mark, fixture
 from copy import deepcopy
 import time
 import syslog
@@ -52,7 +52,7 @@ testInitialSleep = 1
 testRetryLimit = 90
 testRetrySleep = 1
 
-@pytest.fixture(scope="module")
+@fixture(scope="module")
 def setup(topology):
     global ops1
     ops1 = topology.get("ops1")
@@ -493,6 +493,38 @@ def case_22_add_mirror_non_system_interface_fails():
         ctx.vlan_access("1")
         ctx.vlan_trunk_allowed("1")
 
+#     assert 'Status: active' in out
+    assert format('Source: interface {p3} rx') in out
+    assert 'Destination: interface lag100' in out
+
+    ops1(format('configure terminal'))
+    ops1(format('no mirror session bar'))
+    ops1(format('end'))
+
+def case_22_add_mirror_non_system_source_interface_fails():
+    ops1(format('configure terminal'))
+    ops1(format('mirror session non_system'))
+    out = ops1(format('source interface bridge_normal rx'))
+    assert 'Invalid interface' in out
+    ops1(format('end'))
+
+    ops1(format('configure terminal'))
+    ops1(format('no mirror session non_system'))
+    ops1(format('end'))
+
+def case_23_add_mirror_non_system_destination_interface_fails():
+    ops1(format('configure terminal'))
+    ops1(format('mirror session non_system'))
+    out = ops1(format('destination interface bridge_normal'))
+    assert 'Invalid interface' in out
+    ops1(format('end'))
+
+    ops1(format('configure terminal'))
+    ops1(format('no mirror session non_system'))
+    ops1(format('end'))
+
+@mark.gate
+@mark.skipif(True, reason="Once all pd/pi mirror code has been merged, enable this.")
 def test_mirror_ct_cli(topology, setup):
     case_1_activate_ms_foo_succeeds()
     case_2_add_second_source_to_active_mirror_session_foo_succeeds()
