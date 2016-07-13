@@ -17,7 +17,7 @@
 
 import re
 
-import pytest
+from pytest import mark
 from copy import deepcopy
 import time
 
@@ -1776,6 +1776,7 @@ def case_system_qos_put_validate_apply_port_profiles_have_same_queues():
     with ops1.libs.vtysh.Configure() as ctx:
         ctx.apply_qos_queue_profile_schedule_profile('default', 'default')
 
+@mark.gate
 def test_qos_ct_rest_custom_validators(topology, setup):
     setUp_qosApplyGlobal()
 
