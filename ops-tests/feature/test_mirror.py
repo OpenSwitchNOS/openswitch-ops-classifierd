@@ -28,6 +28,7 @@ from time import sleep
 from curses.ascii import isprint
 # from pytest import set_trace
 # from re import search
+from pytest import mark
 
 
 DEFAULT_USER = 'netop'
@@ -258,6 +259,7 @@ def pingandsniff(onoff, topology):
 
 
 # Mirror Test
+@mark.gate
 @mark.test_id(10300)
 def test_mirror(topology):
     """
