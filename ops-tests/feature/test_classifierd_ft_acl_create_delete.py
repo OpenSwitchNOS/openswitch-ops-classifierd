@@ -36,6 +36,7 @@ TOPOLOGY = """
 """
 
 
+@mark.gate
 @mark.test_id(10401)
 def test_acl_create_delete(topology, step):
     """
