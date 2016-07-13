@@ -258,6 +258,7 @@ def pingandsniff(onoff, topology):
 
 
 # Mirror Test
+@mark.gate
 @mark.test_id(10300)
 def test_mirror(topology):
     """
