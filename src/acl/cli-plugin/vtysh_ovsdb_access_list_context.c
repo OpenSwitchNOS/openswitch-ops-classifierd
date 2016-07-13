@@ -32,6 +32,7 @@
 #include <vtysh_ovsdb_config.h>
 
 #include <acl_parse.h>
+#include <acl_db_util.h>
 
 #include "access_list_vty_util.h"
 #include "access_list_vty_ovsdb_util.h"
@@ -98,6 +99,8 @@ show_run_access_list_subcontext_callback(void *p_private)
     const struct ovsrec_vlan *vlan_row = NULL;
     const struct ovsrec_interface *interface_row = NULL;
     const struct ovsrec_port *port_row = NULL;
+    const struct ovsrec_acl *acl_row = NULL;
+    int i;
 
     /* Determine context type and subtype we were called for */
     if (p_msg->contextid == e_vtysh_vlan_context &&
@@ -116,9 +119,16 @@ show_run_access_list_subcontext_callback(void *p_private)
     /* Print port ACL, if any (LAGs won't have interface name == port name) */
     if (interface_row) {
         port_row = get_port_by_name(interface_row->name);
-        if (port_row && port_row->aclv4_in_cfg) {
-            vtysh_ovsdb_cli_print(p_msg, "    apply access-list ip %s in",
-                                  port_row->aclv4_in_cfg->name);
+        if (port_row) {
+            for (i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
+                acl_row = acl_db_util_get_cfg(&acl_db_accessor[i], port_row);
+                if (port_row && acl_row) {
+                    vtysh_ovsdb_cli_print(p_msg,
+                                          "    apply access-list ip %s %s",
+                                          acl_row->name,
+                                          acl_db_accessor[i].direction_str);
+                }
+            }
         }
     }
     return e_vtysh_ok;
