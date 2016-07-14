@@ -217,6 +217,7 @@ def ping_test(host, ip):
     Ping test with L2 config
     """
     ping = host.libs.ping.ping(1, ip)
+    print(ping)
     assert ping['transmitted'] == ping['received'] == 1
 
 
@@ -224,8 +225,16 @@ def start_scapy_on_hosts(hs1, hs2):
     """
     Install and start scapy on hosts
     """
-    hs1.libs.scapy.start_scapy()
-    hs2.libs.scapy.start_scapy()
+    # Having problems with starting scapy sometimes.  The work around is to
+    # try at the most twice
+    for host in [hs1, hs2]:
+        print("Starting scapy for <%s>" % (host.identity))
+        try:
+            host.libs.scapy.start_scapy()
+        except Exception as err:
+            print("Failed to start scapy for <%s> because <%s>, trying again"
+                  % (host.identity, err))
+            host.libs.scapy.start_scapy()
 
 
 def config_vlan(ops, vlan_id):

@@ -19,12 +19,13 @@
 OpenSwitch Test for simple ping test between two host with LAG interface
 """
 
-import constants
-from functions import topology_2switch_2host_lag
-from functions import config_switches_l3_lag
-from functions import config_hosts_l3
-from functions import ping_test
-from acl_classifier_common_lib import wait_until_interface_up
+from .topo_defs import topology_2switch_2host_lag_def
+from .topo_funcs import topology_2switch_2host_lag
+from .topo_funcs import config_switches_l3_lag
+from .topo_funcs import config_hosts_l3
+from .topo_funcs import ping_test
+from .acl_classifier_common_lib import wait_until_interface_up
+
 ip_hs1 = '10.10.10.1/24'
 ip_hs2 = '10.10.30.1/24'
 ip_only_hs2 = '10.10.30.1'
@@ -39,11 +40,13 @@ hs2_ip_route = "ip route add default via 10.10.30.2"
 lag_id_s1 = 100
 lag_id_s2 = 100
 
-TOPOLOGY = constants.topology_2switch_2host_lag
+TOPOLOGY = topology_2switch_2host_lag_def
 
 
 def test_validate_2switch_2host_lag_l3(topology):
 
+    # alksdjfl;adskfljfla;ksjdf;lasdjkfl;adsjf kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+    # kkkkkk
     ops1 = topology.get('ops1')
     ops2 = topology.get('ops2')
     hs1 = topology.get('hs1')
