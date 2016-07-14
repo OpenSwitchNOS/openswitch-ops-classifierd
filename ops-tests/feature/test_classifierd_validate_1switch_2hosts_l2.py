@@ -19,19 +19,20 @@
 OpenSwitch Test for vlan related configurations.
 """
 
-import constants
-from functions import topology_1switch_2host
-from functions import config_switch_l2
-from functions import config_hosts_l2
-from functions import ping_test
+from topo_defs import topology_1switch_2host_def
+from topo_funcs import topology_1switch_2host
+from topo_funcs import config_switch_l2
+from topo_funcs import config_hosts_l2
+from topo_funcs import ping_test
 from acl_classifier_common_lib import wait_until_interface_up
+
 ip_hs1 = '10.10.10.1'
 ip_hs2 = '10.10.10.2'
 ip_hs1_bitlength = '10.10.10.1/24'
 ip_hs2_bitlength = '10.10.10.2/24'
 vlan_id = 10
 
-TOPOLOGY = constants.topology_1switch_2host
+TOPOLOGY = topology_1switch_2host_def
 
 
 def test_validate_1switch_2host_l2(topology):
