@@ -20,6 +20,7 @@ from re import search, findall
 from topology_lib_scapy.library import ScapyThread, send_traffic, sniff_traffic
 from time import sleep
 import re
+# from pdb import set_trace
 
 
 """
@@ -72,6 +73,7 @@ def configure_acl(
     else:
         assert(False)
 
+    # TODO: Handle subnet masks in src_ip and dst_ip strings
     action_line_str = (
                         seq_num + ' ' + action + ' ' + proto
                         + ' ' + src_ip + ' ' + src_port +
@@ -126,13 +128,58 @@ def create_and_verify_traffic(
                         src_port, dst_ip, dst_port, proto_str,
                         filter_str, tx_count, rx_expect
                         ):
+
+    # topology is assumed to be of class TopologyManager.
+    assert topology is not None
+
+    # tx_host and rx_host is expected to be of class Workstation.
+    assert tx_host is not None
+    assert rx_host is not None
+
+    # The ip addresses are expected to be strings containing valid IP
+    # addresses.
+    assert src_ip is not None and isinstance(src_ip, str)
+    assert dst_ip is not None and isinstance(dst_ip, str)
+
+    # The ports are expected to be strings containing valid layer 4 port
+    # numbers.
+    assert src_port is not None and isinstance(src_port, str)
+    assert dst_port is not None and isinstance(dst_port, str)
+
+    # proto_str is expected to be a string.  The supported protocals are in
+    # the tuple below.
+    assert proto_str is not None and \
+        proto_str in ('IP/UDP', 'IP/ICMP') and \
+        isinstance(proto_str, str)
+
+    # The filter_str is expected to be a string.  Below is an example for a
+    # UDP packet:
+    # filter_udp = "lambda p: UDP in p and p[UDP].dport == 48621 and " \
+    #   "p[IP].src == '1.1.1.1' and p[IP].dst == '1.1.1.2'"
+    assert filter_str is not None and isinstance(filter_str, str)
+
+    # tx_count is expected to be an integer that is the number of packets to
+    # transmit.
+    assert tx_count is not None and isinstance(tx_count, int)
+
+    # rx_expect is expected to be a boolean that is whether or not the
+    # packets are expected to be received.
+    assert rx_expect is not None and isinstance(rx_expect, bool)
+
     ip_packet = tx_host.libs.scapy.ip(
                             "dst='" + dst_ip + "', src='" +
                             src_ip + "'"
                                        )
-    icmp_packet = tx_host.libs.scapy.icmp()
+    if proto_str == 'IP/UDP':
+        proto_packet = tx_host.libs.scapy.udp("dport=" + dst_port)
+        result_index = 1
+    elif proto_str == 'IP/ICMP':
+        proto_packet = tx_host.libs.scapy.icmp()
+        result_index = 2
+    else:
+        assert False
 
-    list1 = [ip_packet, icmp_packet]
+    list1 = [ip_packet, proto_packet]
     port_str = '1'
     timeout = 25
 
@@ -155,8 +202,9 @@ def create_and_verify_traffic(
     if rxthread.outresult():
         rest, sniffcnt = rxthread.outresult().split('<Sniffed:')
         list_result = findall(r'[0-9]+', sniffcnt)
+        # set_trace()
 
-        assert (rx_expect == (list_result[2] == str(tx_count)))
+        assert (rx_expect == (list_result[result_index] == str(tx_count)))
 
 
 def wait_until_interface_up(switch, portlbl, timeout=30, polling_frequency=1):
