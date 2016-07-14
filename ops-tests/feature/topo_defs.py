@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-topology_1switch = """
+topology_1switch_def = """
 #+--------+
 #|  ops1  |
 #+--------+
@@ -24,7 +24,7 @@ topology_1switch = """
 [type=openswitch name="openswitch 1"] ops1
 """
 
-topology_1switch_2host = """
+topology_1switch_2host_def = """
 # +-------+                    +-------+
 # |       |     +--------+     |       |
 # |  hs1  <----->  ops1  <----->  hs2  |
@@ -45,7 +45,7 @@ hs1:1 -- ops1:1
 ops1:6 -- hs2:1
 """
 
-topology_2switch_2host_lag = """
+topology_2switch_2host_lag_def = """
 # +-------+                                     +-------+
 # |       |     +--------+     +-------+        |       |
 # | host1 <-----> switch1 <---->switch2<------->| host2 |
@@ -53,10 +53,16 @@ topology_2switch_2host_lag = """
 # +-------+                                     +-------+
 
 #Nodes
-[type=openswitch name="openswitch 1"] ops1
-[type=openswitch name="openswitch 2"] ops2
-[type=host name="Host 1"] hs1
-[type=host name="Host 2"] hs2
+[image="fs-genericx86-64:latest" \
+type=openswitch name="OpenSwitch 1"] ops1
+[image="fs-genericx86-64:latest" \
+type=openswitch name="OpenSwitch 2"] ops2
+[type=host name="Host 1" image="openswitch/ubuntuscapy:latest"] hs1
+[type=host name="Host 2" image="openswitch/ubuntuscapy:latest"] hs2
+# [type=openswitch name="openswitch 1"] ops1
+# [type=openswitch name="openswitch 2"] ops2
+# [type=host name="Host 1"] hs1
+# [type=host name="Host 2"] hs2
 
 #Links
 hs1:1 -- ops1:1
@@ -65,7 +71,7 @@ ops1:6 -- ops2:6
 ops2:1 -- hs2:1
 """
 
-topology_2switch_2host = """
+topology_2switch_2host_def = """
 # +-------+                                     +-------+
 # |       |     +--------+     +-------+        |       |
 # | host1 <-----> switch1 <---->switch2<------->| host2 |
