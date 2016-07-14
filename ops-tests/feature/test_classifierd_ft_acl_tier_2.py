@@ -52,6 +52,7 @@ from topology_lib_scapy.library import ScapyThread
 from topology_lib_scapy.library import send_traffic
 from topology_lib_scapy.library import sniff_traffic
 from datetime import datetime
+from acl_common_test_suite import CommonTestSuit
 
 
 from time import sleep
@@ -95,6 +96,8 @@ filter_str = (
                 "and p[IP].dst == '1.1.1.2'"
             )
 
+ingress_acl_test = CommonTestSuit()
+
 
 @fixture(scope='module')
 def configure_acl_test(request, topology):
@@ -118,6 +121,14 @@ def configure_acl_test(request, topology):
         'set interface {p2} user_config:admin=up'.format(**locals()),
         shell='vsctl'
     )
+
+    ingress_acl_test.set_acl_addr_type('ip')
+    ingress_acl_test.set_acl_app_type('port')
+    ingress_acl_test.set_acl_direction('in')
+    ingress_acl_test.set_topology(topology)
+    ingress_acl_test.set_switch_1(ops1)
+    ingress_acl_test.set_host_1(hs1)
+    ingress_acl_test.set_host_2(hs2)
 
     # Configure interfaces
     with ops1.libs.vtysh.ConfigInterface('1') as ctx:
@@ -187,82 +198,7 @@ def test_acl_permit_udp_any_any(configure_acl_test, topology, step):
     It then sends 10 UDP packets from hs1 to hs2 and verifies that
     10 UDP packets are received on hs2
     """
-    global filter_udp, timeout, count, port_str
-
-    ops1 = topology.get('ops1')
-    hs1 = topology.get('hs1')
-    hs2 = topology.get('hs2')
-
-    assert ops1 is not None
-    assert hs1 is not None
-    assert hs2 is not None
-
-    step('1.a Configure an ACL with 1 permit udp any any rule')
-    configure_permit_acl(ops1, 'test', '1', 'udp', 'any', '', 'any', '', '')
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'1\s+permit\s+udp\s+any\s+any'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
-
-    step('1.b Create UDP packets')
-    ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
-    udp_packet = hs1.libs.scapy.udp("dport=48621")
-
-    list_udp = [ip_packet, udp_packet]
-    proto_str = 'IP/UDP'
-
-    txthread = ScapyThread(
-                send_traffic,
-                'hs1', topology, proto_str, list_udp, '', count,
-                '', 0)
-    rxthread = ScapyThread(
-                sniff_traffic,
-                'hs2', topology, '', [], filter_udp, count,
-                port_str, timeout)
-
-    step('1.c Send and receive udp packets on hs1 and hs2')
-    rxthread.start()
-    txthread.start()
-
-    txthread.join()
-    rxthread.join()
-
-    step('1.d Verify results')
-    if rxthread.outresult():
-        rest, sniffcnt = rxthread.outresult().split('<Sniffed:')
-        list_result = findall(r'[0-9]+', sniffcnt)
-        print(list_result)
-
-        assert (list_result[1] == '10')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test') as ctx:
-        ctx.no('1')
-
-    with ops1.libs.vtysh.Configure() as ctx:
-        ctx.no_access_list_ip('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-         r'(?!access-list\s+ip\s+test\s+)'.format(
-                                         **locals()
-                                     ), test1_result
-    )
+    ingress_acl_test.acl_udp_any_any_permit(step)
 
 
 @mark.platform_incompatible(['docker'])
