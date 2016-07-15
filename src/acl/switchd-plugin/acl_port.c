@@ -755,7 +755,7 @@ void acl_callback_port_delete(struct blk_params *blk_params)
 void
 acl_port_unapply_if_needed(struct acl *acl)
 {
-    struct acl_port_map *port, *next;
+    struct acl_port_map *port, *next = NULL;
 
     if (list_is_empty(&acl->acl_port_map)) {
         return;
