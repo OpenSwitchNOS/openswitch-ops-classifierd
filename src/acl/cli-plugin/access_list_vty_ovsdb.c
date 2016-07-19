@@ -614,6 +614,7 @@ cli_print_acls (const char *interface_type,
     const struct ovsrec_port *port_row = NULL;
     const struct ovsrec_vlan *vlan_row = NULL;
     char vlan_id_str[21]; /* Max string length of 64-bit number +1 for NULL */
+    int i;
 
     /* Get System table */
     ovs = ovsrec_system_first(idl);
@@ -642,16 +643,15 @@ cli_print_acls (const char *interface_type,
         } else {
             print_acl_commands(acl_row, configuration);
             OVSREC_PORT_FOR_EACH(port_row, idl) {
-                int i;
                 for (i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
                     if (!configuration && acl_db_util_get_applied(&acl_db_accessor[i], port_row) == acl_row) {
-                        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(acl_db_util_get_applied(&acl_db_accessor[i], port_row))) {
+                        if (!aces_cur_cfg_equal(acl_db_util_get_applied(&acl_db_accessor[i], port_row))) {
                             print_acl_mismatch_warning(acl_row->name, commands);
                         }
                         print_acl_apply_commands("interface", port_row->name, acl_db_accessor[i].direction_str,
                                 acl_db_util_get_applied(&acl_db_accessor[i], port_row));
                     } else if (configuration && acl_db_util_get_cfg(&acl_db_accessor[i], port_row) == acl_row) {
-                        if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(acl_db_util_get_cfg(&acl_db_accessor[i], port_row))) {
+                        if (!aces_cur_cfg_equal(acl_db_util_get_cfg(&acl_db_accessor[i], port_row))) {
                             print_acl_mismatch_warning(acl_row->name, commands);
                         }
                         print_acl_apply_commands("interface", port_row->name, acl_db_accessor[i].direction_str,
@@ -678,7 +678,6 @@ cli_print_acls (const char *interface_type,
 
     /* Print all ACLs applied to specified Port ("interface" in the CLI) */
     } else if (interface_type && !strcmp(interface_type, "interface")) {
-        int i;
         port_row = get_port_by_name(interface_id);
 
         if (!port_row) {
@@ -797,12 +796,12 @@ cli_print_acls (const char *interface_type,
                             const struct ovsrec_acl* cur_cfg     = acl_db_util_get_cfg(&acl_db_accessor[i], port_row);
 
                             if (!configuration && cur_applied) {
-                                if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(cur_applied)) {
+                                if (!aces_cur_cfg_equal(cur_applied)) {
                                     print_acl_mismatch_warning(cur_applied->name, commands);
                                 }
                                 print_acl_apply_commands("interface", port_row->name, acl_db_accessor[i].direction_str, cur_applied);
                             } else if (configuration && cur_cfg) {
-                                if (!aces_cur_cfg_mismatch && !aces_cur_cfg_equal(acl_db_util_get_cfg(&acl_db_accessor[i], port_row))) {
+                                if (!aces_cur_cfg_equal(acl_db_util_get_cfg(&acl_db_accessor[i], port_row))) {
                                     print_acl_mismatch_warning(cur_cfg->name, commands);
                                 }
                                 print_acl_apply_commands("interface", port_row->name, acl_db_accessor[i].direction_str, cur_cfg);
@@ -826,15 +825,6 @@ cli_print_acls (const char *interface_type,
                 }
             }
         }
-    }
-
-    /* Warn about mismatch of applied ACLs */
-    if (applied_cfg_mismatch) {
-        vty_out(vty, "%% Warning: user-specified access-list apply does not match active configuration%s", VTY_NEWLINE);
-    }
-    /* Warn about mismatch of ACL entries */
-    if (aces_cur_cfg_mismatch) {
-        vty_out(vty, "%% Warning: user-specified access-list entries do not match active configuration%s", VTY_NEWLINE);
     }
 
     return CMD_SUCCESS;
