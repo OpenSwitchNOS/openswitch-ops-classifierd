@@ -1,0 +1,8 @@
+Code-Review+2: Gary Wassermann <gary.wassermann@hpe.com>
+Verified+2: Vivek Mehrotra <vivek.mehrotra@hpe.com>
+Workflow+1: Vivek Mehrotra <vivek.mehrotra@hpe.com>
+Submitted-by: Vivek Mehrotra <vivek.mehrotra@hpe.com>
+Submitted-at: Tue, 19 Jul 2016 23:37:42 +0000
+Reviewed-on: https://review.openswitch.net/12291
+Project: openswitch/ops-classifierd
+Branch: refs/heads/feature/acl
