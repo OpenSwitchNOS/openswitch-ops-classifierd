@@ -48,18 +48,31 @@ Use Case for Library Functions:
 
 def configure_acl(
             switch1, acl_name, seq_num, action, proto, src_ip,
-            src_port, dst_ip, dst_port, count_str
+            src_port, dst_ip, dst_port, *count_log_str
         ):
     """
     Configure an ACL with one permit or one deny rule
     """
+
+    count_str = ''
+    log_str = ''
+    display_str = ''
+
+    for arg in count_log_str:
+        if arg == 'count':
+            count_str = 'count'
+            if display_str == '':
+                display_str = 'count'
+        elif arg == 'log':
+            log_str = 'log'
+            display_str = 'log'
 
     if action == "permit":
         with switch1.libs.vtysh.ConfigAccessListIpTestname(acl_name) as ctx:
             ctx.permit(
                       '',
                       seq_num, proto, src_ip, src_port,
-                      dst_ip, dst_port, count_str
+                      dst_ip, dst_port, count_str, log_str
                       )
 
     elif action == "deny":
@@ -67,17 +80,17 @@ def configure_acl(
             ctx.deny(
                       '',
                       seq_num, proto, src_ip, src_port,
-                      dst_ip, dst_port, count_str
+                      dst_ip, dst_port, count_str, log_str
                       )
     else:
         assert(False)
 
-    action_line_str = (
-                        seq_num + ' ' + action + ' ' + proto
-                        + ' ' + src_ip + ' ' + src_port +
-                        ' ' + dst_ip + ' ' + dst_port +
-                        ' ' + count_str
-                    )
+    action_line_args = [seq_num, action, proto, src_ip, src_port,
+                        dst_ip, dst_port, display_str]
+
+    action_line_str = ' '.join(args for args in action_line_args)
+    print('action_line_str is {}'.format(action_line_str))
+
     action_line_str = re.sub('\s+', ' ', action_line_str).strip()
 
     action_line_re = re.compile(action_line_str)
@@ -106,6 +119,7 @@ def apply_acl(switch1, port_num, acl_name, direction):
                     )
 
     test_result = switch1('show run')
+
     assert re.search(apply_line_re, test_result)
 
 
