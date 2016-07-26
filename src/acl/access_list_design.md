@@ -51,7 +51,7 @@ comparisons are made.
 
 The initial release of ACLs will support the following:
 
-IPv4 ACLs applied ingress to L2 and L3 ports.
+IPv4 ACLs applied ingress to L2 and L3 ports and LAGs.
 
 ACE parameters supported:
 
@@ -76,7 +76,6 @@ including specified counters, the application of the entire ACL will fail.
 Possible future extensions:
 
 - IPv4 ACLs applied egress to L2 and L3 ports
-- IPv4 ACLs applied ingress and egress to LAGs
 - IPv4 ACLs applied ingress and egress to VLANs
 - IPv6 ACLs applied ingress and egress to L2 and L3 ports, LAGs and VLANs
 - logging of packets that match permit entries
@@ -183,22 +182,22 @@ Sequence of applying ACLs to a port, ACL1 and ACL2 successfully, ACL3 failure
 
 ```ditaa
 
-                    +----------------+        +---------------+        +-----------------+
-                    |                |        |               |        |                 |
-                    |  CLI/UI/Mgmt   |        |               |        |                 |
-                    |  interface     |        |   ops-intfd   |        | ops-classifierd |
-                    |                |        |               |        |                 |
-                    |                |        |               |        |                 |
-                    +--------+-------+        +------+--------+        +---------+-------+
-                             |                       |                           |
-                             |                       |                           |
-                             +------------+          |         +-----------------+
-                                          |          |         |
-                                          v          v         v
-                                        +-+----------+---------+---+
-                                        |                          |
-                                        |                          |
-                                        |          OVSDB           |
+                    +----------------+        +---------------+        +-----------------+       +-----------------+
+                    |                |        |               |        |                 |       |                 |
+                    |  CLI/UI/Mgmt   |        |               |        |                 |       |                 |
+                    |  interface     |        |   ops-intfd   |        | ops-classifierd |       |    ops-lacpd    |
+                    |                |        |               |        |                 |       |                 |
+                    |                |        |               |        |                 |       |                 |
+                    +--------+-------+        +------+--------+        +---------+-------+       +--------+--------+
+                             |                       |                           |                        |
+                             |                       |                           |                        |
+                             +------------+          |         +-----------------+                        |
+                                          |          |         |                                          |
+                                          v          v         v                                          |
+                                        +-+----------+---------+---+                                      |
+                                        |                          |                                      |
+                                        |                          |                                      |
+                                        |          OVSDB           + <------------------------------------+
                                         |                          |
                                         |                          |
                                         +------------+-------------+
@@ -241,8 +240,8 @@ Sequence of applying ACLs to a port, ACL1 and ACL2 successfully, ACL3 failure
 ```
 
 ### CLI/UI/Management interface
-Creates ACLs and ACEs, and applies the ACLs to ports.  Interacts with the ACL,
-ACL\_Entry and Port tables in the database.
+Creates ACLs and ACEs, and applies the ACLs to ports and LAGs.
+Interacts with the ACL, ACL\_Entry and Port tables in the database.
 
 ### CoPP
 ACLs will utilize Control Plane Policing (CoPP) within the OpenNSL plugin to
@@ -329,6 +328,37 @@ as they are processed by switchd.
 The ACL feature plugin will listen to the port table for port row modification
 events and unapply the ACL from the physical interfaces in hw as part of
 bridge\_reconfigure loop in switchd.
+
+### Ingress and Egress ACL on LAGs
+A LAG is a logical port created by the user to aggregate two or more physical
+interfaces in order to increase throughput, provide redundant links etc.
+
+IPv4/IPv6 and Mac ACLs can be applied to the LAG in ingress and egress
+directions. Currently, only IPv4 ingress and egress ACLs on LAG ports are supported.
+
+In OVSDB, a LAG is a row in the Port table. It can have 0 or more members configured.
+The following tables provides a brief on LAG state in the database and switchd based on the number of members.
+
+ | Number of LAG Members | Member state |  DB State                                            | Switchd Port Entry|
+ |-----------------------------------------------------------------------------------------------------------------|
+ |         0             |              | Port Row Exists.                                     |  Does not exist   |
+ |         1             |   shutdown   | hw\_bond\_config:tx and rx = false                   |  Exists           |
+ |         1             |  no shutdown | hw\_bond\_config:tx and rx = true                    |  Exists           |
+ |         2             |   shutdown   | hw\_bond\_config: tx and rx = false for both members |  Exists           |
+ |         2             |  no shutdown | hw\_bond\_config:tx and rx = true for both members   |  Exists           |
+
+An ACL can be applied to a LAG in any state. If there are 0 members in the LAG,
+the database row corresponding to the LAG is configured with the given ACL. However, no further action is taken
+as there is no LAG present in switchd yet.
+If there is atleast 1 member interface that is up, then ACL feature plugin communicates with hardware to program
+the ACL on all members of the LAG at this point in time.
+
+When a member is added to a LAG, ops-lacpd determines its eligibility for participation in the LAG and changes the
+interface state information using hw\_bond\_config column. ACL switchd feature plugin monitors this column for
+LAG member state changes so that an appropriate ACL action is taken when state transition occurs.
+
+ACL feature plugin is sensitive to admin status, link status and lag membership.
+If an ACL has been applied to a LAG and then a member is administratively shut down or the link goes down or the member is removed from the LAG, the corresponding ACL entry is uninstalled from hardware. Conversely, when a lag member link goes up or a new member is added to the LAG, an ACL entry corresponding to this member is added in hardware.
 
 
 ## OVSDB schema
