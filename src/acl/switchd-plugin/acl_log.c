@@ -1120,6 +1120,8 @@ acl_log_run(struct run_blk_params *blk_params)
         struct ds msg;
         struct acl_port *acl_port = NULL;
         struct acl *acl = NULL;
+        char empty_name[] = "";
+        const char *port_name = empty_name;
 
         /* We are in the state where we are waiting for packets, but we have
          * not received any packets, so return. */
@@ -1148,6 +1150,29 @@ acl_log_run(struct run_blk_params *blk_params)
             acl_port = acl_port_lookup(pkt_buff.pkt_info.ingress_port_name);
             if (acl_port) {
                 acl = acl_port->port_map[ACL_CFG_PORT_V4_IN].hw_acl;
+                port_name = pkt_buff.pkt_info.ingress_port_name;
+            } else {
+                /* Check for the membership of the ingress port in a LAG,
+                 * and check whether there is an ACL on that LAG*/
+                const struct ovsrec_port *port_row;
+
+                OVSREC_PORT_FOR_EACH(port_row, idl) {
+                    if (strncmp(port_row->name, "lag", 3) == 0) {
+                        int iface;
+
+                        for (iface = 0; iface < port_row->n_interfaces; iface++) {
+                            if (!strcmp(port_row->interfaces[iface]->name,
+                                        pkt_buff.pkt_info.ingress_port_name)) {
+                                acl_port = acl_port_lookup(port_row->name);
+                                if (acl_port) {
+                                    acl = acl_port->port_map[ACL_CFG_PORT_V4_IN].hw_acl;
+                                    port_name = port_row->name;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1225,7 +1250,7 @@ acl_log_run(struct run_blk_params *blk_params)
                             pkt_buff.pkt_info.ingress_vlan);
             }
             if (ACL_LOG_INGRESS_PORT & pkt_buff.pkt_info.valid_fields) {
-                ds_put_format(&msg, "port %s, ", pkt_buff.pkt_info.ingress_port_name);
+                ds_put_format(&msg, "port %s, ", port_name);
             }
         }
 
