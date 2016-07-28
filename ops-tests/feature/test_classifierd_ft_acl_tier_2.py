@@ -52,13 +52,11 @@ from topology_lib_scapy.library import ScapyThread
 from topology_lib_scapy.library import send_traffic
 from topology_lib_scapy.library import sniff_traffic
 from datetime import datetime
-
-
 from time import sleep
 
 TOPOLOGY = """
 # +-------+                    +-------+
-# |       |     +--------+     |       |G
+# |       |     +--------+     |       |
 # |  hs1  <----->  ops1  <----->  hs2  |
 # |       |     +--------+     |       |
 # +-------+                    +-------+
@@ -208,16 +206,7 @@ def test_acl_permit_udp_any_any(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1', 'in')
 
     step('1.b Create UDP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -293,16 +282,7 @@ def test_acl_deny_udp_any_any(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('2.b Create UDP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -380,16 +360,7 @@ def test_acl_permit_udp_hs1_hs2(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('3.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -494,16 +465,7 @@ def test_acl_deny_udp_hs1_hs2(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('4.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -610,16 +572,7 @@ def test_acl_permit_udp_prefix_len_mask(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('5.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -726,16 +679,7 @@ def test_acl_deny_udp_prefix_len_mask(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('6.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -844,16 +788,7 @@ def test_acl_permit_udp_dotted_netmask(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('7.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -962,16 +897,7 @@ def test_acl_deny_udp_dotted_netmask(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('8.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1081,16 +1007,7 @@ def test_acl_permit_udp_non_contiguous_mask(
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('9.b Create udp packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1197,16 +1114,7 @@ def test_acl_deny_udp_non_contiguous_mask(configure_acl_test, topology, step):
        'any'.format(**locals()), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('10.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1313,16 +1221,7 @@ def test_acl_permit_udp_dport_eq_param(configure_acl_test, topology, step):
        '1.1.1.2 eq 48621'.format(**locals()), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('11.b Create UDP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1428,16 +1327,7 @@ def test_acl_deny_udp_dport_eq_param(configure_acl_test, topology, step):
        '1.1.1.2 eq 48621'.format(**locals()), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('12.b Create UDP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1544,16 +1434,7 @@ def test_acl_permit_udp_sport_eq_param(configure_acl_test, topology, step):
        '1.1.1.2'.format(**locals()), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('13.b Create UDP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1663,16 +1544,7 @@ def test_acl_deny_udp_sport_eq_param(configure_acl_test, topology, step):
        '1.1.1.2'.format(**locals()), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('14.b Create udp packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1781,16 +1653,7 @@ def test_acl_modify_after_sending_udp_traffic(
        '1.1.1.2'.format(**locals()), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step('15.b Create UDP and ICMP packets from hs1 to hs2')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -1963,27 +1826,9 @@ def test_acl_deny_udp_on_multiple_ports(configure_acl_test, topology, step):
        'any'.format(**locals()), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
+    apply_acl_and_wait(ops1, 'test', '1')
 
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('2') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '2')
 
     step('16.b Create UDP and ICMP packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -2142,16 +1987,7 @@ def test_acl_permit_icmp_on_multiple_ports(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     with ops1.libs.vtysh.ConfigAccessListIpTestname('test') as ctx:
         ctx.permit(
@@ -2168,16 +2004,7 @@ def test_acl_permit_icmp_on_multiple_ports(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('2') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '2')
 
     step('Create packets')
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -2289,16 +2116,7 @@ def test_acl_replace_with_icmp_traffic(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test', '1')
 
     step("Create ICMP packets")
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -2344,16 +2162,7 @@ def test_acl_replace_with_icmp_traffic(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test2')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test2\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    apply_acl_and_wait(ops1, 'test2', '1')
 
     step("Send ICMP traffic again")
     txthread_icmp = ScapyThread(
@@ -2428,27 +2237,7 @@ def test_acl_permit_any_hs1_hs2_hitcount(configure_acl_test, topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    show_interface_re = (
-        r'(?P<interface>\d+)\s+(?P<rule_applied>apply)'
-    )
-
-    interface_info, rest, *misc = test1_result.split(
-                        'apply access-list ip test in'
-                                    )
-
-    interface_line = findall(r'interface\s+\d+', interface_info)[-1]
-    interface_num = search('(?<=interface )\d+', interface_line).group()
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
+    interface_num = apply_acl_and_wait(ops1, 'test', '1')
 
     step("Create ICMP packets")
     ip_packet = hs1.libs.scapy.ip("dst='1.1.1.2', src='1.1.1.1'")
@@ -2530,23 +2319,7 @@ def test_acl_permit_any_hs1_hs2_config_persistence_ten_entries(
                     (ops1, 'test', seq, y, x, '', 'any', '', 'count')
                     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
-
-    interface_info, rest, *misc = test1_result.split(
-                        'apply access-list ip test in'
-                                    )
-
-    interface_line = findall(r'interface\s+\d+', interface_info)[-1]
-    interface_num = search('(?<=interface )\d+', interface_line).group()
+    interface_num = apply_acl_and_wait(ops1, 'test', '1')
 
     create_and_verify_traffic(topology, hs1, hs2)
 
@@ -2646,23 +2419,7 @@ def test_acl_permit_any_hs1_hs2_config_persistence_300_entries(
                     (ops1, 'test', seq, y, x, '', 'any', '', 'count')
                     )
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
-
-    interface_info, rest, *misc = test1_result.split(
-                        'apply access-list ip test in'
-                                    )
-
-    interface_line = findall(r'interface\s+\d+', interface_info)[-1]
-    interface_num = search('(?<=interface )\d+', interface_line).group()
+    interface_num = apply_acl_and_wait(ops1, 'test', '1')
 
     create_and_verify_traffic(topology, hs1, hs2)
 
@@ -2771,25 +2528,7 @@ def test_acl_permit_any_hs1_hs2_config_persistence_150x2_entries(
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.apply_access_list_ip_in('test1')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test1\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
-
-    interface_info, rest, *misc = test1_result.split(
-                        'apply access-list ip test1 in'
-                                    )
-
-    interface_line = findall(r'interface\s+\d+', interface_info)[-1]
-    interface_num = search('(?<=interface )\d+', interface_line).group()
-    print('INTERFACE is ')
-    print(interface_num)
+    interface_num = apply_acl_and_wait(ops1, 'test1', '1')
 
     create_and_verify_traffic(topology, hs1, hs2)
 
@@ -2812,26 +2551,7 @@ def test_acl_permit_any_hs1_hs2_config_persistence_150x2_entries(
                     (ops1, 'test2', seq, y, x, '', 'any', '', 'count')
                     )
 
-    with ops1.libs.vtysh.ConfigInterface('2') as ctx:
-        ctx.apply_access_list_ip_in('test2')
-
-    test1_result = ops1('show run')
-
-    assert search(
-        r'(access-list\s+ip\s+test2\s+\in)'.format(
-                                          **locals()
-                                        ), test1_result
-    )
-
-    interface_info, rest, *misc = test1_result.split(
-                        'apply access-list ip test2 in'
-                                    )
-
-    interface_line = findall(r'interface\s+\d+', interface_info)[-1]
-    interface_num = search('(?<=interface )\d+', interface_line).group()
-
-    print('INTERFACE is ')
-    print(interface_num)
+    interface_num = apply_acl_and_wait(ops1, 'test2', '2')
 
     # clear hitcount on interface
     ops1.libs.vtysh.clear_access_list_hitcounts_ip_interface(
@@ -3145,3 +2865,59 @@ def create_and_verify_traffic(
                                  **locals()
                                ), rxthread.outresult()
             )
+
+
+def apply_acl_and_wait(
+            switch, acl_name, port_num, direction='in',
+            retries=3, polling_frequency=2,
+                ):
+    """
+    Retry 'retries' number of times until ACL gets applied to interface on
+    hardware or operation fails
+
+    :param switch: The switch node.
+    :param string acl_name: ACL name.
+    :param str port_num: Port that is mapped to the interfaces.
+    :param retries: Number of retires before deciding error in applying ACE.
+    :param int polling_frequency: Frequency of the polling.
+    """
+    if direction == 'in':
+        with switch.libs.vtysh.ConfigInterface(port_num) as ctx:
+            ctx.apply_access_list_ip_in(acl_name)
+    elif direction == 'out':
+        with switch.libs.vtysh.ConfigInterface(port_num) as ctx:
+            ctx.apply_access_list_ip_out(acl_name)
+    else:
+        assert(False)
+
+    count = 0
+    while count < retries:
+        test_result = switch('show access-list commands')
+
+        search_chk = search(
+            r'(access-list\s+ip\s+{}\s+\{})'.format(
+                                        acl_name, direction
+                                        ), test_result
+        )
+
+        warn1_chk = search(
+            r'(access-list\s+{}\s+user configuration does not match'
+            'active configuration)'.format(
+                                        acl_name
+                                        ), test_result
+        )
+        if search_chk is not None and warn1_chk is None:
+            break
+        else:
+            count = count+1
+            sleep(polling_frequency)
+
+    split_based_on = 'apply access-list ip {} {}'.format(
+                    acl_name, direction
+                    )
+    interface_info, rest, *misc = test_result.split(
+                    split_based_on
+                                    )
+    interface_line = findall(r'interface\s+\d+', interface_info)[-1]
+    interface_num = search('(?<=interface )\d+', interface_line).group()
+    return interface_num
