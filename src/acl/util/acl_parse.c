@@ -316,10 +316,10 @@ ovsrec_port_aclv4_statistics_getvalue(const struct acl_db_util *acl_db,
                                         const struct ovsrec_port *port_row,
                                         const int64_t key)
 {
-    int i;
-    for (i = 0; i < acl_db_util_get_n_statistics(acl_db, port_row); i++) {
-        if (acl_db_util_get_key_statistics(acl_db, port_row)[i] == key) {
-            return acl_db_util_get_value_statistics(acl_db, port_row)[i];
+    int acl_type_iter;
+    for (acl_type_iter = 0; acl_type_iter < acl_db_util_get_n_statistics(acl_db, port_row); acl_type_iter++) {
+        if (acl_db_util_get_key_statistics(acl_db, port_row)[acl_type_iter] == key) {
+            return acl_db_util_get_value_statistics(acl_db, port_row)[acl_type_iter];
         }
     }
     return 0;

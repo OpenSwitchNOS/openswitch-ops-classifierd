@@ -112,7 +112,7 @@ enum acl_db_util_index {
     ACL_CFG_PORT_V4_OUT,
     ACL_CFG_VLAN_V4_IN,
     ACL_CFG_VLAN_V4_OUT,
-    ACL_CFG_NUM_OF_TYPES,
+    ACL_CFG_MAX_TYPES,
     ACL_CFG_MIN_PORT_TYPES = ACL_CFG_PORT_V4_IN,
     ACL_CFG_MAX_PORT_TYPES = ACL_CFG_PORT_V4_OUT,
     ACL_CFG_MIN_VLAN_TYPES = ACL_CFG_VLAN_V4_IN,
@@ -122,7 +122,7 @@ enum acl_db_util_index {
 #define ACL_CFG_NUM_PORT_TYPES (ACL_CFG_MAX_PORT_TYPES - ACL_CFG_MIN_PORT_TYPES + 1)
 #define ACL_CFG_NUM_VLAN_TYPES (ACL_CFG_MAX_VLAN_TYPES - ACL_CFG_MIN_VLAN_TYPES + 1)
 
-extern struct acl_db_util acl_db_accessor[ACL_CFG_NUM_OF_TYPES];
+extern struct acl_db_util acl_db_accessor[ACL_CFG_MAX_TYPES];
 
 /**
  * Initialize acl_db_accessor array. All possible configurations and their
@@ -231,6 +231,39 @@ const size_t acl_db_util_get_n_statistics(
     const struct acl_db_util *acl_db, const struct ovsrec_port *port);
 
 /**
+ * Gets the statistics value column of a given ovsrec_port
+ *
+ * @param[in] acl_db - Pointer to the @see acl_db_util structure
+ * @param[in] port   - Pointer to the port row
+ *
+ * @returns The value of statistics of this port row.
+ */
+const int64_t* acl_db_util_get_value_statistics(
+    const struct acl_db_util *acl_db, const struct ovsrec_port *port);
+
+/**
+ * Gets the statistics key column of a given ovsrec_port
+ *
+ * @param[in] acl_db - Pointer to the @see acl_db_util structure
+ * @param[in] port   - Pointer to the port row
+ *
+ * @returns The key of statistics of this port row.
+ */
+const int64_t* acl_db_util_get_key_statistics(
+    const struct acl_db_util *acl_db, const struct ovsrec_port *port);
+
+/**
+ * Gets the statistics number column of a given ovsrec_port
+ *
+ * @param[in] acl_db - Pointer to the @see acl_db_util structure
+ * @param[in] port   - Pointer to the port row
+ *
+ * @returns The number of statistics of this port row.
+ */
+const size_t acl_db_util_get_n_statistics(
+    const struct acl_db_util *acl_db, const struct ovsrec_port *port);
+
+/**
  * Sets the applied column of a given ovsrec_port
  *
  * @param[in] acl_db - Pointer to the @see acl_db_util structure
@@ -262,8 +295,7 @@ void acl_db_util_set_cfg(const struct acl_db_util *acl_db,
 void
 acl_db_util_set_cfg_version(const struct acl_db_util *acl_db,
                              const struct ovsrec_port *port,
-                             const int64_t *cfg_version,
-                             size_t n_cfg_version);
+                             const int64_t *cfg_version);
 /**
  * Sets the cfg_status column of a given ovsrec_port. This function
  * is called after the feature plugin has called the asic plugin API.
@@ -347,7 +379,7 @@ acl_db_util_status_setkey(const struct acl_db_util *acl_db,
  * @param[in] port             - Pointer to the port row
  * @param[in] key_statistics   - Pointer to the status key string
  * @param[in] value_statistics - Pointer to the detail string
- * @param[in] n_statistics     - Pointer to the detail string
+ * @param[in] n_statistics     - Number of key-value pairs
  */
 void
 acl_db_util_set_statistics(const struct acl_db_util *acl_db,

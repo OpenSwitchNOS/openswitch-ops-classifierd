@@ -699,12 +699,17 @@ acl_show_ports(struct unixctl_conn *conn, int argc, const char *argv[],
     struct acl_port *acl_port;
 
     SHASH_FOR_EACH_SAFE(node, next, &all_ports) {
+        int acl_type_iter;
         acl_port = (struct acl_port *)node->data;
         ds_put_format(&ds, "-----------------------------\n");
         ds_put_format(&ds, "Port name: %s\n", acl_port->port->name);
-        if (acl_port->port_map[ACL_CFG_PORT_V4_IN].hw_acl) {
-            ds_put_format(&ds, "Applied ACL name: %s\n",
-                acl_port->port_map[ACL_CFG_PORT_V4_IN].hw_acl->name);
+        for (acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+                acl_type_iter <= ACL_CFG_MAX_PORT_TYPES; ++acl_type_iter) {
+            if (acl_port->port_map[acl_type_iter].hw_acl) {
+                ds_put_format(&ds, "Applied ACL name (%s): %s\n",
+                    acl_db_accessor[acl_type_iter].direction_str,
+                    acl_port->port_map[acl_type_iter].hw_acl->name);
+            }
         }
     }
 
@@ -1314,8 +1319,10 @@ acl_port_new(struct port *port, unsigned int seqno,
     struct acl_port *acl_port = xzalloc(sizeof *acl_port);
 
     /* setup my port_map to know about me and which acl_port_map they represent */
-    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
-        acl_port_map_construct(&acl_port->port_map[i], acl_port, i);
+    for (int acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+            acl_type_iter <= ACL_CFG_MAX_PORT_TYPES; ++acl_type_iter) {
+        acl_port_map_construct(&acl_port->port_map[acl_type_iter], acl_port,
+                acl_type_iter);
     }
 
     acl_port->port = port;
@@ -1348,8 +1355,9 @@ acl_port_delete(const char *port_name)
                                                          port_name);
 
     /* cleanup my port_map */
-    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
-        acl_port_map_destruct(&port->port_map[i]);
+    for (int acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+            acl_type_iter <= ACL_CFG_MAX_PORT_TYPES; ++acl_type_iter) {
+        acl_port_map_destruct(&port->port_map[acl_type_iter]);
     }
 
     /* cleanup port interfaces list */
@@ -1389,10 +1397,10 @@ void acl_callback_port_delete(struct blk_params *blk_params)
         }
         port_cfg = shash_find_data(&br->wanted_ports, del_port->name);
         if (port_cfg == NULL) {
-            for (int i = ACL_CFG_MIN_PORT_TYPES;
-                 i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
+            for (int acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+                 acl_type_iter <= ACL_CFG_MAX_PORT_TYPES; ++acl_type_iter) {
                 VLOG_DBG("PORT %s deleted", del_port->name);
-                acl_port_map_cfg_delete(&acl_port->port_map[i], del_port, blk_params->ofproto);
+                acl_port_map_cfg_delete(&acl_port->port_map[acl_type_iter], del_port, blk_params->ofproto);
             }
             acl_port_delete(del_port->name);
         }
@@ -1421,15 +1429,15 @@ void acl_callback_port_delete(struct blk_params *blk_params)
                 VLOG_DBG("Number of lag ifaces to reconfigure: %zu \n",
                              list_size(&reconfigure_ifaces_list));
 
-                for (int i = ACL_CFG_MIN_PORT_TYPES;
-                         i <= ACL_CFG_MAX_PORT_TYPES; i++) {
-                    if (acl_db_util_get_cfg(&acl_db_accessor[i],
+                for (int acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+                         acl_type_iter <= ACL_CFG_MAX_PORT_TYPES; acl_type_iter++) {
+                    if (acl_db_util_get_cfg(&acl_db_accessor[acl_type_iter],
                                             del_port->cfg)) {
-                        acl_port_map_cfg_update(&acl_port->port_map[i],
+                        acl_port_map_cfg_update(&acl_port->port_map[acl_type_iter],
                                                 del_port,
                                                 blk_params->ofproto,
                                                 &reconfigure_ifaces_list);
-                        acl_port_map_set_hw_acl(&acl_port->port_map[i], NULL);
+                        acl_port_map_set_hw_acl(&acl_port->port_map[acl_type_iter], NULL);
                     }
                 }
 
@@ -1493,14 +1501,16 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
                     VLOG_DBG("Number of lag ifaces to reconfigure: %zu \n",
                              list_size(&reconfigure_ifaces_list));
                 }
-                for (int i = ACL_CFG_MIN_PORT_TYPES;
-                         i <= ACL_CFG_MAX_PORT_TYPES; i++) {
-                    if (acl_db_util_get_cfg(&acl_db_accessor[i], port->cfg)) {
+                for (int acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+                        acl_type_iter <= ACL_CFG_MAX_PORT_TYPES;
+                        ++acl_type_iter) {
+                    if (acl_db_util_get_cfg(&acl_db_accessor[acl_type_iter],
+                                            port->cfg)) {
                         /* Reconfigure ACL */
                         acl_port->ovsdb_row = port->cfg;
                         acl_port->delete_seqno = blk_params->idl_seqno;
                         VLOG_DBG("PORT %s changed", acl_port->port->name);
-                        acl_port_map_cfg_update(&acl_port->port_map[i], port,
+                        acl_port_map_cfg_update(&acl_port->port_map[acl_type_iter], port,
                                                 blk_params->ofproto,
                                                 &reconfigure_ifaces_list);
                     } else {
@@ -1508,8 +1518,8 @@ void acl_callback_port_reconfigure(struct blk_params *blk_params)
                          * this case is hit.
                          */
                          VLOG_DBG("PORT %s deleted", port->name);
-                         acl_port_map_cfg_delete(&acl_port->port_map[i], port,
-                                                 blk_params->ofproto);
+                         acl_port_map_cfg_delete(&acl_port->port_map[acl_type_iter],
+                                                 port, blk_params->ofproto);
                     }
                 }
                 acl_port_lag_iface_reconfigure_list_delete(
@@ -1541,9 +1551,12 @@ acl_callback_port_update(struct blk_params *blk_params)
         VLOG_DBG("PORT %s created", blk_params->port->cfg->name);
 
         /* Apply if ACL is configured on the port.*/
-        for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
-            if (acl_db_util_get_cfg(&acl_db_accessor[i], blk_params->port->cfg)) {
-                 acl_port_map_cfg_create(&acl_port->port_map[i],
+        for (int acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+                acl_type_iter <= ACL_CFG_MAX_PORT_TYPES;
+                ++acl_type_iter) {
+            if (acl_db_util_get_cfg(&acl_db_accessor[acl_type_iter],
+                                    blk_params->port->cfg)) {
+                 acl_port_map_cfg_create(&acl_port->port_map[acl_type_iter],
                                           blk_params->port,
                                           blk_params->ofproto);
             }
@@ -1579,8 +1592,9 @@ acl_callback_port_stats_get(struct stats_blk_params *sblk,
         return;
     }
     /* Get statistics for this port if needed */
-    for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; ++i) {
-        acl_port_map_stats_get(&acl_port->port_map[i], br->ofproto);
+    for (int acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+            acl_type_iter <= ACL_CFG_MAX_PORT_TYPES; ++acl_type_iter) {
+        acl_port_map_stats_get(&acl_port->port_map[acl_type_iter], br->ofproto);
     }
 }
 

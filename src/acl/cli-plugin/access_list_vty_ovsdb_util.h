@@ -75,17 +75,6 @@ const struct ovsrec_acl_entry *ovsrec_acl_cfg_aces_getvalue(const struct ovsrec_
 /**
  * Look up an ACE by key (sequence number) in ACE statistics
  *
- * @param  port_row        Port row pointer
- * @param  sequence_number ACE sequence number
- *
- * @return                 Hit count for ACE, 0 on failure
- */
-const int64_t ovsrec_port_aclv4_in_statistics_getvalue(const struct ovsrec_port *port_row,
-                                                       const int64_t key);
-
-/**
- * Look up an ACE by key (sequence number) in ACE statistics
- *
  * @param  vlan_row        VLAN row pointer
  * @param  sequence_number ACE sequence number
  *

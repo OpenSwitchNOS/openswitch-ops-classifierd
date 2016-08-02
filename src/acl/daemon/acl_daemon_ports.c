@@ -38,7 +38,7 @@ static bool
 acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
 {
     const char *status = NULL;
-    int i;
+    int acl_type_iter;
 
     ovs_assert(port_row);
 
@@ -46,11 +46,10 @@ acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
      * - If ACL is NOT configured for this port
      * - If ACL is configured and applied status is success
      */
-    /* @todo: need to handle multiple acls to the port
-     */
-    for (i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
+    for (acl_type_iter = ACL_CFG_MIN_PORT_TYPES;
+            acl_type_iter <= ACL_CFG_MAX_PORT_TYPES; acl_type_iter++) {
         const struct ovsrec_acl *acl_row =
-            acl_db_util_get_cfg(&acl_db_accessor[i], port_row);
+            acl_db_util_get_cfg(&acl_db_accessor[acl_type_iter], port_row);
         if(!acl_row) {
             VLOG_DBG("port %s: ACL not configured \n", port_row->name);
             /* do not block hw_ready on the interface due to this ACL */
@@ -59,7 +58,7 @@ acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
              * ACL is applied successfully in hw or not
              */
             status =
-                acl_db_util_get_cfg_status(&acl_db_accessor[i], port_row);
+                acl_db_util_get_cfg_status(&acl_db_accessor[acl_type_iter], port_row);
 
             VLOG_DBG("port %s: ACL %s configured, apply status %s \n",
                       port_row->name, acl_row->name,

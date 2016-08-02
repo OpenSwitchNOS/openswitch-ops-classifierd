@@ -17,7 +17,7 @@
 # under the License.
 
 """
-OpenSwitch Test for traffic mirroring
+OpenSwitch Test for simple ping between nodes.
 """
 
 from pytest import mark
@@ -62,6 +62,7 @@ TOPOLOGY = """
 [type=host name="Host 3"] hs3
 [type=host name="Sniffer 1" image="openswitch/ubuntuscapy:latest"] sn1
 [type=openswitch name="OpenSwitch 1"] ops1
+
 
 # Links
 hs1:1 -- ops1:1
@@ -126,9 +127,6 @@ def setup_topo(topology):
     eth = sn1.ports['1']
     print("sniffer interface " + eth)
 
-    # uncomment for hardware target
-    # assert sn1.send_command('apt-get install scapy', shell='bash')
-
     # Setup the switch ports for mirror testing
     p1 = ops1.ports['1']
     p2 = ops1.ports['2']
@@ -167,14 +165,10 @@ def setup_topo(topology):
         ctx.no_shutdown()
 
     with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.no_routing()
         ctx.no_shutdown()
 
     # Configure vlan and switch interfaces
     with ops1.libs.vtysh.ConfigVlan('100') as ctx:
-        ctx.no_shutdown()
-
-    with ops1.libs.vtysh.ConfigVlan('200') as ctx:
         ctx.no_shutdown()
 
     with ops1.libs.vtysh.ConfigInterface('1') as ctx:
@@ -185,9 +179,6 @@ def setup_topo(topology):
 
     with ops1.libs.vtysh.ConfigInterface('3') as ctx:
         ctx.vlan_access(100)
-
-    with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.vlan_access(200)
 
     # FIXME: Use library
     vlan_result = ops1('show vlan 100')
@@ -232,14 +223,14 @@ def pingandsniff(onoff, topology):
     sleep(5)
 
     # ping with 1/2 second delay
-    hs1.send_command('ping -q -i 0.5 10.0.10.3 > /dev/null &', shell='bash')
-    hs2.send_command('ping -q -i 0.5 10.0.10.3 > /dev/null &', shell='bash')
+    hs1.send_command('ping -q -i 0.5 10.0.10.3 > /dev/null &')
+    hs2.send_command('ping -q -i 0.5 10.0.10.3 > /dev/null &')
 
     # listen on the sniffer node
     response = sn1.send_command('echo "sniff(iface=\\"' + eth + '\\", '
                                 'prn=lambda x: x.summary(),'
-                                'timeout=5)" | scapy 2>/dev/null',
-                                shell='bash')
+                                'timeout=5)" | scapy 2>/dev/null')
+
     # Stop the ping
     if onoff == 0:
         hs1.send_command('pkill ping', shell='bash')
@@ -255,9 +246,8 @@ def pingandsniff(onoff, topology):
 
 
 # Mirror Test
-@mark.gate
 @mark.test_id(10300)
-@mark.platform_incompatible(['ostl'])
+@mark.platform_incompatible(['docker'])
 def test_mirror(topology):
     """
     Test that a vlan configuration is functional with a OpenSwitch switch.
@@ -387,6 +377,7 @@ def test_mirror(topology):
     # no shutdown
     # end
     # ---------------------------------------
+
     logger.info('========= CASE 2 -  src I/F 1 rx, dest I/F 4  =========')
     # Create mirror FOO with port configuration
     assert not ops1('configure terminal', shell='vtysh')

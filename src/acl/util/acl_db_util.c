@@ -25,7 +25,7 @@
  * by the switchd plugin to access the quartet columns of ovsrec_port row
  * for a given (type, direction) type easily.
  */
-struct acl_db_util acl_db_accessor[ACL_CFG_NUM_OF_TYPES];
+struct acl_db_util acl_db_accessor[ACL_CFG_MAX_TYPES];
 
 /**
  * Macro to populate the acl_db_accessor global array at switchd-plugin
@@ -227,10 +227,9 @@ acl_db_util_set_cfg(const struct acl_db_util *acl_db,
 void
 acl_db_util_set_cfg_version(const struct acl_db_util *acl_db,
                              const struct ovsrec_port *port,
-                             const int64_t *cfg_version,
-                             size_t n_cfg_version)
+                             const int64_t *cfg_version)
 {
-    (*acl_db->set_cfg_version)(port, cfg_version, n_cfg_version);
+    (*acl_db->set_cfg_version)(port, cfg_version, 1);
 }
 
 void

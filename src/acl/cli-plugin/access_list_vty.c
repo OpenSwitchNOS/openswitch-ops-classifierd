@@ -1196,10 +1196,10 @@ DEFUN (cli_show_access_list_applied, cli_show_access_list_applied_cmd,
 }
 
 /**
- * Action routine for showing specific applications of ACLs
+ * Action routine for showing applications of ACLs with the type specified
  */
 DEFUN (cli_show_access_list_ip_dir_applied, cli_show_access_list_ip_dir_applied_cmd,
-       "show access-list (interface|vlan) ID ip (in|out) { commands | configuration }",
+       "show access-list (interface|vlan) ID (ip) (in|out) { commands | configuration }",
        SHOW_STR
        ACL_STR
        ACL_INTERFACE_STR
@@ -1222,7 +1222,7 @@ DEFUN (cli_show_access_list_ip_dir_applied, cli_show_access_list_ip_dir_applied_
 }
 
 /**
- * Action routine for showing specific applications of ACLs
+ * Action routine for showing specific applications of ACLs (no type specified)
  */
 DEFUN (cli_show_access_list_dir_applied, cli_show_access_list_dir_applied_cmd,
        "show access-list (interface|vlan) ID (in|out) { commands | configuration }",
@@ -1328,7 +1328,7 @@ DEFUN (cli_no_apply_access_list, cli_no_apply_access_list_cmd,
 }
 
 /**
- * Action routine for showing ACL statistics on a specified interface
+ * Action routine for showing ACL statistics on a specified interface in a specified direction
  */
 DEFUN (cli_show_access_list_hitcounts_dir,
        cli_show_access_list_hitcounts_dir_cmd,
@@ -1417,7 +1417,7 @@ DEFUN (cli_show_access_list_hitcounts_all,
 }
 
 /**
- * Action routine for clearing ACL statistics on a specified interface
+ * Action routine for clearing ACL statistics on a specified interface in a specified direction
  */
 DEFUN (cli_clear_access_list_hitcounts,
        cli_clear_access_list_hitcounts_cmd,
@@ -1462,10 +1462,10 @@ DEFUN (cli_clear_access_list_hitcounts_all,
        ACL_ALL_STR
       )
 {
-    return cli_clear_acl_statistics(NULL,                       /* type */
-                                    NULL,                       /* name */
-                                    NULL,                       /* interface type */
-                                    NULL,                       /* interface id */
+    return cli_clear_acl_statistics(NULL,  /* type */
+                                    NULL,  /* name */
+                                    NULL,  /* interface type */
+                                    NULL,  /* interface id */
                                     NULL); /* direction */
 }
 
