@@ -45,6 +45,7 @@ acl_ovsdb_init(struct ovsdb_idl *idl)
      * applied status, especially for LAGs
      */
     ovsdb_idl_add_column(idl, &ovsrec_port_col_interfaces);
+    ovsdb_idl_add_column(idl, &ovsrec_port_col_admin);
     ovsdb_idl_add_column(idl, &ovsrec_acl_col_name);
     ovsdb_idl_add_column(idl, &ovsrec_acl_col_cfg_aces);
 
@@ -54,11 +55,14 @@ acl_ovsdb_init(struct ovsdb_idl *idl)
     ovsdb_idl_add_column(idl, &ovsrec_acl_col_status);
     ovsdb_idl_add_column(idl, &ovsrec_acl_col_cfg_version);
     ovsdb_idl_add_column(idl, &ovsrec_interface_col_hw_status);
+    ovsdb_idl_add_column(idl, &ovsrec_interface_col_user_config);
 
     /* Omit alerts for the columns we are writing. */
     ovsdb_idl_omit_alert(idl, &ovsrec_acl_col_in_progress_aces);
     ovsdb_idl_omit_alert(idl, &ovsrec_acl_col_in_progress_version);
     ovsdb_idl_omit_alert(idl, &ovsrec_interface_col_hw_status);
+    ovsdb_idl_omit_alert(idl, &ovsrec_interface_col_user_config);
+    ovsdb_idl_omit_alert(idl, &ovsrec_port_col_admin);
 
     acl_db_util_init();
 } /* acl_ovsdb_init */
