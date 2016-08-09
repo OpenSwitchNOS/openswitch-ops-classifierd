@@ -28,8 +28,61 @@
 #include "acl_db_util.h"
 #include "ops-cls-asic-plugin.h"
 #include "ops_cls_status_msgs.h"
+#include "openswitch-idl.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_daemon_ports);
+
+/* This function updates the hw_bond_config entry with value provided */
+static void
+acl_port_update_hw_bond_config_map_value(
+    const struct ovsrec_interface *iface_row,
+    const char *key,
+    const char *value)
+{
+    struct smap smap;
+
+    if ((iface_row == NULL) ||
+        (key == NULL) ||
+        (value == NULL)) {
+        return;
+    }
+
+    if (!smap_is_empty(&iface_row->hw_bond_config)) {
+        smap_clone(&smap, &iface_row->hw_bond_config);
+        smap_replace(&smap, key, value);
+
+        ovsrec_interface_set_hw_bond_config(iface_row, &smap);
+
+        smap_destroy(&smap);
+    }
+}
+
+/* This function updates the hw_bond_config in the interface table
+ * with the boolean value provided.
+ */
+static void
+acl_port_update_hw_bond_config(
+    const struct ovsrec_interface *iface_row,
+    bool rx_and_tx_enabled)
+{
+    if (iface_row == NULL) {
+        return;
+    }
+
+    acl_port_update_hw_bond_config_map_value(
+        iface_row,
+        INTERFACE_HW_BOND_CONFIG_MAP_RX_ENABLED,
+        (rx_and_tx_enabled ?
+         INTERFACE_HW_BOND_CONFIG_MAP_ENABLED_TRUE :
+         INTERFACE_HW_BOND_CONFIG_MAP_ENABLED_FALSE));
+
+    acl_port_update_hw_bond_config_map_value(
+        iface_row,
+        INTERFACE_HW_BOND_CONFIG_MAP_TX_ENABLED,
+        (rx_and_tx_enabled ?
+         INTERFACE_HW_BOND_CONFIG_MAP_ENABLED_TRUE :
+         INTERFACE_HW_BOND_CONFIG_MAP_ENABLED_FALSE));
+}
 
 /* This function determines if hw_ready_state can be set for the interface
  * associated with the port_row.
@@ -123,7 +176,7 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
                  smap_get(
                   (const struct smap *)&port_row->interfaces[intf_idx]->hw_status,
                   OPS_INTF_HW_READY_BLOCKED_REASON_STR);
-                if((hw_status != NULL) &&
+                if((hw_status == NULL) ||
                    (strncmp(
                      hw_status,
                      OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS,
@@ -143,6 +196,10 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
                     ovsrec_interface_update_hw_status_delkey(
                                              port_row->interfaces[intf_idx],
                                              OPS_INTF_HW_READY_BLOCKED_REASON_STR);
+
+                    /* set the hw_bond_config to true */
+                    acl_port_update_hw_bond_config(port_row->interfaces[intf_idx],
+                                                   true);
 
                     /* increment rc to indicate db update */
                     rc++;
@@ -167,6 +224,10 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
                                  port_row->interfaces[intf_idx],
                                  OPS_INTF_HW_READY_BLOCKED_REASON_STR,
                                  OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS);
+
+                /* set the hw_bond_config to false */
+                acl_port_update_hw_bond_config(port_row->interfaces[intf_idx],
+                                               false);
 
                 /* increment rc to indicate db update */
                 rc++;
