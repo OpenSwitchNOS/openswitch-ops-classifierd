@@ -28,8 +28,36 @@
 #include "acl_db_util.h"
 #include "ops-cls-asic-plugin.h"
 #include "ops_cls_status_msgs.h"
+#include "openswitch-idl.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_daemon_ports);
+
+/* This function sets the admin entry in user_config column in the
+ * interface table with value provided.
+ */
+static void
+acl_port_set_intfd_user_config(
+    const struct ovsrec_interface *iface_row,
+    const char *value)
+{
+    struct smap user_config;
+
+    if ((iface_row == NULL) ||
+        (value == NULL)) {
+        return;
+    }
+
+    if (!smap_is_empty(&iface_row->user_config)) {
+        smap_clone(&user_config, &iface_row->user_config);
+        smap_replace(&user_config,
+                     INTERFACE_USER_CONFIG_MAP_ADMIN,
+                     value);
+
+        ovsrec_interface_set_user_config(iface_row, &user_config);
+
+        smap_destroy(&user_config);
+    }
+}
 
 /* This function determines if hw_ready_state can be set for the interface
  * associated with the port_row.
@@ -92,6 +120,7 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
     unsigned int intf_idx;
     const char *hw_status = NULL;
     bool hw_ready_state = false;
+    const char *port_admin_state = NULL;
 
     ovs_assert(port_row);
 
@@ -118,12 +147,13 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
                         strlen(OPS_INTF_HW_READY_VALUE_STR_FALSE)) == 0)) {
 
                 /* If hw_ready was blocked due to acls, set the hw_status
-                   to true and delete hw_blocked_reason key */
+                 * to true and delete hw_blocked_reason key
+                 */
                 hw_status =
                  smap_get(
                   (const struct smap *)&port_row->interfaces[intf_idx]->hw_status,
                   OPS_INTF_HW_READY_BLOCKED_REASON_STR);
-                if((hw_status != NULL) &&
+                if((hw_status == NULL) ||
                    (strncmp(
                      hw_status,
                      OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS,
@@ -136,13 +166,21 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
 
                     /* set interface hw_ready_state to true in db */
                     ovsrec_interface_update_hw_status_setkey(
-                                                 port_row->interfaces[intf_idx],
-                                                 OPS_INTF_HW_READY_KEY_STR,
-                                                 OPS_INTF_HW_READY_VALUE_STR_TRUE);
+                                             port_row->interfaces[intf_idx],
+                                             OPS_INTF_HW_READY_KEY_STR,
+                                             OPS_INTF_HW_READY_VALUE_STR_TRUE);
 
                     ovsrec_interface_update_hw_status_delkey(
-                                             port_row->interfaces[intf_idx],
-                                             OPS_INTF_HW_READY_BLOCKED_REASON_STR);
+                                         port_row->interfaces[intf_idx],
+                                         OPS_INTF_HW_READY_BLOCKED_REASON_STR);
+
+                    /* set the user_config to up */
+                    acl_port_set_intfd_user_config(
+                                      port_row->interfaces[intf_idx],
+                                      OVSREC_INTERFACE_USER_CONFIG_ADMIN_UP);
+
+                    /* update the admin_state in port table to up */
+                    port_admin_state = OVSREC_INTERFACE_ADMIN_STATE_UP;
 
                     /* increment rc to indicate db update */
                     rc++;
@@ -164,15 +202,28 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
 
                 /* set interface hw_ready_blocked_reason in db */
                 ovsrec_interface_update_hw_status_setkey(
-                                 port_row->interfaces[intf_idx],
-                                 OPS_INTF_HW_READY_BLOCKED_REASON_STR,
-                                 OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS);
+                              port_row->interfaces[intf_idx],
+                              OPS_INTF_HW_READY_BLOCKED_REASON_STR,
+                              OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS);
+
+                /* set the user_config to down */
+                acl_port_set_intfd_user_config(
+                                  port_row->interfaces[intf_idx],
+                                  OVSREC_INTERFACE_USER_CONFIG_ADMIN_DOWN);
+
+                /* update the admin_state in port table to down */
+                port_admin_state = OVSREC_INTERFACE_ADMIN_STATE_DOWN;
 
                 /* increment rc to indicate db update */
                 rc++;
             }
         }
     } /* end for loop */
+
+    /* set the admin_state in port table */
+    if (port_admin_state != NULL) {
+        ovsrec_port_set_admin(port_row, port_admin_state);
+    }
 
     return rc;
 }

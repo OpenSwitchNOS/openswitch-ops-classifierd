@@ -31,6 +31,7 @@
  *************************************************************/
  struct acl_port_interface {
      struct ovs_list iface_node;
+     const struct ovsrec_interface *ovsdb_iface_row; /*< Iface table row */
      bool tx_enable; /*< TRUE if interface is tx_enabled in hw_bond_config */
      bool rx_enable; /*< TRUE if interface is rx_enabled in hw_bond_config */
      ofp_port_t      ofp_port; /*< OpenFlow Port number */
@@ -166,6 +167,5 @@ void acl_port_lag_ifaces_reconfigure(struct blk_params *blk_params);
  *****************************************************************************/
 void
 acl_port_map_cfg_update(struct acl_port_map* acl_port_map, struct port *port,
-                        struct ofproto *ofproto,
-                        struct ovs_list *reconfigure_lag_ifaces_list);
+                        struct ofproto *ofproto);
 #endif  /* __SWITCHD__PLUGIN__ACL_PORT_H__ */
