@@ -141,16 +141,12 @@ acl_db_util_get_cfg_version(const struct acl_db_util *acl_db,
     return MEMBER_AT_OFFSET(port, acl_db->offset_cfg_version, int64_t *);
 }
 
-const char*
+const struct smap
 acl_db_util_get_cfg_status(const struct acl_db_util *acl_db,
                              const struct ovsrec_port *port)
 {
-    struct smap acl_status;
-
-    acl_status = MEMBER_AT_OFFSET(port, acl_db->offset_cfg_status,
-                                  const struct smap);
-
-    return smap_get(&acl_status, OPS_CLS_STATUS_CODE_STR);
+    return MEMBER_AT_OFFSET(port, acl_db->offset_cfg_status,
+                            const struct smap);
 }
 
 int64_t

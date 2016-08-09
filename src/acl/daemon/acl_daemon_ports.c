@@ -37,7 +37,7 @@ VLOG_DEFINE_THIS_MODULE(acl_daemon_ports);
 static bool
 acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
 {
-    const char *status = NULL;
+    const char *status_str = NULL;
     int i;
 
     ovs_assert(port_row);
@@ -58,18 +58,20 @@ acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
             /* ACL is configured on this port so verify if
              * ACL is applied successfully in hw or not
              */
-            status =
+            const struct smap acl_status =
                 acl_db_util_get_cfg_status(&acl_db_accessor[i], port_row);
+
+            status_str = smap_get(&acl_status, OPS_CLS_STATUS_CODE_STR);
 
             VLOG_DBG("port %s: ACL %s configured, apply status %s \n",
                       port_row->name, acl_row->name,
-                      status);
+                      status_str);
 
-            if (status == NULL) {
+            if (status_str == NULL) {
                 return false;
             }
 
-            if(strtoul(status, NULL, 10) != OPS_CLS_STATUS_SUCCESS) {
+            if(strtoul(status_str, NULL, 10) != OPS_CLS_STATUS_SUCCESS) {
                 /* block hw_ready on this interface */
                 return false;
             }
@@ -115,18 +117,8 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
                         OPS_INTF_HW_READY_VALUE_STR_FALSE,
                         strlen(OPS_INTF_HW_READY_VALUE_STR_FALSE)) == 0)) {
 
-                VLOG_DBG("port %s: setting hw_ready_state to true on "
-                         "interface %s\n", port_row->name,
-                          port_row->interfaces[intf_idx]->name);
-
-                /* set interface hw_ready_state to true in db */
-                ovsrec_interface_update_hw_status_setkey(
-                                             port_row->interfaces[intf_idx],
-                                             OPS_INTF_HW_READY_KEY_STR,
-                                             OPS_INTF_HW_READY_VALUE_STR_TRUE);
-
-                /* The hw_status is set to true above. So if hw_ready was
-                   blocked due to acls, delete it now */
+                /* If hw_ready was blocked due to acls, set the hw_status
+                   to true and delete hw_blocked_reason key */
                 hw_status =
                  smap_get(
                   (const struct smap *)&port_row->interfaces[intf_idx]->hw_status,
@@ -137,6 +129,17 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
                      OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS,
                      strlen(
                          OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS)) == 0)) {
+
+                    VLOG_DBG("port %s: setting hw_ready_state to true on "
+                             "interface %s\n", port_row->name,
+                             port_row->interfaces[intf_idx]->name);
+
+                    /* set interface hw_ready_state to true in db */
+                    ovsrec_interface_update_hw_status_setkey(
+                                                 port_row->interfaces[intf_idx],
+                                                 OPS_INTF_HW_READY_KEY_STR,
+                                                 OPS_INTF_HW_READY_VALUE_STR_TRUE);
+
                     ovsrec_interface_update_hw_status_delkey(
                                              port_row->interfaces[intf_idx],
                                              OPS_INTF_HW_READY_BLOCKED_REASON_STR);

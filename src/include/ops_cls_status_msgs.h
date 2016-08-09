@@ -81,7 +81,7 @@
 #define OPS_CLS_STATUS_MSG_OP_CLEARALL_STR   \
                 "clear all"     /**< string to display clearall operation   */
 #define OPS_CLS_STATUS_MSG_OP_LAG_UPDATE_STR   \
-                "clear all"     /**< string to display lag update operation */
+                "lag update"     /**< string to display lag update operation */
 
 /* Following macros define the strings that can be used by the
  * callers to fill in variable feature str in ops_cls_status_msgs

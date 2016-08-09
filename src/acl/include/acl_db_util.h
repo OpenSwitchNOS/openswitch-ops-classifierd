@@ -194,7 +194,7 @@ const int64_t *acl_db_util_get_cfg_version(
  *
  * @returns cfg status of this port row.
  */
-const char* acl_db_util_get_cfg_status(
+const struct smap acl_db_util_get_cfg_status(
     const struct acl_db_util *acl_db, const struct ovsrec_port *port);
 
 /**

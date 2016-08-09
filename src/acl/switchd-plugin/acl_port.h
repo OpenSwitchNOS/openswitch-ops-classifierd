@@ -154,4 +154,18 @@ void acl_port_unapply_if_needed(struct acl *acl);
  * @param[in] blk_params - Pointer to the block parameters structure
  *****************************************************************************/
 void acl_port_lag_ifaces_reconfigure(struct blk_params *blk_params);
+
+/**************************************************************************//**
+ * This function updates/replaces an ACL to a given port with a given
+ * configuration.
+ * This is the update/replace call of PI CRUD API.
+ *
+ * @param[in] acl_port_map - Pointer to the @see struct acl_port_map
+ * @param[in] port         - Pointer to @see struct port
+ * @param[in] ofproto      - Pointer to @see struct ofproto
+ *****************************************************************************/
+void
+acl_port_map_cfg_update(struct acl_port_map* acl_port_map, struct port *port,
+                        struct ofproto *ofproto,
+                        struct ovs_list *reconfigure_lag_ifaces_list);
 #endif  /* __SWITCHD__PLUGIN__ACL_PORT_H__ */

@@ -27,6 +27,9 @@
 #include "acl_port.h"
 #include "ops_cls_status_msgs.h"
 #include "ops_cls_status_table.h"
+#include "acl_db_util.h"
+#include "bridge.h"
+#include "vrf.h"
 
 VLOG_DEFINE_THIS_MODULE(acl_switchd_plugin_global);
 
@@ -342,11 +345,110 @@ acl_set_cfg_status(const struct ovsrec_acl *row, char *state,
 }
 
 /************************************************************
+* This function checks if there is any port on which this
+* acl couldn't be applied previously. If yes, it tries to
+* apply it now
+*************************************************************/
+static void
+acl_cfg_check_ports_and_apply(struct acl* acl, struct bridge* br,
+                              unsigned int delete_seqno)
+{
+    struct port *port = NULL;
+    struct acl_port *acl_port = NULL;
+
+    if ((acl == NULL) ||
+        (br == NULL)) {
+        return;
+    }
+
+    HMAP_FOR_EACH(port, hmap_node, &br->ports) {
+        acl_port = acl_port_lookup(port->name);
+        if (acl_port == NULL) {
+            continue;
+        }
+        for (int i = ACL_CFG_MIN_PORT_TYPES; i <= ACL_CFG_MAX_PORT_TYPES; i++) {
+            const struct ovsrec_acl *acl_row = acl_db_util_get_cfg(
+                                                    &acl_db_accessor[i],
+                                                    port->cfg);
+            if (acl_row == NULL) {
+                continue;
+            }
+
+            /* check if the acl configured on the port matches the
+             * acl that got updated
+             */
+            if ((strlen(acl->name) == strlen(acl_row->name)) &&
+                (strncmp(acl->name, acl_row->name, strlen(acl->name)) == 0)) {
+                const struct smap acl_status = acl_db_util_get_cfg_status(
+                                                         &acl_db_accessor[i],
+                                                         port->cfg);
+                const char *status_str = smap_get(&acl_status,
+                                               OPS_CLS_STATUS_CODE_STR);
+                const char *status_state_str = smap_get(&acl_status,
+                                                     OPS_CLS_STATUS_STATE_STR);
+
+                /* check if the acl application status on the port
+                 * was not successful
+                 */
+                if ((status_str) &&
+                    (status_state_str)) {
+                    if ((strtoul(status_str, NULL, 10) != OPS_CLS_STATUS_SUCCESS) &&
+                        (strncmp(status_state_str,
+                                 OPS_CLS_STATE_REJECTED_STR,
+                                 strlen(OPS_CLS_STATE_REJECTED_STR)) == 0)) {
+                        acl_port->ovsdb_row = port->cfg;
+                        acl_port->delete_seqno = delete_seqno;
+
+                        VLOG_DBG("ACL row corresponding to port %s updated",
+                                 port->name);
+
+                        acl_port_map_cfg_update(&acl_port->port_map[i],
+                                                port,
+                                                br->ofproto,
+                                                NULL);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/************************************************************
+* This function handles acl config apply if on any ports,
+* this configuration got rejected
+*************************************************************/
+static void
+acl_cfg_apply_if_needed(struct acl* acl, struct blk_params* blk_params)
+{
+    struct bridge *br = NULL;
+    struct vrf *vrf = NULL;
+
+    if ((acl == NULL) ||
+        (blk_params == NULL)) {
+        return;
+    }
+
+    HMAP_FOR_EACH(br, node, blk_params->all_bridges) {
+        if (br->ofproto == NULL) {
+            continue;
+        }
+        acl_cfg_check_ports_and_apply(acl, br, blk_params->idl_seqno);
+    }
+
+    HMAP_FOR_EACH(vrf, node, blk_params->all_vrfs) {
+        if ((vrf->up == NULL) || (vrf->up->ofproto == NULL)) {
+            continue;
+        }
+        acl_cfg_check_ports_and_apply(acl, vrf->up, blk_params->idl_seqno);
+    }
+}
+
+/************************************************************
  * This function handles acl config update by making PD API
  * call and then updating ovsdb for the status
  ************************************************************/
 static void
-acl_cfg_update(struct acl* acl)
+acl_cfg_update(struct acl* acl, struct blk_params* blk_params)
 {
     /* Always translate/validate user input, so we can fail early
      * on unsupported values */
@@ -412,16 +514,15 @@ acl_cfg_update(struct acl* acl)
                                status.status_code, status_str);
         }
     } else {
-        snprintf(details, sizeof(details),
-                "ACL %s -- Not applied. No PD call necessary",
-                acl->name);
-        VLOG_DBG(details);
+        acl_cfg_apply_if_needed(acl, blk_params);
+
         ovsrec_acl_set_cur_aces(acl->ovsdb_row,
                                 acl->ovsdb_row->key_in_progress_aces,
                                 acl->ovsdb_row->value_in_progress_aces,
                                 acl->ovsdb_row->n_in_progress_aces);
         /* status_str will be NULL on success */
-        acl_set_cfg_status(acl->ovsdb_row, OPS_CLS_STATE_APPLIED_STR, 0, status_str);
+        acl_set_cfg_status(acl->ovsdb_row, OPS_CLS_STATE_APPLIED_STR,
+                           0, status_str);
     }
 }
 
@@ -501,7 +602,7 @@ acl_reconfigure_init(struct blk_params *blk_params)
             if (row_changed && acl_row->n_in_progress_version > 0 &&
                 acl_row->in_progress_version[0] >
                                    acl->in_progress_version) {
-                acl_cfg_update(acl);
+                acl_cfg_update(acl, blk_params);
                 acl->in_progress_version = acl_row->in_progress_version[0];
             }
         }
