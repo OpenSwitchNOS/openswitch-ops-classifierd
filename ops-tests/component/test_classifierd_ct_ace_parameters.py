@@ -23,7 +23,6 @@ from pytest import mark
 from re import search
 import pytest
 from topology_lib_vtysh import exceptions
-import time
 
 TOPOLOGY = """
 # +--------+
@@ -39,15 +38,6 @@ TOPOLOGY = """
 
 @mark.test_id(10402)
 def test_ace_parameters(topology, step):
-    step('################ Introduce delay in ACE ###########')
-    step('################ creation in case docker ###############')
-    step('################ is not up for > 45 seconds ###############')
-
-    # Temporarily adding a sleep time at boot up to ensure switchd
-    # deamonizing completely. Will remove sleep when test framework
-    # implements switchd deamonizing checking
-    time.sleep(60)
-
     """
     Adding ACL entries
 
@@ -57,10 +47,18 @@ def test_ace_parameters(topology, step):
 
     assert ops1 is not None
 
+    step('################ T0 Make sure there are no ACLs defined ###########')
+    out = ops1.libs.vtysh.show_access_list_commands()
+    for acl_type in out['access-list']:
+        for acl_name in out['access-list'][acl_type]:
+            print("Cleaning: " + acl_type + " " + acl_name)
+            with ops1.libs.vtysh.Configure() as ctx:
+                ctx.no_access_list(type=acl_type, access_list=acl_name)
+
     step('################ T1 Add Permit ACE ###########')
     step('################ to existing ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.permit('', '1', 'pim', '1.2.3.4', '', '5.6.7.8', '')
 
     test1_result = ops1('show run')
@@ -76,7 +74,7 @@ def test_ace_parameters(topology, step):
     step('################ T2 Add Deny ACE ###########')
     step('################ to existing ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.deny('', '1', 'igmp', '1.2.3.4', '', '5.6.7.8', '')
     test1_result = ops1('show run')
 
@@ -91,12 +89,12 @@ def test_ace_parameters(topology, step):
     step('################ T3 Remove ACE ###########')
     step('################ from existing ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.no('1')
 
     test1_result = ops1('show run')
 
-    # Verify acl presents after created.
+    # Verify acl presence after created.
     assert search(
        r'(?!1\s+\S+)'.format(
                                          **locals()
@@ -109,13 +107,13 @@ def test_ace_parameters(topology, step):
 
     with pytest.raises(exceptions.AclDoesNotExistException):
         with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-            ctx.apply_access_list_ip_in('test4')
+            ctx.apply_access_list('ip', 'test4', 'in')
 
     step('################ T4b Apply ACL ###########')
     step('################ to interface ###############')
     step('################ Create ACL first ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '8', 'igmp', '1.2.3.4/255.0.0.0',
@@ -132,7 +130,7 @@ def test_ace_parameters(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -146,7 +144,7 @@ def test_ace_parameters(topology, step):
     step('################ on interface ###############')
 
     with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -159,7 +157,7 @@ def test_ace_parameters(topology, step):
     step('################ T6 Replace an ACE ###########')
     step('################ in existing ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.permit('', '25', 'sctp', '1.2.3.4/8', '', '5.6.7.8/24', '')
 
     test1_result = ops1('show run')
@@ -172,7 +170,7 @@ def test_ace_parameters(topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.permit('', '25', 'sctp', '172.21.30.4/24', 'eq 10', 'any', 'eq 20')
 
     test1_result = ops1('show run')
@@ -188,7 +186,7 @@ def test_ace_parameters(topology, step):
     step('################ T7 Remove ACE from ACL ###########')
     step('################ Remove ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.no('25')
 
     test1_result = ops1('show run')
@@ -201,7 +199,7 @@ def test_ace_parameters(topology, step):
 
     step('################ Remove ACL ###############')
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.no_access_list_ip('test1')
+        ctx.no_access_list('ip', 'test1')
 
     test1_result = ops1('show run')
 
@@ -215,7 +213,7 @@ def test_ace_parameters(topology, step):
     step('################ invalid L4 src port ###############')
 
     with pytest.raises(exceptions.UnknownCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
             ctx.permit(
                 '',
                 '30', 'sctp', '1.2.3.4/8', 'eq 66000',
@@ -224,7 +222,7 @@ def test_ace_parameters(topology, step):
     step('################ T9 Add ACE sctp ###########')
     step('################ valid L4 src, dst port ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.deny(
                 '',
                 '30', 'sctp', '1.2.3.4/8', 'eq 65000',
@@ -244,7 +242,7 @@ def test_ace_parameters(topology, step):
     step('################ invalid L4 dst port ###############')
 
     with pytest.raises(exceptions.UnknownCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
             ctx.permit(
                 '',
                 '30', 'sctp', '1.2.3.4/8', 'eq 4',
@@ -255,7 +253,7 @@ def test_ace_parameters(topology, step):
     step('################ ECHO WORKAROUND ###############')
 
     with pytest.raises(exceptions.EchoCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test11') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test11') as ctx:
             ctx.permit(
                 '',
                 '40', 'sctp', '1.2.3.4/1', 'range 100 500',
@@ -275,7 +273,7 @@ def test_ace_parameters(topology, step):
     step('################ range min,max port ###############')
     with pytest.raises(
             exceptions.InvalidL4SourcePortRangeException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test12') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test12') as ctx:
             ctx.permit(
                 '',
                 '12', 'sctp', '1.2.3.4/1', 'range 100 5',
@@ -296,7 +294,7 @@ def test_ace_parameters(topology, step):
 
     with pytest.raises(
             exceptions.InvalidL4SourcePortRangeException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test12') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test12') as ctx:
             ctx.permit(
                 '',
                 '12', 'sctp', 'any', 'range 100 5',
@@ -306,7 +304,7 @@ def test_ace_parameters(topology, step):
     step('################ invalid prefix ###############')
 
     with pytest.raises(exceptions.UnknownCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test13') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test13') as ctx:
             ctx.permit(
                 '',
                 '13', 'sctp', '1.2.3.4/40', 'eq 100 ',
@@ -326,7 +324,7 @@ def test_ace_parameters(topology, step):
     step('################ invalid subnet mask ###############')
 
     with pytest.raises(exceptions.UnknownCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test14') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test14') as ctx:
             ctx.permit(
                 '',
                 '14', 'sctp', '1.2.3.4/259.1.1.1', 'eq 100 ',
@@ -336,7 +334,7 @@ def test_ace_parameters(topology, step):
     step('################ invalid numeric proto ###############')
 
     with pytest.raises(exceptions.UnknownCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test15') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test15') as ctx:
             ctx.permit(
                 '',
                 '15', '290', '1.2.3.4/255.255.255.0', '',
@@ -346,7 +344,7 @@ def test_ace_parameters(topology, step):
     step('################ unsupported proto ###############')
 
     with pytest.raises(exceptions.UnknownCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test16') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test16') as ctx:
             ctx.permit(
                 '',
                 '16', '999', '1.2.3.4', '',
@@ -357,7 +355,7 @@ def test_ace_parameters(topology, step):
     step('################ Command success. ###############')
 
     with pytest.raises(exceptions.MaxACEsException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test17') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test17') as ctx:
             for i in range(1, 514):
                 ctx.deny(
                     '',
@@ -369,13 +367,13 @@ def test_ace_parameters(topology, step):
     step('################ T18 Add ACE ###########')
     step('################ Resequence ACEs###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test18') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test18') as ctx:
         ctx.permit('', '25', 'sctp', '172.21.30.4/24', 'eq 10', 'any', 'eq 20')
         ctx.permit('', '35', 'tcp', '172.21.30.4/24', 'eq 10', 'any', 'eq 20')
         ctx.permit('', '45', 'udp', '172.21.30.4/24', 'eq 10', 'any', 'eq 20')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip_resequence('test18', '1', '10')
+        ctx.access_list_resequence('ip', 'test18', '1', '10')
 
     test1_result = ops1('show run')
 
@@ -393,14 +391,14 @@ def test_ace_parameters(topology, step):
     with pytest.raises(
                 exceptions.ResequenceNumberException):
         with ops1.libs.vtysh.Configure() as ctx:
-            ctx.access_list_ip_resequence('test18', '4294967295', '10')
+            ctx.access_list_resequence('ip', 'test18', '4294967295', '10')
 
     test1_result = ops1('show run')
 
     step('################ T20 Replace deny ACE ###########')
     step('################ with Permit ACE ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test18') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test18') as ctx:
         ctx.deny('',
                  '11', 'tcp', '172.21.30.4/24', 'eq 10',
                  'any', 'eq 20')
@@ -419,12 +417,12 @@ def test_ace_parameters(topology, step):
     step('################ Negative Test ###############')
 
     with pytest.raises(exceptions.AceDoesNotExistException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test18') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test18') as ctx:
             ctx.no('4101')
 
     step('################ T22 Remove ACE ###########')
     step('################ Positive Test ###############')
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test17') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test17') as ctx:
         ctx.no('401')
 
     test1_result = ops1('show run')

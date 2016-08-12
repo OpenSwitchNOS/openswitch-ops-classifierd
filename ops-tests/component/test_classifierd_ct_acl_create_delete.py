@@ -48,11 +48,19 @@ def test_acl_create_delete(topology, step):
 
     assert ops1 is not None
 
+    step('################ T0 Make sure there are no ACLs defined ###########')
+    out = ops1.libs.vtysh.show_access_list_commands()
+    for acl_type in out['access-list']:
+        for acl_name in out['access-list'][acl_type]:
+            print("Cleaning: " + acl_type + " " + acl_name)
+            with ops1.libs.vtysh.Configure() as ctx:
+                ctx.no_access_list(type=acl_type, access_list=acl_name)
+
     step('################ T1 access-list create ACL ###########')
     step('################ with one number ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('1')
+        ctx.access_list('ip', '1')
 
     test1_result = ops1('show run')
 
@@ -66,7 +74,7 @@ def test_acl_create_delete(topology, step):
     step('################ with apostrophe ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('1\'s')
+        ctx.access_list('ip', '1\'s')
 
     test1_result = ops1('show run')
 
@@ -80,7 +88,7 @@ def test_acl_create_delete(topology, step):
     step('################ with quotation ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('1\"s')
+        ctx.access_list('ip', '1\"s')
 
     test1_result = ops1('show run')
 
@@ -94,7 +102,7 @@ def test_acl_create_delete(topology, step):
     step('################ with @ sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('1@s')
+        ctx.access_list('ip', '1@s')
 
     test1_result = ops1('show run')
 
@@ -108,7 +116,7 @@ def test_acl_create_delete(topology, step):
     step('################ with 1 char ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('z')
+        ctx.access_list('ip', 'z')
 
     test1_result = ops1('show run')
 
@@ -122,7 +130,7 @@ def test_acl_create_delete(topology, step):
     step('################ with grave accent ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v`v')
+        ctx.access_list('ip', 'v`v')
 
     test1_result = ops1('show run')
 
@@ -136,7 +144,7 @@ def test_acl_create_delete(topology, step):
     step('################ with number sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v+v')
+        ctx.access_list('ip', 'v+v')
 
     test1_result = ops1('show run')
 
@@ -150,7 +158,7 @@ def test_acl_create_delete(topology, step):
     step('################ with percent sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v%v')
+        ctx.access_list('ip', 'v%v')
 
     test1_result = ops1('show run')
 
@@ -164,7 +172,7 @@ def test_acl_create_delete(topology, step):
     step('################ with greater sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v>v')
+        ctx.access_list('ip', 'v>v')
 
     test1_result = ops1('show run')
 
@@ -178,7 +186,7 @@ def test_acl_create_delete(topology, step):
     step('################ with lesser sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v<v')
+        ctx.access_list('ip', 'v<v')
 
     test1_result = ops1('show run')
 
@@ -192,7 +200,7 @@ def test_acl_create_delete(topology, step):
     step('################ with exclamation sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v!v')
+        ctx.access_list('ip', 'v!v')
 
     test1_result = ops1('show run')
 
@@ -206,7 +214,7 @@ def test_acl_create_delete(topology, step):
     step('################ with period sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v.v')
+        ctx.access_list('ip', 'v.v')
 
     test1_result = ops1('show run')
 
@@ -220,7 +228,7 @@ def test_acl_create_delete(topology, step):
     step('################ with brackets ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v(v)')
+        ctx.access_list('ip', 'v(v)')
 
     test1_result = ops1('show run')
 
@@ -234,7 +242,7 @@ def test_acl_create_delete(topology, step):
     step('################ with asterisk sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v*v')
+        ctx.access_list('ip', 'v*v')
 
     test1_result = ops1('show run')
 
@@ -248,7 +256,7 @@ def test_acl_create_delete(topology, step):
     step('################ with dollar sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v$v')
+        ctx.access_list('ip', 'v$v')
 
     test1_result = ops1('show run')
 
@@ -262,7 +270,7 @@ def test_acl_create_delete(topology, step):
     step('################ with semicolon sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v;v')
+        ctx.access_list('ip', 'v;v')
 
     test1_result = ops1('show run')
 
@@ -276,7 +284,7 @@ def test_acl_create_delete(topology, step):
     step('################ with colon sign ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v:v')
+        ctx.access_list('ip', 'v:v')
 
     test1_result = ops1('show run')
 
@@ -290,7 +298,7 @@ def test_acl_create_delete(topology, step):
     step('################ with caret ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v^v')
+        ctx.access_list('ip', 'v^v')
 
     test1_result = ops1('show run')
 
@@ -304,7 +312,7 @@ def test_acl_create_delete(topology, step):
     step('################ with braces ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v{v}')
+        ctx.access_list('ip', 'v{v}')
 
     test1_result = ops1('show run')
 
@@ -318,7 +326,7 @@ def test_acl_create_delete(topology, step):
     step('################ with hyphen  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v-v')
+        ctx.access_list('ip', 'v-v')
 
     test1_result = ops1('show run')
 
@@ -332,7 +340,7 @@ def test_acl_create_delete(topology, step):
     step('################ with equal  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v=v')
+        ctx.access_list('ip', 'v=v')
 
     test1_result = ops1('show run')
 
@@ -346,7 +354,7 @@ def test_acl_create_delete(topology, step):
     step('################ with tilde  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v~v')
+        ctx.access_list('ip', 'v~v')
 
     test1_result = ops1('show run')
 
@@ -360,7 +368,7 @@ def test_acl_create_delete(topology, step):
     step('################ with slash  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v/v')
+        ctx.access_list('ip', 'v/v')
 
     test1_result = ops1('show run')
 
@@ -374,7 +382,7 @@ def test_acl_create_delete(topology, step):
     step('################ with backslash  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v\\v')
+        ctx.access_list('ip', 'v\\v')
 
     test1_result = ops1('show run')
 
@@ -388,7 +396,7 @@ def test_acl_create_delete(topology, step):
     step('################ with pipe  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v|v')
+        ctx.access_list('ip', 'v|v')
 
     test1_result = ops1('show run')
 
@@ -402,7 +410,7 @@ def test_acl_create_delete(topology, step):
     step('################ with ampersand  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v&v')
+        ctx.access_list('ip', 'v&v')
 
     test1_result = ops1('show run')
 
@@ -416,7 +424,7 @@ def test_acl_create_delete(topology, step):
     step('################ with dash  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v-v')
+        ctx.access_list('ip', 'v-v')
 
     test1_result = ops1('show run')
 
@@ -430,7 +438,7 @@ def test_acl_create_delete(topology, step):
     step('################ with underscore  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('v_v')
+        ctx.access_list('ip', 'v_v')
 
     test1_result = ops1('show run')
 
@@ -444,7 +452,7 @@ def test_acl_create_delete(topology, step):
     step('################ with Capitalization 1  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('VIvTest')
+        ctx.access_list('ip', 'VIvTest')
 
     test1_result = ops1('show run')
 
@@ -458,7 +466,7 @@ def test_acl_create_delete(topology, step):
     step('################ with Capitalization 2  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('viVtEST')
+        ctx.access_list('ip', 'viVtEST')
 
     test1_result = ops1('show run')
 
@@ -472,7 +480,7 @@ def test_acl_create_delete(topology, step):
     step('################ with valid name ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('test1')
+        ctx.access_list('ip', 'test1')
 
     test1_result = ops1('show run')
 
@@ -486,7 +494,7 @@ def test_acl_create_delete(topology, step):
     step('################ with name contains invalid char ###############')
     with pytest.raises(exceptions.UnknownCommandException):
         with ops1.libs.vtysh.Configure() as ctx:
-            ctx.access_list_ip('te st!$')
+            ctx.access_list('ip', 'te st!$')
 
     test1_result = ops1('show run')
     assert search(
@@ -500,7 +508,7 @@ def test_acl_create_delete(topology, step):
     step(' characters  ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('goodtest$!')
+        ctx.access_list('ip', 'goodtest$!')
 
     test1_result = ops1('show run')
     assert search(
@@ -515,7 +523,7 @@ def test_acl_create_delete(topology, step):
     with pytest.raises(
             exceptions.IncompleteCommandException):
         with ops1.libs.vtysh.Configure() as ctx:
-            ctx.access_list_ip(' ')
+            ctx.access_list('ip', ' ')
 
     test1_result = ops1('show run')
     assert search(
@@ -532,7 +540,7 @@ def test_acl_create_delete(topology, step):
 
     with pytest.raises(exceptions.UnknownCommandException):
         with ops1.libs.vtysh.Configure() as ctx:
-            ctx.access_list_ip('%s' % longstr)
+            ctx.access_list('ip', '%s' % longstr)
 
     test1_result = ops1('show run')
 
@@ -545,7 +553,7 @@ def test_acl_create_delete(topology, step):
     step('################ access-list delete ACL ###############')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('test2')
+        ctx.access_list('ip', 'test2')
 
     test1_result = ops1('show run')
 
@@ -556,7 +564,7 @@ def test_acl_create_delete(topology, step):
     )
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.no_access_list_ip('test2')
+        ctx.no_access_list('ip', 'test2')
 
     test1_result = ops1('show run')
 
@@ -570,7 +578,7 @@ def test_acl_create_delete(topology, step):
     step('################# with valid resequence number ##################')
 
     with ops1.libs.vtysh.Configure() as ctx:
-        ctx.access_list_ip('test1')
+        ctx.access_list('ip', 'test1')
 
     test1_result = ops1('show run')
 
@@ -582,7 +590,7 @@ def test_acl_create_delete(topology, step):
 
     with pytest.raises(exceptions.AclEmptyException):
         with ops1.libs.vtysh.Configure() as ctx:
-            ctx.access_list_ip_resequence('test1', 1, 10)
+            ctx.access_list_resequence('ip', 'test1', 1, 10)
 
     test1_result = ops1('show run')
 
@@ -597,4 +605,4 @@ def test_acl_create_delete(topology, step):
 
     with pytest.raises(exceptions.UnknownCommandException):
         with ops1.libs.vtysh.Configure() as ctx:
-            ctx.access_list_ip_resequence('test1', 0, 10)
+            ctx.access_list_resequence('ip', 'test1', 0, 10)
