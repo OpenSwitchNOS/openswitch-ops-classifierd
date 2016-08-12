@@ -23,7 +23,6 @@ from pytest import mark
 from re import search
 import pytest
 from topology_lib_vtysh import exceptions
-import time
 
 TOPOLOGY = """
 # +--------+
@@ -39,15 +38,6 @@ TOPOLOGY = """
 
 @mark.test_id(10403)
 def test_ace_apply(topology, step):
-    step('################ Introduce delay in ACE ###########')
-    step('################ creation in case docker ###############')
-    step('################ is not up for > 45 seconds ###############')
-
-    # Temporarily adding a sleep time at boot up to ensure switchd
-    # deamonizing completely. Will remove sleep when test framework
-    # implements switchd deamonizing checking
-    time.sleep(60)
-
     """
     Test apply of ACEs to ports.
 
@@ -58,10 +48,18 @@ def test_ace_apply(topology, step):
 
     assert ops1 is not None
 
+    step('################ T0 Make sure there are no ACLs defined ###########')
+    out = ops1.libs.vtysh.show_access_list_commands()
+    for acl_type in out['access-list']:
+        for acl_name in out['access-list'][acl_type]:
+            print("Cleaning: " + acl_type + " " + acl_name)
+            with ops1.libs.vtysh.Configure() as ctx:
+                ctx.no_access_list(type=acl_type, access_list=acl_name)
+
     step('################ T1 Add Permit ACE ###########')
     step('################ to existing ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.permit('', '1', 'pim', '1.2.3.4', '', '5.6.7.8', '')
 
     test1_result = ops1('show run')
@@ -77,7 +75,7 @@ def test_ace_apply(topology, step):
     step('################ T2 Add Deny ACE ###########')
     step('################ to existing ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.deny('', '1', 'igmp', '1.2.3.4', '', '5.6.7.8', '')
 
     test1_result = ops1('show run')
@@ -94,7 +92,7 @@ def test_ace_apply(topology, step):
     step('################ T3 Remove ACE ###########')
     step('################ from existing ACL ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test1') as ctx:
         ctx.no('1')
 
     test1_result = ops1('show run')
@@ -111,14 +109,14 @@ def test_ace_apply(topology, step):
     step('################ ACL does not exist ###############')
     with pytest.raises(exceptions.AclDoesNotExistException):
         with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-            ctx.apply_access_list_ip_in('test4')
+            ctx.apply_access_list('ip', 'test4', 'in')
 
     step('################ T4b Apply ACL ###########')
     step('################ to interface ###############')
     step('################ igmp protocol  ###############')
 
     # time.sleep(1)
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '4', 'igmp', '1.2.3.4/255.0.0.0',
@@ -135,7 +133,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -145,14 +143,14 @@ def test_ace_apply(topology, step):
                                        ), test1_result
     )
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('4')
 
     step('################ T5 Apply no ACL ###########')
     step('################ on interface 4 ###############')
 
     with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -166,7 +164,7 @@ def test_ace_apply(topology, step):
     step('################ to interface ###############')
     step('################ A.B.C.D/M Network  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '6', 'igmp', '1.2.3.4/8',
@@ -183,7 +181,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('5') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -194,18 +192,18 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('5') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('6')
 
     step('################ T7 Apply ACL ###########')
     step('################ to interface ###############')
     step('################ A.B.C.D Host  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '7', 'igmp', '1.2.3.4',
@@ -222,7 +220,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('7') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -233,18 +231,18 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('7') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('7')
 
     step('################ T8 Apply IPV4 ACL ###########')
     step('################ to interface ###############')
     step('################ proto any Host  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '8', '4', 'any',
@@ -260,7 +258,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('8') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -271,7 +269,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('8') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -279,7 +277,7 @@ def test_ace_apply(topology, step):
     step('################ to interface ###############')
     step('################ sctp eq L4  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '9', 'sctp', '172.21.30.4/24',
@@ -297,7 +295,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('9') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -308,18 +306,18 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('9') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('9')
 
     step('################ T10 Apply ACL ###########')
     step('################ to interface ###############')
     step('################ sctp eq L4  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '10', 'sctp', '172.21.30.4/24',
@@ -336,7 +334,7 @@ def test_ace_apply(topology, step):
                                        ), test1_result
     )
     with ops1.libs.vtysh.ConfigInterface('10') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -347,18 +345,18 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('10') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('10')
 
     step('################ T11 Apply ACL ###########')
     step('################ to interface ###############')
     step('################ sctp gt L4  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '11', 'sctp', '172.21.30.4/24',
@@ -376,7 +374,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('11') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -387,18 +385,18 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('11') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('11')
 
     step('################ T12 Apply ACL ###########')
     step('################ to interface ###############')
     step('################ sctp lt L4  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.permit(
             '',
             '12', 'sctp', '172.21.30.4/24',
@@ -416,7 +414,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('12') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -427,11 +425,11 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('12') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('12')
 
     step('################ T13 Apply ACL ###########')
@@ -440,7 +438,7 @@ def test_ace_apply(topology, step):
     step('################ EchoCommandException  ###############')
 
     with pytest.raises(exceptions.EchoCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+        with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
             ctx.permit(
                 '',
                 '13', 'sctp', '1.2.3.4/1', 'range 100 500',
@@ -457,7 +455,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('13') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -468,11 +466,11 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('13') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('13')
 
     step('################ T14 Apply ACL ###########')
@@ -480,7 +478,7 @@ def test_ace_apply(topology, step):
     step('################ 6(UnknownCommand) eq L4  ###############')
     step('################ EchoCommandException  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.deny(
                 '',
                 '14', 'tcp', '1.2.3.4/8', 'eq 4',
@@ -497,7 +495,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('14') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -508,11 +506,11 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('14') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('14')
 
     step('################ T15 Apply ACL ###########')
@@ -520,7 +518,7 @@ def test_ace_apply(topology, step):
     step('################ range L4  ###############')
     step('################ EchoCommandException  ###############')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.deny(
                 '',
                 '15', 'tcp', '1.2.3.4/8', 'range 4 6',
@@ -538,7 +536,7 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('15') as ctx:
-        ctx.apply_access_list_ip_in('test4')
+        ctx.apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
@@ -549,9 +547,9 @@ def test_ace_apply(topology, step):
     )
 
     with ops1.libs.vtysh.ConfigInterface('15') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
+        ctx.no_apply_access_list('ip', 'test4', 'in')
 
     test1_result = ops1('show run')
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
+    with ops1.libs.vtysh.ConfigAccessListIp('test4') as ctx:
         ctx.no('15')
