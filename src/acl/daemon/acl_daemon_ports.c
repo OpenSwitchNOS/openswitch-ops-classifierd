@@ -123,7 +123,7 @@ acl_port_reconfigure_all(const struct ovsrec_port *port_row)
                  smap_get(
                   (const struct smap *)&port_row->interfaces[intf_idx]->hw_status,
                   OPS_INTF_HW_READY_BLOCKED_REASON_STR);
-                if((hw_status != NULL) &&
+                if((hw_status == NULL) ||
                    (strncmp(
                      hw_status,
                      OPS_INTF_HW_READY_BLOCKED_REASON_VALUE_STR_ACLS,

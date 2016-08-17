@@ -404,8 +404,7 @@ acl_cfg_check_ports_and_apply(struct acl* acl, struct bridge* br,
 
                         acl_port_map_cfg_update(&acl_port->port_map[i],
                                                 port,
-                                                br->ofproto,
-                                                NULL);
+                                                br->ofproto);
                     }
                 }
             }
