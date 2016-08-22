@@ -45,6 +45,7 @@ hs1:1 -- ops1:1
 ops1:6 -- hs2:1
 """
 
+
 topology_2switch_2host_lag_def = """
 # +-------+                                     +-------+
 # |       |     +--------+     +-------+        |       |
@@ -53,8 +54,8 @@ topology_2switch_2host_lag_def = """
 # +-------+                                     +-------+
 
 #Nodes
-[type=openswitch name="openswitch 1"] ops1
-[type=openswitch name="openswitch 2"] ops2
+[type=openswitch name="openswitch 1" image="acl_docker:latest"] ops1
+[type=openswitch name="openswitch 2" image="acl_docker:latest"] ops2
 [type=host name="Host 1"] hs1
 [type=host name="Host 2"] hs2
 
@@ -62,6 +63,7 @@ topology_2switch_2host_lag_def = """
 hs1:1 -- ops1:1
 ops1:5 -- ops2:5
 ops1:6 -- ops2:6
+ops1:7 -- ops2:7
 ops2:1 -- hs2:1
 """
 
