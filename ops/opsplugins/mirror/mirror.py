@@ -31,6 +31,10 @@ class MirrorValidator(BaseValidator):
     # Validates that the given modification to a given row is allowed.
     #
     def validate_modification(self, validation_args):
+        #  temporarily disabling this validator
+        #  as references are not setup yet when this
+        #  validator is invoked from DC
+        return
         mirror_row = validation_args.resource_row
         # Only check active mirrors.
         if not hasattr(mirror_row, 'active') or \
