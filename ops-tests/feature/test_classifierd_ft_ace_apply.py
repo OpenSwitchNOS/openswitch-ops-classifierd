@@ -19,26 +19,25 @@
 OpenSwitch Test for ACE apply to interfaces.
 """
 
-from pytest import mark, raises
+from pytest import mark
 from re import search
+import pytest
 from topology_lib_vtysh import exceptions
 import time
 
-TOPOLOGY = """
-# +--------+
-# |  ops1  |
-# +--------+
+from topo_defs import topology_1switch_def
+from acl_classifier_common_lib import configure_acl_l3
+from acl_classifier_common_lib import unconfigure_acl
+from acl_classifier_common_lib import apply_acl
+from acl_classifier_common_lib import wait_on_warnings
 
-# Nodes
-[type=openswitch name="OpenSwitch 1"] ops1
-
-# Links
-"""
+TOPOLOGY = topology_1switch_def
 
 
-@mark.gate
 @mark.test_id(10403)
 def test_ace_apply(topology, step):
+    test_num = 0
+
     step('################ Introduce delay in ACE ###########')
     step('################ creation in case docker ###############')
     step('################ is not up for > 45 seconds ###############')
@@ -55,503 +54,807 @@ def test_ace_apply(topology, step):
     delete ACL.
     """
     ops1 = topology.get('ops1')
-
     assert ops1 is not None
 
-    step('################ T1 Add Permit ACE ###########')
-    step('################ to existing ACL ###############')
+    acl_name = 'test1'
+    seq_num = '1'
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
-        ctx.permit('', '1', 'pim', '1.2.3.4', '', '5.6.7.8', '')
+    test_num += 1
+    step(
+        '#### T{test_num} Add Permit ACE ####\n'
+        '#### to existing IPv4 ACL ####'
+        .format(**locals())
+        )
+    configure_acl_l3(
+        sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num=seq_num,
+        action='permit', proto='pim', src_ip='1.2.3.4', src_port='',
+        dst_ip='5.6.7.8', dst_port='', count='', log=''
+        )
 
-    test1_result = ops1('show run')
+    test_num += 1
+    step(
+        '#### T{test_num} Add Deny ACE ####\n'
+        '#### to existing IPv4 ACL ####'
+        .format(**locals())
+        )
+    configure_acl_l3(
+        sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num=seq_num,
+        action='deny', proto='igmp', src_ip='1.2.3.4', src_port='',
+        dst_ip='5.6.7.8', dst_port='', count='', log=''
+        )
 
-    # Test pass criteria
+    test_num += 1
+    step(
+        '#### T{test_num} Add Permit ACE ####\n'
+        '#### to existing IPv4 ACL ####\n'
+        '#### with just count ####'
+        .format(**locals())
+        )
+    configure_acl_l3(
+        sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num=seq_num,
+        action='permit', proto='igmp', src_ip='9.10.11.12', src_port='',
+        dst_ip='13.14.15.16', dst_port='', count='count', log=''
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Add Permit ACE ####\n'
+        '#### to existing IPv4 ACL ####\n'
+        '#### with count and log ####'
+        .format(**locals())
+        )
+    configure_acl_l3(
+        sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num=seq_num,
+        action='permit', proto='igmp', src_ip='17.18.19.20', src_port='',
+        dst_ip='21.22.23.24', dst_port='', count='count', log='log'
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Add Permit ACE ####\n'
+        '#### to existing IPv4 ACL ####\n'
+        '#### with just log ####'
+        .format(**locals())
+        )
+    configure_acl_l3(
+        sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num=seq_num,
+        action='permit', proto='igmp', src_ip='25.26.27.28', src_port='',
+        dst_ip='29.30.31.32', dst_port='', count='', log='log'
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Remove ACE ####\n'
+        '#### from existing IPv4 ACL ####'
+        .format(**locals())
+        )
+    unconfigure_ace(
+        sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+        seq_num=seq_num
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Remove IPv4 ACL ####'
+        .format(**locals())
+        )
+    unconfigure_acl(sw=ops1, acl_addr_type='ip', acl_name=acl_name)
+
+    for direction in ['in', 'out']:
+
+        dir_synonym = "Ingress" if direction == 'in' else "Egress"
+        acl_name = 'testApplyACL_{dir_synonym}'.format(**locals())
+
+        test_num += 1
+        step(
+            '## T{test_num} Applying {dir_synonym} IPV4 ACL  ##\n'
+            '#### T{test_num}a Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### ACL does not exist ####'
+            .format(**locals())
+            )
+        with pytest.raises(exceptions.AclDoesNotExistException):
+            apply_acl(
+                sw=ops1, app_type='port', interface_num='4',
+                acl_addr_type='ip', acl_name=acl_name, direction=direction
+                )
+
+        step(
+            '#### T{test_num}b Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### igmp protocol ####'
+            .format(**locals())
+            )
+        seq_num = '4'
+        configure_acl_l3(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num=seq_num,
+            action='permit', proto='igmp', src_ip='1.2.3.4/255.0.0.0',
+            src_port='', dst_ip='5.6.7.8/255.255.0.0', dst_port='', count='',
+            log=''
+            )
+        interface_num = '4'
+        apply_acl(
+            sw=ops1, app_type='port', interface_num='4', acl_addr_type='ip',
+            acl_name=acl_name, direction=direction
+            )
+        unconfigure_ace(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num=seq_num
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} no ACL ####\n'
+            '#### on interface 4 ####'
+            .format(**locals())
+            )
+        no_apply_interface(
+            sw=ops1, app_type='port', interface_num=interface_num,
+            acl_addr_type='ip', acl_name=acl_name, direction=direction
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### A.B.C.D/M Network ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='6',
+            action='permit', proto='igmp',
+            src_ip='1.2.3.4/8', src_port='',
+            dst_ip='5.6.7.8/24', dst_port='',
+            app_type='port', interface_num='5', direction=direction,
+            count='', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### A.B.C.D Host count ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='7',
+            action='permit', proto='igmp',
+            src_ip='1.2.3.4', src_port='',
+            dst_ip='5.6.7.8', dst_port='',
+            app_type='port', interface_num='7', direction=direction,
+            count='count', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### Numbered proto and any host log ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='8',
+            action='permit', proto='4',
+            src_ip='any', src_port='',
+            dst_ip='any', dst_port='',
+            app_type='port', interface_num='8', direction=direction,
+            count='', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### sctp eq L4 count log####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='9',
+            action='permit', proto='sctp',
+            src_ip='172.21.30.4', src_port='eq 10',
+            dst_ip='5.6.7.8/24', dst_port='eq 11',
+            app_type='port', interface_num='9', direction=direction,
+            count='count', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### sctp eq L4 ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='10',
+            action='permit', proto='sctp',
+            src_ip='172.21.30.4', src_port='eq 10',
+            dst_ip='5.6.7.8/24', dst_port='eq 11',
+            app_type='port', interface_num='10', direction=direction,
+            count='', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### sctp gt L4 count ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='11',
+            action='permit', proto='sctp',
+            src_ip='172.21.30.4/24', src_port='gt 10',
+            dst_ip='5.6.7.8/24', dst_port='gt 11',
+            app_type='port', interface_num='11', direction=direction,
+            count='count', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### sctp lt L4 log ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='12',
+            action='permit', proto='sctp',
+            src_ip='172.21.30.4/24', src_port='lt 10',
+            dst_ip='5.6.7.8/24', dst_port='lt 11',
+            app_type='port', interface_num='12', direction=direction,
+            count='', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### sctp range L4 count log ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='13',
+            action='permit', proto='sctp',
+            src_ip='1.2.3.4/1', src_port='range 100 500',
+            dst_ip='5.6.7.8/32', dst_port='range 40 50',
+            app_type='port', interface_num='13', direction=direction,
+            count='count', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### tcp deny eq L4 ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='14',
+            action='deny', proto='tcp',
+            src_ip='1.2.3.4/8', src_port='eq 4',
+            dst_ip='5.6.7.8/24', dst_port='eq 40',
+            app_type='port', interface_num='14', direction=direction,
+            count='', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Apply {dir_synonym} IPV4 ACL ####\n'
+            '#### to interface ####\n'
+            '#### tcp deny range L4 count ####'
+            .format(**locals())
+            )
+        common_apply_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name, seq_num='15',
+            action='deny', proto='tcp',
+            src_ip='1.2.3.4/8', src_port='range 4 6',
+            dst_ip='5.6.7.8/24', dst_port='range 40 60',
+            app_type='port', interface_num='15', direction=direction,
+            count='count', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Remove {dir_synonym} IPV4 ACL ####'
+            .format(**locals())
+            )
+        unconfigure_acl(sw=ops1, acl_addr_type='ip', acl_name=acl_name)
+    # END for direction in ['in' : 'out']:
+
+    # Beginning of mixing ingress with egress using a single ACL
+    acl_name = "testIngressEgressOneACL"
+    for dir_list in [['in', 'out'], ['out', 'in']]:
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### deny udp any Host L4 range ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='1', action='deny', proto='udp',
+            src_ip='any', src_port='',
+            dst_ip='1.1.1.1', dst_port='range 0 65535',
+            app_type='port', interface_num='1', dir_list=dir_list,
+            count='', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### permit tcp Network L4 lt Non-contiguous L4 gt count ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='2', action='permit', proto='tcp',
+            src_ip='1.1.1.0/24', src_port='lt 42',
+            dst_ip='1.1.0.0/255.0.255.255', dst_port='gt 50',
+            app_type='port', interface_num='2', dir_list=dir_list,
+            count='count', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### deny sctp Host L4 eq any log ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='3', action='deny', proto='sctp',
+            src_ip='1.1.1.1', src_port='eq 1000',
+            dst_ip='any', dst_port='',
+            app_type='port', interface_num='3', dir_list=dir_list,
+            count='', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### permit udp Host L4 range Network L4 lt count log ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='4', action='permit', proto='udp',
+            src_ip='1.1.1.1', src_port='range 1 65534',
+            dst_ip='1.1.1.0/255.255.255.0', dst_port='lt 65535',
+            app_type='port', interface_num='4', dir_list=dir_list,
+            count='count', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### deny tcp non-contiguous Network gt Network eq ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='5', action='deny', proto='tcp',
+            src_ip='18.32.144.40/254.228.144.172', src_port='gt 0',
+            dst_ip='1.1.0.0/16', dst_port='eq 42',
+            app_type='port', interface_num='5', dir_list=dir_list,
+            count='', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### permit sctp any Host count ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='6', action='permit', proto='sctp',
+            src_ip='any', src_port='',
+            dst_ip='1.1.1.1', dst_port='',
+            app_type='port', interface_num='6', dir_list=dir_list,
+            count='count', log=''
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### deny icmp any Host log ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='7', action='deny', proto='icmp',
+            src_ip='any', src_port='',
+            dst_ip='1.1.1.1', dst_port='',
+            app_type='port', interface_num='7', dir_list=dir_list,
+            count='', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### permit 255 Network Network count log ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='8', action='permit', proto='255',
+            src_ip='1.1.1.0/24', src_port='',
+            dst_ip='1.1.0.0/255.255.0.0', dst_port='',
+            app_type='port', interface_num='8', dir_list=dir_list,
+            count='count', log='log'
+            )
+
+        test_num += 1
+        step(
+            '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+            '#### On one port, ACL, and ACE ####\n'
+            '#### deny 0 Non-contiguous any ####'
+            .format(**locals())
+            )
+        common_in_out_apply_one_acl_one_ace_test(
+            sw=ops1, acl_addr_type='ip', acl_name=acl_name,
+            seq_num='9', action='deny', proto='0',
+            src_ip='255.0.255.255/255.0.255.255', src_port='',
+            dst_ip='any', dst_port='',
+            app_type='port', interface_num='9', dir_list=dir_list,
+            count='', log=''
+            )
+    # End for dir_list in [['in', 'out'], ['out', 'in']]:
+
+    test_num += 1
+    step(
+        '#### T{test_num} Remove Ingress Egress IPV4 ACL ####'
+        .format(**locals())
+        )
+    unconfigure_acl(sw=ops1, acl_addr_type='ip', acl_name=acl_name)
+
+    # Begin testing different Ingress and Egress ACLs applied to one port
+    acl_name_in = 'testIngress'
+    acl_name_out = 'testEgress'
+    test_num += 1
+    step(
+        '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+        '#### On one port with two ACLs with one ACE each ####\n'
+        '#### Ingress permit udp any Network L4 lt ####\n'
+        '#### Egress deny tcp Host L4 range Network L4 gt ####'
+        .format(**locals())
+        )
+    common_in_out_apply_different_acl_test(
+        sw=ops1, acl_addr_type='ip',
+        acl_name_list=[acl_name_in, acl_name_out],
+        seq_num_list=['1', '1'],
+        action_list=['permit', 'deny'],
+        proto_list=['udp', 'tcp'],
+        src_ip_list=['any', '1.1.1.1'],
+        src_port_list=['', 'range 1 2'],
+        dst_ip_list=['1.1.1.0/24', '1.1.0.0/255.255.0.0'],
+        dst_port_list=['lt 42', 'gt 50'],
+        app_type='port', interface_num='1',
+        dir_list=['in', 'out'],
+        count_list=['', ''],
+        log_list=['', '']
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+        '#### On one port with two ACLs with one ACE each count ####\n'
+        '#### Egress deny sctp non-contiguous L4 eq any log ####\n'
+        '#### Ingress permit 250 any Host ####'
+        .format(**locals())
+        )
+    common_in_out_apply_different_acl_test(
+        sw=ops1, acl_addr_type='ip',
+        acl_name_list=[acl_name_out, acl_name_in],
+        seq_num_list=['2', '500'],
+        action_list=['deny', 'permit'],
+        proto_list=['sctp', '250'],
+        src_ip_list=['1.0.1.1/255.0.255.255', 'any'],
+        src_port_list=['eq 1024', ''],
+        dst_ip_list=['any', '1.1.1.2'],
+        dst_port_list=['', ''],
+        app_type='port', interface_num='2',
+        dir_list=['out', 'in'],
+        count_list=['count', ''],
+        log_list=['', 'log']
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+        '#### On one port with two ACLs with one ACE each ####\n'
+        '#### Ingress permit icmp any any log ####\n'
+        '#### Egress permit icmp any any count ####'
+        .format(**locals())
+        )
+    common_in_out_apply_different_acl_test(
+        sw=ops1, acl_addr_type='ip',
+        acl_name_list=[acl_name_in, acl_name_out],
+        seq_num_list=['4', '4'],
+        action_list=['permit', 'permit'],
+        proto_list=['icmp', 'icmp'],
+        src_ip_list=['any', 'any'],
+        src_port_list=['', ''],
+        dst_ip_list=['any', 'any'],
+        dst_port_list=['', ''],
+        app_type='port', interface_num='3',
+        dir_list=['in', 'out'],
+        count_list=['', 'count'],
+        log_list=['log', '']
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Mix Ingress and Egress IPV4 ACL ####\n'
+        '#### On one port with two ACLs with one ACE each ####\n'
+        '#### Egress deny igmp Network Network count log ####\n'
+        '#### Ingress deny pim non-contiguous any count log ####'
+        .format(**locals())
+        )
+    common_in_out_apply_different_acl_test(
+        sw=ops1, acl_addr_type='ip',
+        acl_name_list=[acl_name_out, acl_name_in],
+        seq_num_list=['4', '5'],
+        action_list=['deny', 'deny'],
+        proto_list=['igmp', 'pim'],
+        src_ip_list=['1.1.1.0/24', '1.0.1.1/255.0.255.255'],
+        src_port_list=['', ''],
+        dst_ip_list=['1.1.0.0/255.255.0.0', 'any'],
+        dst_port_list=['', ''],
+        app_type='port', interface_num='4',
+        dir_list=['out', 'in'],
+        count_list=['count', 'count'],
+        log_list=['log', 'log']
+        )
+
+    test_num += 1
+    step(
+        '#### T{test_num} Remove Ingress IPV4 ACL ####'
+        .format(**locals())
+        )
+    unconfigure_acl(sw=ops1, acl_addr_type='ip', acl_name=acl_name_in)
+
+    test_num += 1
+    step(
+        '#### T{test_num} Remove Ingress IPV4 ACL ####'
+        .format(**locals())
+        )
+    unconfigure_acl(sw=ops1, acl_addr_type='ip', acl_name=acl_name_out)
+
+
+# Helper functions
+
+
+def no_apply_interface(
+        sw, app_type, interface_num, acl_addr_type, acl_name, direction
+        ):
+
+    assert sw is not None
+    assert app_type in ('port', 'vlan')
+    assert isinstance(interface_num, str)
+    assert acl_addr_type in ('ip', 'ipv6', 'mac')
+    assert isinstance(acl_name, str)
+    assert direction in ('in', 'out')
+
+    print(">>>>>>>>>>>>>>>> unapplying the {acl_name} from interface "
+          "{interface_num} for the "
+          "direction {direction}".format(**locals()))
+
+    if app_type == 'port':
+        if acl_addr_type == 'ip':
+            with sw.libs.vtysh.ConfigInterface(interface_num) as ctx:
+                if direction == 'in':
+                    ctx.no_apply_access_list_ip_in(acl_name)
+                    pass
+                else:
+                    ctx.no_apply_access_list_ip_out(acl_name)
+                    pass
+        else:
+            print(
+                "<%s> address type is not supported in no_apply_interface()"
+                % (acl_addr_type)
+                )
+            assert False
+    else:
+        print(
+            "<%s> ACL application type is not supported in"
+            " no_apply_interface()" % (app_type)
+            )
+        assert False
+
+    if app_type == 'port':
+        app_type = 'interface'
+
+    wait_on_warnings(sw=sw, retries=3, polling_frequency=2)
+    test_result = sw(
+            'show access-list {app_type} {interface_num} {acl_addr_type} '
+            'commands'.format(**locals())
+            )
+    print(">>>>>>>>.after\n" + test_result)
+    print(">>>> The search is search(r'(apply\s+access-list\s+{acl_addr_type}"
+          "\s+{acl_name}\s+{direction})'".format(**locals()))
     assert search(
-       ''
-       r'1\s+permit\s+pim\s+[0-9]\.[0-9]\.[0-9]\.[0-9]'
-       '\s+[0-9]\.[0-9]\.[0-9]\.[0-9]'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-    step('################ T2 Add Deny ACE ###########')
-    step('################ to existing ACL ###############')
+       r'(apply\s+access-list\s+{acl_addr_type}\s+{acl_name}\s+{direction})'
+       .format(**locals()), test_result
+       ) is None
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
-        ctx.deny('', '1', 'igmp', '1.2.3.4', '', '5.6.7.8', '')
 
-    test1_result = ops1('show run')
+def unconfigure_ace(sw, acl_addr_type, acl_name, seq_num):
 
-    # Verify acl presents after created.
-    assert search(
-       ''
-       r'1\s+deny\s+igmp\s+[0-9]\.[0-9]\.[0-9]\.[0-9]'
-       '\s+[0-9]\.[0-9]\.[0-9]\.[0-9]'.format(
-                                         **locals()
-                                       ), test1_result
-    )
+    assert sw is not None
+    assert acl_addr_type in ('ip', 'ipv6', 'mac')
+    assert isinstance(acl_name, str)
+    assert isinstance(seq_num, str)
 
-    step('################ T3 Remove ACE ###########')
-    step('################ from existing ACL ###############')
+    if acl_addr_type == 'ip':
+        with sw.libs.vtysh.ConfigAccessListIpTestname(acl_name) as ctx:
+            ctx.no(seq_num)
+    else:
+        print(
+            "<%s> ACL address type is not supported in"
+            " unconfigure_ace()" % (acl_addr_type)
+            )
 
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test1') as ctx:
-        ctx.no('1')
+    wait_on_warnings(sw=sw, retries=3, polling_frequency=2)
 
-    test1_result = ops1('show run')
+    test_result = sw(
+            'show access-list {acl_addr_type} {acl_name} commands'
+            .format(**locals())
+            )
+    print(test_result)
+    assert search(r'\n\s+{seq_num}'.format(**locals()), test_result) is None
 
-    # Verify sequence number 1 is missing
-    assert search(
-       r'(?!1\s+\S+)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
 
-    step('################ T4a Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ ACL does not exist ###############')
-    with raises(exceptions.AclDoesNotExistException):
-        with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-            ctx.apply_access_list_ip_in('test4')
+def common_apply_test(
+        sw, acl_addr_type, acl_name, seq_num, action, proto,
+        src_ip, src_port, dst_ip, dst_port, app_type, interface_num,
+        direction, count, log
+        ):
 
-    step('################ T4b Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ igmp protocol  ###############')
+    assert sw is not None
+    assert acl_addr_type in ('ip', 'ipv6', 'mac')
+    assert isinstance(acl_name, str)
+    assert isinstance(seq_num, str)
+    assert action in ('permit', 'deny')
+    assert isinstance(proto, str)
+    assert isinstance(src_ip, str)
+    assert isinstance(src_port, str)
+    assert isinstance(dst_ip, str)
+    assert isinstance(dst_port, str)
+    assert app_type in ('port', 'vlan')
+    assert isinstance(interface_num, str)
+    assert direction in ('in', 'out')
+    assert count in ('count', '')
+    assert log in ('log', '')
 
-    # time.sleep(1)
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '4', 'igmp', '1.2.3.4/255.0.0.0',
-            '', '5.6.7.8/255.255.0.0', '')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'4\s+permit\s+igmp\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.0\.0\.0'
-       '\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.255\.0\.0'.format(
-                                         **locals()
-                                       ), test1_result
+    common_in_out_apply_one_acl_one_ace_test(
+        sw=sw, acl_addr_type=acl_addr_type, acl_name=acl_name, seq_num=seq_num,
+        action=action, proto=proto, src_ip=src_ip, src_port=src_port,
+        dst_ip=dst_ip, dst_port=dst_port, app_type=app_type,
+        interface_num=interface_num, dir_list=[direction],
+        count=count, log=log
     )
 
-    with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.apply_access_list_ip_in('test4')
 
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('4')
-
-    step('################ T5 Apply no ACL ###########')
-    step('################ on interface 4 ###############')
-
-    with ops1.libs.vtysh.ConfigInterface('4') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(?!access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    step('################ T6 Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ A.B.C.D/M Network  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '6', 'igmp', '1.2.3.4/8',
-            '', '5.6.7.8/24', '')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'6\s+permit\s+igmp\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.0\.0\.0'
-       '\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.255\.255\.0'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('5') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('5') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('6')
-
-    step('################ T7 Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ A.B.C.D Host  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '7', 'igmp', '1.2.3.4',
-            '', '5.6.7.8', '')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'7\s+permit\s+igmp\s+[0-9]\.[0-9]\.[0-9]\.[0-9]'
-       '\s+[0-9]\.[0-9]\.[0-9]\.[0-9]'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('7') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('7') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('7')
-
-    step('################ T8 Apply IPV4 ACL ###########')
-    step('################ to interface ###############')
-    step('################ proto any Host  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '8', '4', 'any',
-            '', 'any', '')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'8\s+permit\s+4\s+any\s+any'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('8') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('8') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    step('################ T9 Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ sctp eq L4  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '9', 'sctp', '172.21.30.4/24',
-            'eq 10', '5.6.7.8/24', 'eq 11')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'9\s+permit\s+sctp\s+172\.21\.30\.4/255\.255\.255\.0'
-       '\s+eq\s+10\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.255\.255\.0'
-       '\s+eq\s+11'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('9') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('9') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('9')
-
-    step('################ T10 Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ sctp eq L4  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '10', 'sctp', '172.21.30.4/24',
-            'eq 10', '5.6.7.8/24', 'eq 11')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'10\s+permit\s+sctp\s+172\.21\.30\.4/255\.255\.255\.0'
-       '\s+eq\s+10\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.255\.255\.0'
-       '\s+eq\s+11'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-    with ops1.libs.vtysh.ConfigInterface('10') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('10') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('10')
-
-    step('################ T11 Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ sctp gt L4  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '11', 'sctp', '172.21.30.4/24',
-            'gt 10', '5.6.7.8/24', 'gt 11')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'11\s+permit\s+sctp\s+172\.21\.30\.4/255\.255\.255\.0'
-       '\s+gt\s+10\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.255\.255\.0'
-       '\s+gt\s+11'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('11') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('11') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('11')
-
-    step('################ T12 Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ sctp lt L4  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.permit(
-            '',
-            '12', 'sctp', '172.21.30.4/24',
-            'lt 10', '5.6.7.8/24', 'lt 11')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'12\s+permit\s+sctp\s+172\.21\.30\.4/255\.255\.255\.0'
-       '\s+lt\s+10\s+[0-9]\.[0-9]\.[0-9]\.[0-9]/255\.255\.255\.0'
-       '\s+lt\s+11'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('12') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('12') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('12')
-
-    step('################ T13 Apply ACL ###########')
-    step('################ to interface ###############')
-    step('################ sctp range L4  ###############')
-    step('################ EchoCommandException  ###############')
-
-    with raises(exceptions.EchoCommandException):
-        with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-            ctx.permit(
-                '',
-                '13', 'sctp', '1.2.3.4/1', 'range 100 500',
-                '5.6.7.8/32', 'range 40 50')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'13\s+permit\s+sctp\s+1\.2\.3\.4/128\.0\.0\.0'
-       '\s+range\s+100\s+500\s+5\.6\.7\.8\s+range\s+40\s+50'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('13') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('13') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('13')
-
-    step('################ T14 Apply ACL ###########')
-    step('################ to interface tcp ###############')
-    step('################ 6(UnknownCommand) eq L4  ###############')
-    step('################ EchoCommandException  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.deny(
-                '',
-                '14', 'tcp', '1.2.3.4/8', 'eq 4',
-                '5.6.7.8/24', 'eq 40')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'14\s+deny\s+tcp\s+1\.2\.3\.4/255\.0\.0\.0'
-       '\s+eq\s+4\s+5\.6\.7\.8/255\.255\.255\.0\s+eq\s+40'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('14') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('14') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('14')
-
-    step('################ T15 Apply ACL ###########')
-    step('################ to interface tcp ###############')
-    step('################ range L4  ###############')
-    step('################ EchoCommandException  ###############')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.deny(
-                '',
-                '15', 'tcp', '1.2.3.4/8', 'range 4 6',
-                '5.6.7.8/24', 'range 40 60')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       ''
-       r'15\s+deny\s+tcp\s+1\.2\.3\.4/255\.0\.0\.0'
-       '\s+range\s+4\s+6\s+5\.6\.7\.8/255\.255\.255\.0'
-       '\s+range\s+40\s+60'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('15') as ctx:
-        ctx.apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    assert search(
-       r'(access-list\s+ip\s+test4\s+\in)'.format(
-                                         **locals()
-                                       ), test1_result
-    )
-
-    with ops1.libs.vtysh.ConfigInterface('15') as ctx:
-        ctx.no_apply_access_list_ip_in('test4')
-
-    test1_result = ops1('show run')
-
-    with ops1.libs.vtysh.ConfigAccessListIpTestname('test4') as ctx:
-        ctx.no('15')
+def common_in_out_apply_one_acl_one_ace_test(
+        sw, acl_addr_type, acl_name, seq_num, action, proto,
+        src_ip, src_port, dst_ip, dst_port, app_type, interface_num,
+        dir_list, count, log
+        ):
+
+    assert sw is not None
+    assert acl_addr_type in ('ip', 'ipv6', 'mac')
+    assert isinstance(acl_name, str)
+    assert isinstance(seq_num, str)
+    assert action in ('permit', 'deny')
+    assert isinstance(proto, str)
+    assert isinstance(src_ip, str)
+    assert isinstance(src_port, str)
+    assert isinstance(dst_ip, str)
+    assert isinstance(dst_port, str)
+    assert app_type in ('port', 'vlan')
+    assert isinstance(interface_num, str)
+    assert isinstance(dir_list, list)
+    assert count in ('count', '')
+    assert log in ('log', '')
+
+    for direction in dir_list:
+        assert direction in ['in', 'out']
+
+    configure_acl_l3(
+        sw=sw, acl_addr_type=acl_addr_type, acl_name=acl_name, seq_num=seq_num,
+        action=action, proto=proto, src_ip=src_ip,
+        src_port=src_port, dst_ip=dst_ip, dst_port=dst_port, count=count,
+        log=log
+        )
+    for direction in dir_list:
+        apply_acl(
+            sw=sw, app_type=app_type, interface_num=interface_num,
+            acl_addr_type=acl_addr_type, acl_name=acl_name, direction=direction
+            )
+    for direction in dir_list:
+        no_apply_interface(
+            sw=sw, app_type=app_type, interface_num=interface_num,
+            acl_addr_type=acl_addr_type, acl_name=acl_name, direction=direction
+            )
+    unconfigure_ace(
+        sw=sw, acl_addr_type=acl_addr_type, acl_name=acl_name,
+        seq_num=seq_num
+        )
+
+
+def common_in_out_apply_different_acl_test(
+        sw, acl_addr_type, acl_name_list, seq_num_list, action_list,
+        proto_list, src_ip_list, src_port_list, dst_ip_list, dst_port_list,
+        app_type, interface_num, dir_list, count_list, log_list
+        ):
+
+    assert sw is not None
+    assert acl_addr_type in ('ip', 'ipv6', 'mac')
+    assert isinstance(acl_name_list, list)
+    for acl_name in acl_name_list:
+        assert isinstance(acl_name, str)
+    assert isinstance(seq_num_list, list)
+    for seq_num in seq_num_list:
+        assert isinstance(seq_num, str)
+    assert isinstance(action_list, list)
+    for action in action_list:
+        assert action in ('permit', 'deny')
+    assert isinstance(proto_list, list)
+    for proto in proto_list:
+        assert isinstance(proto, str)
+    assert isinstance(src_ip_list, list)
+    for src_ip in src_ip_list:
+        assert isinstance(src_ip, str)
+    assert isinstance(src_port_list, list)
+    for src_port in src_port_list:
+        assert isinstance(src_port, str)
+    assert isinstance(dst_ip_list, list)
+    for dst_ip in dst_ip_list:
+        assert isinstance(dst_ip, str)
+    assert app_type in ('port', 'vlan')
+    assert isinstance(interface_num, str)
+    assert isinstance(dir_list, list)
+    for direction in dir_list:
+        assert direction in ['in', 'out']
+    assert isinstance(count_list, list)
+    for count in count_list:
+        assert count in ('count', '')
+    assert isinstance(log_list, list)
+    for log in log_list:
+        assert log in ('log', '')
+
+    # For each acl named, there needs to be one ACE and one direction for the
+    # acl to applied to the one interface
+    for i in list(range(len(acl_name_list))):
+        configure_acl_l3(
+            sw=sw, acl_addr_type=acl_addr_type, acl_name=acl_name_list[i],
+            seq_num=seq_num_list[i], action=action_list[i],
+            proto=proto_list[i], src_ip=src_ip_list[i],
+            src_port=src_port_list[i], dst_ip=dst_ip_list[i],
+            dst_port=dst_port_list[i], count=count_list[i], log=log_list[i]
+            )
+    for i in list(range(len(acl_name_list))):
+        apply_acl(
+            sw=sw, app_type=app_type, interface_num=interface_num,
+            acl_addr_type=acl_addr_type, acl_name=acl_name_list[i],
+            direction=dir_list[i]
+            )
+    for i in list(range(len(acl_name_list))):
+        no_apply_interface(
+            sw=sw, app_type=app_type, interface_num=interface_num,
+            acl_addr_type=acl_addr_type, acl_name=acl_name_list[i],
+            direction=dir_list[i]
+            )
+    for i in list(range(len(acl_name_list))):
+        unconfigure_ace(
+            sw=sw, acl_addr_type=acl_addr_type, acl_name=acl_name_list[i],
+            seq_num=seq_num_list[i]
+            )
