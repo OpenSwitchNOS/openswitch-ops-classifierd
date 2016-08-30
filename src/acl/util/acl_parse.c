@@ -137,6 +137,7 @@ acl_ipv4_address_user_to_normalized(const char *user_str, char *normalized_str)
     char *mask_substr = NULL;
     struct in_addr v4_mask;
     uint8_t prefix_len;
+    int x, dots = 0;
 
     /* Special cases of NULL or "any" can return early */
     if (!user_str || !strcmp(user_str, "any")) {
@@ -148,6 +149,22 @@ acl_ipv4_address_user_to_normalized(const char *user_str, char *normalized_str)
     slash_ptr = strchr(user_str, '/');
     /* If no mask is given, set host mask (/32) */
     if (!slash_ptr) {
+
+        /* The 'A.B.C.D' CMDSTR permits short-form v4 addrs, but we don't accept
+         * ACE src/dst in this form nor will we pad them out (e.g. via inet_aton).
+         * The CMDSTR does however ensure that the numeric sections are in the
+         * proper range so no further validation is necessary.
+         */
+        for (x=0; x<(strlen(user_str));x++) {
+            if (user_str[x] == '.') {
+                dots++;
+            }
+        }
+        if (dots != 3)
+            VLOG_ERR("Invalid IPv4 address %s", user_str);
+            return false;
+        }
+
         strncpy(normalized_str, user_str, INET_ADDRSTRLEN*2);
         strcat(normalized_str, "/255.255.255.255");
         return true;
