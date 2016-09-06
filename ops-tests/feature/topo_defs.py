@@ -33,9 +33,6 @@ topology_1switch_2host_def = """
 
 # Nodes
 # [image="fs-genericx86-64:latest" \
-# type=openswitch name="OpenSwitch 1"] ops1
-# [type=host name="Host 1" image="openswitch/ubuntuscapy:latest"] hs1
-# [type=host name="Host 2" image="openswitch/ubuntuscapy:latest"] hs2
 [type=openswitch name="Switch 1"] ops1
 [type=host name="Host 1"] hs1
 [type=host name="Host 2"] hs2
