@@ -58,9 +58,9 @@ def test_validate_2switch_2host_l3(topology):
                 hs1, hs2, ip_hs1, ip_hs2,
                 hs1_ip_route, hs2_ip_route
                 )
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops1, portlbl)
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops2, portlbl)
 
     ping_test(hs1, ip_only_hs2)
