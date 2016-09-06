@@ -20,7 +20,6 @@ OpenSwitch Test for vlan related configurations.
 """
 
 from pytest import mark
-from topo_defs import topology_1switch_2host_def
 from topo_funcs import topology_1switch_2host
 from topo_funcs import config_switch_l3
 from topo_funcs import config_hosts_l3
@@ -35,7 +34,22 @@ ip_ops1_int2 = '10.10.30.2/24'
 hs1_ip_route = "ip route add default via 10.10.10.2"
 hs2_ip_route = "ip route add default via 10.10.30.2"
 
-TOPOLOGY = topology_1switch_2host_def
+TOPOLOGY = """
+# +-------+                    +-------+
+# |       |     +--------+     |       |
+# |  hs1  <----->  ops1  <----->  hs2  |
+# |       |     +--------+     |       |
+# +-------+                    +-------+
+
+# Nodes
+[type=openswitch name="Switch 1"] ops1
+[type=host name="Host 1"] hs1
+[type=host name="Host 2"] hs2
+
+# Links
+hs1:if01 -- ops1:if01
+ops1:if06 -- hs2:if01
+"""
 
 
 @mark.platform_incompatible(['docker'])
@@ -51,7 +65,7 @@ def test_validate_1switch_2host_l3(topology):
                 hs1, hs2, ip_hs1, ip_hs2,
                 hs1_ip_route, hs2_ip_route
                 )
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops1, portlbl)
     ping_test(hs1, ip_only_hs2)
     ops1('show run')
