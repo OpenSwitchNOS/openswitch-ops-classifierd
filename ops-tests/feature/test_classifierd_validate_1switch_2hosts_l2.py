@@ -19,7 +19,7 @@
 OpenSwitch Test for vlan related configurations.
 """
 
-from topo_defs import topology_1switch_2host_def
+from pytest import mark
 from topo_funcs import topology_1switch_2host
 from topo_funcs import config_switch_l2
 from topo_funcs import config_hosts_l2
@@ -32,9 +32,29 @@ ip_hs1_bitlength = '10.10.10.1/24'
 ip_hs2_bitlength = '10.10.10.2/24'
 vlan_id = 10
 
-TOPOLOGY = topology_1switch_2host_def
+TOPOLOGY = """
+# +-------+                    +-------+
+# |       |     +--------+     |       |
+# |  hs1  <----->  ops1  <----->  hs2  |
+# |       |     +--------+     |       |
+# +-------+                    +-------+
+
+# Nodes
+# [image="fs-genericx86-64:latest" \
+# type=openswitch name="OpenSwitch 1"] ops1
+# [type=host name="Host 1" image="openswitch/ubuntuscapy:latest"] hs1
+# [type=host name="Host 2" image="openswitch/ubuntuscapy:latest"] hs2
+[type=openswitch name="Switch 1"] ops1
+[type=host name="Host 1"] hs1
+[type=host name="Host 2"] hs2
+
+# Links
+hs1:1 -- ops1:1
+ops1:6 -- hs2:1
+"""
 
 
+@mark.platform_incompatible(['docker'])
 def test_validate_1switch_2host_l2(topology):
 
     ops1 = topology.get('ops1')
