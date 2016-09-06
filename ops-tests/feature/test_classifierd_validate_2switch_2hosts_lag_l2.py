@@ -51,9 +51,9 @@ def test_validate_2switch_2host_lag_l2(topology):
                         )
     config_hosts_l2(hs1, hs2, ip_hs1_bitlength, ip_hs2_bitlength)
     # Wait until interfaces are up
-    for switch, portlbl in [(ops1, '1'), (ops1, '5'), (ops1, '6')]:
+    for switch, portlbl in [(ops1, 'if01'), (ops1, 'if05'), (ops1, 'if06')]:
         wait_until_interface_up(switch, portlbl)
-    for switch, portlbl in [(ops2, '1'), (ops2, '5'), (ops2, '6')]:
+    for switch, portlbl in [(ops2, 'if01'), (ops2, 'if05'), (ops2, 'if06')]:
         wait_until_interface_up(switch, portlbl)
 
     ping_test(hs1, ip_hs2)

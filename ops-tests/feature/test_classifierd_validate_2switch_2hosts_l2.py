@@ -45,9 +45,9 @@ def test_validate_2switch_2host_l2(topology):
     topology_2switch_2host(ops1, ops2, hs1, hs2)
     config_2switch_l2(ops1, ops2, vlan_id_s1, vlan_id_s2)
     config_hosts_l2(hs1, hs2, ip_hs1_bitlength, ip_hs2_bitlength)
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops1, portlbl)
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops2, portlbl)
     ping_test(hs1, ip_hs2)
     ops1('show run')
