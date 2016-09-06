@@ -19,8 +19,6 @@
 OpenSwitch Test for simple ping test between two host with LAG interface
 """
 
-from pytest import mark
-from topo_defs import topology_2switch_2host_lag_def
 from topo_funcs import topology_2switch_2host_lag
 from topo_funcs import config_switches_l3_lag
 from topo_funcs import config_hosts_l3
@@ -41,10 +39,27 @@ hs2_ip_route = "ip route add default via 10.10.30.2"
 lag_id_s1 = 100
 lag_id_s2 = 100
 
-TOPOLOGY = topology_2switch_2host_lag_def
+TOPOLOGY = """
+# +-------+                                     +-------+
+# |       |     +--------+     +-------+        |       |
+# | host1 <-----> switch1 <---->switch2<------->| host2 |
+# |       |     +--------+     +-------+        |       |
+# +-------+                                     +-------+
+
+# Nodes
+[type=openswitch name="openswitch 1"] ops1
+[type=openswitch name="openswitch 2"] ops2
+[type=host name="Host 1"] hs1
+[type=host name="Host 2"] hs2
+
+# Links
+hs1:if01 -- ops1:if01
+ops1:if05 -- ops2:if05
+ops1:if06 -- ops2:if06
+ops2:if01 -- hs2:if01
+"""
 
 
-@mark.platform_incompatible(['docker'])
 def test_validate_2switch_2host_lag_l3(topology):
 
     ops1 = topology.get('ops1')
@@ -62,9 +77,9 @@ def test_validate_2switch_2host_lag_l3(topology):
                 hs1_ip_route, hs2_ip_route
                 )
     # Wait until interfaces are up
-    for switch, portlbl in [(ops1, '1'), (ops1, '5'), (ops1, '6')]:
+    for switch, portlbl in [(ops1, 'if01'), (ops1, 'if05'), (ops1, 'if06')]:
         wait_until_interface_up(switch, portlbl)
-    for switch, portlbl in [(ops2, '1'), (ops2, '5'), (ops2, '6')]:
+    for switch, portlbl in [(ops2, 'if01'), (ops2, 'if05'), (ops2, 'if06')]:
         wait_until_interface_up(switch, portlbl)
 
     ping_test(hs1, ip_only_hs2)

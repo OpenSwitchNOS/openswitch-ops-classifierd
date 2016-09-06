@@ -20,7 +20,6 @@ OpenSwitch Test for simple ping between nodes.
 """
 
 from pytest import mark
-from topo_defs import topology_2switch_2host_def
 from topo_funcs import topology_2switch_2host
 from topo_funcs import config_switches_l3
 from topo_funcs import config_hosts_l3
@@ -39,7 +38,24 @@ ip_route_ops2 = "ip route 10.10.10.0/24 10.10.20.1"
 hs1_ip_route = "ip route add default via 10.10.10.2"
 hs2_ip_route = "ip route add default via 10.10.30.2"
 
-TOPOLOGY = topology_2switch_2host_def
+TOPOLOGY = """
+# +-------+                                     +-------+
+# |       |     +--------+     +-------+        |       |
+# | host1 <-----> switch1 <---->switch2<------->| host2 |
+# |       |     +--------+     +-------+        |       |
+# +-------+                                     +-------+
+
+# Nodes
+[type=openswitch name="openswitch 1"] ops1
+[type=openswitch name="openswitch 2"] ops2
+[type=host name="Host 1"] hs1
+[type=host name="Host 2"] hs2
+
+# Links
+hs1:if01 -- ops1:if01
+ops1:if06 -- ops2:if06
+ops2:if01 -- hs2:if01
+"""
 
 
 @mark.platform_incompatible(['docker'])
@@ -58,9 +74,9 @@ def test_validate_2switch_2host_l3(topology):
                 hs1, hs2, ip_hs1, ip_hs2,
                 hs1_ip_route, hs2_ip_route
                 )
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops1, portlbl)
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops2, portlbl)
 
     ping_test(hs1, ip_only_hs2)
