@@ -32,17 +32,13 @@ topology_1switch_2host_def = """
 # +-------+                    +-------+
 
 # Nodes
-# [image="fs-genericx86-64:latest" \
-# type=openswitch name="OpenSwitch 1"] ops1
-# [type=host name="Host 1" image="openswitch/ubuntuscapy:latest"] hs1
-# [type=host name="Host 2" image="openswitch/ubuntuscapy:latest"] hs2
 [type=openswitch name="Switch 1"] ops1
 [type=host name="Host 1"] hs1
 [type=host name="Host 2"] hs2
 
 # Links
-hs1:1 -- ops1:1
-ops1:6 -- hs2:1
+hs1:if01 -- ops1:if01
+ops1:if06 -- hs2:if01
 """
 
 topology_2switch_2host_lag_def = """
@@ -59,10 +55,10 @@ topology_2switch_2host_lag_def = """
 [type=host name="Host 2"] hs2
 
 # Links
-hs1:1 -- ops1:1
-ops1:5 -- ops2:5
-ops1:6 -- ops2:6
-ops2:1 -- hs2:1
+hs1:if01 -- ops1:if01
+ops1:if05 -- ops2:if05
+ops1:if06 -- ops2:if06
+ops2:if01 -- hs2:if01
 """
 
 topology_2switch_2host_def = """
@@ -79,7 +75,7 @@ topology_2switch_2host_def = """
 [type=host name="Host 2"] hs2
 
 # Links
-hs1:1 -- ops1:1
-ops1:6 -- ops2:6
-ops2:1 -- hs2:1
+hs1:if01 -- ops1:if01
+ops1:if06 -- ops2:if06
+ops2:if01 -- hs2:if01
 """

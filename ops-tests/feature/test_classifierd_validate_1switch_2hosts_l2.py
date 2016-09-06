@@ -19,8 +19,6 @@
 OpenSwitch Test for vlan related configurations.
 """
 
-from pytest import mark
-from topo_defs import topology_1switch_2host_def
 from topo_funcs import topology_1switch_2host
 from topo_funcs import config_switch_l2
 from topo_funcs import config_hosts_l2
@@ -33,10 +31,24 @@ ip_hs1_bitlength = '10.10.10.1/24'
 ip_hs2_bitlength = '10.10.10.2/24'
 vlan_id = 10
 
-TOPOLOGY = topology_1switch_2host_def
+TOPOLOGY = """
+# +-------+                    +-------+
+# |       |     +--------+     |       |
+# |  hs1  <----->  ops1  <----->  hs2  |
+# |       |     +--------+     |       |
+# +-------+                    +-------+
+
+# Nodes
+[type=openswitch name="Switch 1"] ops1
+[type=host name="Host 1"] hs1
+[type=host name="Host 2"] hs2
+
+# Links
+hs1:if01 -- ops1:if01
+ops1:if06 -- hs2:if01
+"""
 
 
-@mark.platform_incompatible(['docker'])
 def test_validate_1switch_2host_l2(topology):
 
     ops1 = topology.get('ops1')
@@ -45,7 +57,7 @@ def test_validate_1switch_2host_l2(topology):
     topology_1switch_2host(ops1, hs1, hs2)
     config_switch_l2(ops1, vlan_id)
     config_hosts_l2(hs1, hs2, ip_hs1_bitlength, ip_hs2_bitlength)
-    for portlbl in ['1', '6']:
+    for portlbl in ['if01', 'if06']:
         wait_until_interface_up(ops1, portlbl)
     ping_test(hs1, ip_hs2)
     ops1('show run')
