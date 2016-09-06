@@ -25,8 +25,8 @@ def topology_1switch_2host(ops1, hs1, hs2):
     assert hs1 is not None
     assert hs2 is not None
 
-    p1 = ops1.ports['1']
-    p2 = ops1.ports['6']
+    p1 = ops1.ports['if01']
+    p2 = ops1.ports['if06']
 
     # Mark interfaces as enabled
     assert not ops1(
@@ -48,8 +48,8 @@ def topology_2switch_2host(ops1, ops2, hs1, hs2):
 
     assert ops2 is not None
 
-    p21 = ops2.ports['1']
-    p22 = ops2.ports['6']
+    p21 = ops2.ports['if01']
+    p22 = ops2.ports['if06']
 
     assert not ops2(
         'set interface {p21} user_config:admin=up'.format(**locals()),
@@ -67,8 +67,8 @@ def topology_2switch_2host_lag(ops1, ops2, hs1, hs2):
     sets ports 1, 5 and 6 of both switch1 and switch-2 up
     """
     topology_2switch_2host(ops1, ops2, hs1, hs2)
-    p15 = ops1.ports['5']
-    p25 = ops2.ports['5']
+    p15 = ops1.ports['if05']
+    p25 = ops2.ports['if05']
 
     assert not ops1(
         'set interface {p15} user_config:admin=up'.format(**locals()),
@@ -80,65 +80,68 @@ def topology_2switch_2host_lag(ops1, ops2, hs1, hs2):
     )
 
 
-def config_switch_l2(ops, vlan_id):
+def config_switch_l2(ops, vlan_id, ifacelist=['if01', 'if06']):
     """
     1 Configuration of one
     Switch (L2 only) (NOT for LAG)
     Configures Interface 1 and 6 for a switch and
     creates VLAN and sets it for interfaces 1 and 6
     """
-    config_switch(ops)
+    config_switch_no_shut_no_routing(ops, ifacelist)
     config_vlan(ops, vlan_id)
-    with ops.libs.vtysh.ConfigInterface('6') as ctx:
+    with ops.libs.vtysh.ConfigInterface(ifacelist[1]) as ctx:
         ctx.vlan_access(vlan_id)
 
 
-def config_2switch_l2(ops1, ops2, vlan_id1, vlan_id2):
+def config_2switch_l2(
+    ops1, ops2, vlan_id1, vlan_id2, ifacelist=['if01', 'if06']
+        ):
     """
     2 Configuration of two Switch (L2 only)
     (NOT for LAG)
     Configures Interface 1 and 6 for switch1 and switch2 and
     creates VLAN and sets it for interfaces 1 and 6
     """
-    config_switch_l2(ops1, vlan_id1)
-    config_switch_l2(ops2, vlan_id2)
+    config_switch_l2(ops1, vlan_id1, ifacelist)
+    config_switch_l2(ops2, vlan_id2, ifacelist)
 
 
 def config_switch_lag_l2(
                         ops1, ops2, vlan_id1, vlan_id2,
-                        lag_id1, lag_id2
+                        lag_id1, lag_id2, interface_list=['if05', 'if06'],
+                        non_lag_iface='if01'
                         ):
     """
     3 Configuration of two Switch (L2 only) (LAG)
     Configures Interface 1 and (5&6 FOR lag) for switch1 and switch2 and
     creates VLAN and sets it for interfaces 1 and LAG
     """
-    config_switch(ops1)
-    config_switch(ops2)
-    config_vlan(ops1, vlan_id1)
-    config_vlan(ops2, vlan_id2)
-    config_additional_port_for_lag(ops1, ops2)
-    config_lag_l2(ops1, vlan_id1, lag_id1)
-    config_lag_l2(ops2, vlan_id2, lag_id2)
+    config_switch_no_shut_no_routing(ops1, interface_list)
+    config_switch_no_shut_no_routing(ops2, interface_list)
+    config_switch_no_shut_no_routing(ops1, [non_lag_iface])
+    config_switch_no_shut_no_routing(ops2, [non_lag_iface])
+    config_vlan(ops1, vlan_id1, [non_lag_iface], True)
+    config_vlan(ops2, vlan_id2, [non_lag_iface], True)
+    config_lag_l2(ops1, vlan_id1, lag_id1, interface_list)
+    config_lag_l2(ops2, vlan_id2, lag_id2, interface_list)
 
 
-def config_switch_l3(ops, ip1, ip2):
+def config_switch_l3(ops, ip1, ip2, ifacelist=['if01', 'if06']):
     """
     4 Configuration of one Switch
     (L3 only) (NOT for LAG)
     Configures Interface 1 and 6 for a switch and
     sets IP address to interfaces 1 and 6
     """
-    config_switch(ops)
-    switch_interface1_ip_address(ops, ip1)
-    with ops.libs.vtysh.ConfigInterface('6') as ctx:
-        ctx.routing()
-        ctx.ip_address(ip2)
+    config_interface_state(ops, 'port', ifacelist, True)
+    switch_interface_ip_address(ops, ifacelist[0], ip1)
+    switch_interface_ip_address(ops, ifacelist[1], ip2)
 
 
 def config_switches_l3(
                     ops1, ops2, ip_ops1_int1, ip_ops2_int1, ip_ops1_int6,
-                    ip_ops2_int6, ip_route_ops1, ip_route_ops2
+                    ip_ops2_int6, ip_route_ops1, ip_route_ops2,
+                    ifacelist=['if01', 'if06']
                      ):
     """
     5 Configuration of two Switch
@@ -146,42 +149,34 @@ def config_switches_l3(
     Configures Interface 1 and 6 for a switch and
     sets IP address to interfaces 1 and 6
     """
-    config_switch(ops1)
-    config_switch(ops2)
-    switch_interface1_ip_address(ops1, ip_ops1_int1)
-    switch_interface1_ip_address(ops2, ip_ops2_int1)
-    with ops1.libs.vtysh.ConfigInterface('6') as ctx:
-        ctx.routing()
-        ctx.ip_address(ip_ops1_int6)
-    with ops2.libs.vtysh.ConfigInterface('6') as ctx:
-        ctx.routing()
-        ctx.ip_address(ip_ops2_int6)
+    config_interface_state(ops1, 'port', ifacelist, True)
+    config_interface_state(ops2, 'port', ifacelist, True)
+    switch_interface_ip_address(ops1, ifacelist[0], ip_ops1_int1)
+    switch_interface_ip_address(ops2, ifacelist[0], ip_ops2_int1)
+    switch_interface_ip_address(ops1, ifacelist[1], ip_ops1_int6)
+    switch_interface_ip_address(ops2, ifacelist[1], ip_ops2_int6)
     ip_route_switch(ops1, ip_route_ops1)
     ip_route_switch(ops2, ip_route_ops2)
 
 
 def config_switches_l3_lag(
-                ops1, ops2, ip_ops1_int1, ip_ops2_int2, ip_ops1_lag,
+                ops1, ops2, ip_ops1_int1, ip_ops2_int1, ip_ops1_lag,
                 ip_ops2_lag, ip_route_ops1, ip_route_ops2, lag_id1,
-                lag_id2
+                lag_id2, interface_list=['if05', 'if06'], non_lag_iface='if01'
                 ):
     """
     6 Configuration of two Switch (L3 only) (for LAG)
-    Configures Interface 1 (5&6 FOR lag) for switch1 and switch2  and
+    Configures Interface 1, interfaces int interface_list
+    (default 5&6 FOR lag) for switch1 and switch2  and
     sets IP address to interfaces 1 and lag
     """
-    config_switch(ops1)
-    config_switch(ops2)
-    config_additional_port_for_lag(ops1, ops2)
-    switch_interface1_ip_address(ops1, ip_ops1_int1)
-    switch_interface1_ip_address(ops2, ip_ops2_int2)
-    config_lag(ops1, lag_id1)
-    config_lag(ops2, lag_id1)
+    switch_interface_ip_address(ops1, non_lag_iface, ip_ops1_int1)
+    switch_interface_ip_address(ops2, non_lag_iface, ip_ops2_int1)
+    config_lag(ops1, lag_id1, interface_list)
+    config_lag(ops2, lag_id1, interface_list)
     with ops1.libs.vtysh.ConfigInterfaceLag(lag_id1) as ctx:
-        ctx.routing()
         ctx.ip_address(ip_ops1_lag)
     with ops2.libs.vtysh.ConfigInterfaceLag(lag_id2) as ctx:
-        ctx.routing()
         ctx.ip_address(ip_ops2_lag)
     ip_route_switch(ops1, ip_route_ops1)
     ip_route_switch(ops2, ip_route_ops2)
@@ -191,10 +186,10 @@ def config_hosts_l2(hs1, hs2, ip_hs1, ip_hs2):
     """
     Configuration of host (L2 only)
     """
-    hs1.libs.ip.interface('1', up=False)
-    hs2.libs.ip.interface('1', up=False)
-    hs1.libs.ip.interface('1', addr=ip_hs1, up=True)
-    hs2.libs.ip.interface('1', addr=ip_hs2, up=True)
+    hs1.libs.ip.interface('if01', up=False)
+    hs2.libs.ip.interface('if01', up=False)
+    hs1.libs.ip.interface('if01', addr=ip_hs1, up=True)
+    hs2.libs.ip.interface('if01', addr=ip_hs2, up=True)
 
 
 def config_hosts_l3(
@@ -204,10 +199,10 @@ def config_hosts_l3(
     """
     Configuration of host (L3 only)
     """
-    hs1.libs.ip.interface('1', up=False)
-    hs2.libs.ip.interface('1', up=False)
-    hs1.libs.ip.interface('1', addr=ip_hs1, up=True)
-    hs2.libs.ip.interface('1', addr=ip_hs2, up=True)
+    hs1.libs.ip.interface('if01', up=False)
+    hs2.libs.ip.interface('if01', up=False)
+    hs1.libs.ip.interface('if01', addr=ip_hs1, up=True)
+    hs2.libs.ip.interface('if01', addr=ip_hs2, up=True)
     hs1(ip_route_hs1)
     hs2(ip_route_hs2)
 
@@ -237,71 +232,126 @@ def start_scapy_on_hosts(hs1, hs2):
             host.libs.scapy.start_scapy()
 
 
-def config_vlan(ops, vlan_id):
+def config_vlan(ops, vlan_id, interface_list=['if01'], enable=True):
     """
-    Creates vlan 10 and sets it to interface 1
+    Creates/delete vlan and sets it to all interfaces in interface_list
+    (default value '1')
     """
-    with ops.libs.vtysh.ConfigVlan(vlan_id) as ctx:
-        ctx.no_shutdown()
-    with ops.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.vlan_access(vlan_id)
+    if enable:
+        with ops.libs.vtysh.ConfigVlan(vlan_id) as ctx:
+            ctx.no_shutdown()
+        for interface_id in interface_list:
+            with ops.libs.vtysh.ConfigInterface(interface_id) as ctx:
+                ctx.vlan_access(vlan_id)
+    else:
+        with ops.libs.vtysh.Configure() as ctx:
+            ctx.no_vlan(vlan_id)
 
 
-def config_switch(ops):
+def config_switch_no_shut_no_routing(ops, interface_list):
     """
     Sets interfaces 1 and 6 of a switch to "no shutdown and no routing"
     """
-    with ops.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.no_routing()
-        ctx.no_shutdown()
-
-    with ops.libs.vtysh.ConfigInterface('6') as ctx:
-        ctx.no_routing()
-        ctx.no_shutdown()
+    for interface in interface_list:
+        with ops.libs.vtysh.ConfigInterface(interface) as ctx:
+            ctx.no_routing()
+            ctx.no_shutdown()
 
 
-def config_additional_port_for_lag(ops1, ops2):
+def update_lag_members(ops, interface_list, lag_id, add_or_remove):
     """
-    Sets new interface 5 to "no shutdown and no routing for LAG"
+    Add/Remove lag members to an existing lag.
+    NOTE - Lag needs to be created before using this function
+           to create lag, use function config_lag
     """
-    with ops1.libs.vtysh.ConfigInterface('5') as ctx:
-        ctx.no_routing()
-        ctx.no_shutdown()
+    assert ops is not None
+    assert isinstance(lag_id, int)
+    assert isinstance(interface_list, list)
+    assert isinstance(add_or_remove, bool)
+    if add_or_remove:
+        config_interface_state(ops, 'port', interface_list, True)
+        for interface in interface_list:
+            assert isinstance(interface, str)
+            with ops.libs.vtysh.ConfigInterface(interface) as ctx:
+                ctx.lag(lag_id)
+            """
+            verify whether lag member is added
+            """
+            result = ops('show running-config interface ' +
+                         ops.ports[interface])
+            print(result)
+            assert 'lag '+str(lag_id) in result
 
-    with ops2.libs.vtysh.ConfigInterface('5') as ctx:
-        ctx.no_routing()
-        ctx.no_shutdown()
+    else:
+        for interface in interface_list:
+            assert isinstance(interface, str)
+            with ops.libs.vtysh.ConfigInterface(interface) as ctx:
+                ctx.no_lag(lag_id)
+            """
+            verify whether lag member is removed
+            """
+            print('interface '+ops.ports[interface])
+            command = 'show running-config interface ' + ops.ports[interface]
+            print(command)
+            result = ops(command)
+            print('running interface \n'+result)
+            if 'interface '+ops.ports[interface] in result:
+                assert 'lag '+str(lag_id) not in result
 
 
-def config_lag(ops, lag_id):
+def config_lag(ops, lag_id, interface_list=['if05', 'if06'], enable=True):
     """
-    Creates lag10 and sets it to interfaces 5 and interface 6 of a switch
+    Create/Delete a lag. After creation add
+    a list of interfaces (default value 5 and 6).
+    NOTE - interface needs to be up for this operation
     """
-    with ops.libs.vtysh.ConfigInterfaceLag(lag_id) as ctx:
-        ctx.no_shutdown()
+    assert ops is not None
+    assert isinstance(lag_id, int)
+    assert isinstance(interface_list, list)
+    assert isinstance(enable, bool)
 
-    with ops.libs.vtysh.ConfigInterface('5') as ctx:
-        ctx.lag(lag_id)
-    with ops.libs.vtysh.ConfigInterface('6') as ctx:
-        ctx.lag(lag_id)
+    if enable:
+        config_interface_state(ops, 'port', interface_list, True)
+        with ops.libs.vtysh.ConfigInterfaceLag(lag_id) as ctx:
+            ctx.no_shutdown()
+        for interface in interface_list:
+            assert isinstance(interface, str)
+            with ops.libs.vtysh.ConfigInterface(interface) as ctx:
+                ctx.lag(lag_id)
+            """
+            verify whether lag member is added
+            """
+            result = ops('show running-config interface ' +
+                         str(ops.ports[interface]))
+            assert 'lag '+str(lag_id) in result
+    else:
+        with ops.libs.vtysh.Configure() as ctx:
+            ctx.no_interface_lag(str(lag_id))
+        """
+        verify whether lag is removed
+        """
+        result = ops('show run')
+        print(result)
+        assert 'lag '+str(lag_id) not in result
 
 
-def config_lag_l2(ops, vlan_id, lag_id):
+def config_lag_l2(ops, vlan_id, lag_id, interface_list=['if05', 'if06']):
     """
     Creates Interface lag 10 for a switch and sets VLAN 10 to the lag10
+    also create vlan and enable interface if not done before
     """
-    config_lag(ops, lag_id)
+    config_lag(ops, lag_id, interface_list, True)
+    config_vlan(ops, vlan_id, [], enable=True)
     with ops.libs.vtysh.ConfigInterfaceLag(lag_id) as ctx:
         ctx.no_routing()
         ctx.vlan_access(vlan_id)
 
 
-def switch_interface1_ip_address(ops, ip):
+def switch_interface_ip_address(ops, iface, ip):
     """
     Sets IP address for interface1 of switch2
     """
-    with ops.libs.vtysh.ConfigInterface('1') as ctx:
-        ctx.routing()
+    with ops.libs.vtysh.ConfigInterface(iface) as ctx:
         ctx.ip_address(ip)
 
 
@@ -312,3 +362,38 @@ def ip_route_switch(ops1, ip_route):
     ops1("configure terminal")
     ops1(ip_route)
     ops1("exit")
+
+
+def config_interface_state(ops, interface_type, interface_list, enable):
+
+    assert ops is not None
+    assert interface_type in ('vlan', 'port', 'lag')
+    assert isinstance(interface_list, list)
+    assert isinstance(enable, bool)
+
+    for interface in interface_list:
+        if interface_type == 'port':
+            assert isinstance(interface, str)
+            with ops.libs.vtysh.ConfigInterface(interface) as ctx:
+                ctx.no_shutdown() if enable else ctx.shutdown()
+
+        if interface_type == 'lag':
+            assert isinstance(interface, int)
+            with ops.libs.vtysh.ConfigInterfaceLag(interface) as ctx:
+                ctx.no_shutdown() if enable else ctx.shutdown()
+
+        if interface_type == 'vlan':
+            assert isinstance(interface, int)
+            with ops.libs.vtysh.ConfigVlan(interface) as ctx:
+                ctx.no_shutdown() if enable else ctx.shutdown()
+
+
+def config_port_routing(ops, interface_list, enable):
+
+    assert ops is not None
+    assert isinstance(interface_list, list)
+    assert isinstance(enable, bool)
+
+    for interface in interface_list:
+        with ops.libs.vtysh.ConfigInterface(interface) as ctx:
+            ctx.routing() if enable else ctx.no_routing()
