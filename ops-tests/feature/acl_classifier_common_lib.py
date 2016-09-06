@@ -23,7 +23,9 @@ from time import sleep
 from ipaddress import ip_address, IPv4Address
 from datetime import datetime
 import re
-
+import random
+import time
+from acl_protocol_names import ipv4_protocol_names
 from acl_protocol_names import get_ipv4_protocol_name
 
 
@@ -54,7 +56,7 @@ Use Case for Library Functions:
 def configure_acl_l3(
             sw, acl_addr_type, acl_name, seq_num, action, proto, src_ip,
             src_port, dst_ip, dst_port, count, log='', retries=3,
-            polling_frequency=2
+            polling_frequency=2, suppress_warning=False
         ):
     """
     Configure an ACL with one permit or one deny rule
@@ -111,26 +113,27 @@ def configure_acl_l3(
     else:
         # TODO: add ipv6 here
         assert False
-
-    wait_on_warnings(
+    if suppress_warning is False:
+        wait_on_warnings(
             sw=sw, retries=retries, polling_frequency=polling_frequency
             )
 
     ace_re = re.compile(re.sub('\s+', '\s+', ace_str.strip()))
     test_result = sw('show access-list {acl_addr_type} {acl_name} commands'
                      .format(**locals()))
-    assert re.search(ace_re, test_result)
+    if suppress_warning is False:
+        assert re.search(ace_re, test_result)
 
 
 def apply_acl(
             sw, app_type, interface_num, acl_addr_type, acl_name, direction,
-            retries=3, polling_frequency=2
+            retries=3, polling_frequency=2, suppress_warning=False
         ):
     """
     Apply ACL on interface in ingress or egress direction
     """
     assert sw is not None
-    assert app_type in ('port', 'vlan')  # Will add tunnel in future
+    assert app_type in ('port', 'vlan', 'lag')  # Will add tunnel in future
     assert acl_addr_type in ('ip', 'ipv6', 'mac')
 
     # If the app_type is port, then interface_num is the port number the acl
@@ -150,22 +153,37 @@ def apply_acl(
         else:
             # Undefined direction
             assert(False)
+    elif app_type == 'lag':
+        if direction == 'in':
+            with sw.libs.vtysh.ConfigInterfaceLag(interface_num) as ctx:
+                ctx.apply_access_list_ip_in(acl_name)
+        elif direction == 'out':
+            with sw.libs.vtysh.ConfigInterfaceLag(interface_num) as ctx:
+                ctx.apply_access_list_ip_out(acl_name)
+        else:
+            # Undefined direction
+            assert(False)
     else:
         # Undefined ACL application type
         assert(False)
-
-    wait_on_warnings(sw, retries, polling_frequency)
+    if suppress_warning is False:
+        wait_on_warnings(sw, retries, polling_frequency)
 
     test_result = ''
     if app_type == 'port':
         actual_port = sw.ports.get(interface_num, interface_num)
         test_result = sw('show access-list interface {actual_port} commands'
                          .format(**locals()))
+    elif app_type == 'lag':
+        actual_port = sw.ports.get('lag'+interface_num, 'lag'+interface_num)
+        test_result = sw('show access-list interface {actual_port} commands'
+                         .format(**locals()))
+        print(test_result)
     else:
         # app_type not implemented yet
         assert False
-
-    assert re.search(
+    if suppress_warning is False:
+        assert re.search(
             r'(apply\s+access-list\s+{acl_addr_type}\s+{acl_name}\s+'
             '{direction})'.format(**locals()),
             test_result
@@ -195,7 +213,7 @@ def unconfigure_acl(sw, acl_addr_type, acl_name):
 def create_and_verify_traffic(
                         topology, tx_host, rx_host, src_ip,
                         src_port, dst_ip, dst_port, proto_str,
-                        filter_str, tx_count, rx_expect
+                        filter_str, tx_count, rx_expect, port_str='1'
                         ):
     assert topology is not None
     assert tx_host is not None
@@ -205,7 +223,7 @@ def create_and_verify_traffic(
     assert isinstance(src_port, str)
     assert isinstance(dst_port, str)
     assert isinstance(proto_str, str) and \
-        proto_str in ('IP/UDP', 'IP/ICMP')
+        proto_str in ('IP/UDP', 'IP/ICMP', 'IP/TCP')
 
     # The filter_str is expected to be a string.  Below is an example for a
     # UDP packet:
@@ -227,11 +245,17 @@ def create_and_verify_traffic(
     elif proto_str == 'IP/ICMP':
         proto_packet = tx_host.libs.scapy.icmp()
         result_index = 2
+    elif proto_str == 'IP/TCP':
+        proto_packet = tx_host.libs.scapy.tcp()
+        if dst_port != '':
+            proto_packet['dport'] = int(dst_port)
+        if src_port != '':
+            proto_packet['sport'] = int(src_port)
+        result_index = 0
     else:
         assert False
 
     list1 = [ip_packet, proto_packet]
-    port_str = '1'
     timeout = 25
 
     txthread = ScapyThread(
@@ -400,7 +424,6 @@ def wait_on_warnings(sw, retries=3, polling_frequency=2):
 
     acl_mismatch_warning = \
             "user configuration does not match active configuration."
-
     for count in list(range(retries)):
         if acl_mismatch_warning not in sw('show run'):
             break
@@ -409,3 +432,170 @@ def wait_on_warnings(sw, retries=3, polling_frequency=2):
     else:
         print("Failed to apply configuration")
         assert False
+
+
+def create_acl_with_random_aces(ops, acl_name, n, suppress_warning=False):
+    result = []
+    seq = 0
+    ipaddr = ['1.1.1.1', '1.1.1.2', 'any', '10.0.10.3', '10.0.10.4',
+              '10.0.10.1', '10.0.10.5', '10.0.10.6', '10.0.10.2', '1.1.1.3',
+              '10.0.10.7', '10.0.10.8', '10.0.10.9', '1.1.1.10',
+              '1.1.1.11']
+
+    action = ['permit', 'deny']
+
+    for seq in range(1, n):
+        action_rand = random.choice(action)
+        prot_rand = random.choice(ipv4_protocol_names)
+        ip_src_rand = random.choice(ipaddr)
+        ip_dst_rand = random.choice(ipaddr)
+        configure_acl_l3(
+            ops, 'ip', acl_name, str(seq),
+            action_rand, prot_rand, ip_src_rand,
+            '', ip_dst_rand, '', count='', retries=5,
+            polling_frequency=5, suppress_warning=suppress_warning)
+        result.append([seq, action_rand, prot_rand,
+                       ip_src_rand, ip_dst_rand])
+    return result
+
+
+def execute_appctl_command(switch, destination, command):
+
+    assert switch is not None
+    assert isinstance(destination, str)
+    assert isinstance(command, str)
+    # Wait for 5 seconds to make sure all PD
+    # changes are executed as expected
+    time.sleep(5)
+    _shell = switch.get_shell('bash')
+    _shell.send_command(
+            'ovs-appctl ' + destination + '/' + command)
+    return _shell.get_response()
+
+
+def verify_acl_bindings(
+                switch, acl_name, interface_list, direction,
+                applied_or_unapplied=True, retries=3
+                    ):
+    """
+    Verify on appctl shell if acl_name is
+    applied to interface_list by viewing the output
+    """
+    assert switch is not None
+    assert isinstance(acl_name, str)
+    assert isinstance(interface_list, list)
+    assert isinstance(direction, str)
+    assert isinstance(retries, int)
+
+    # repeat this command after a 5s sleep if failed, in case
+    # changes are not applied in PD, the repetition will occur for a
+    # maximum of retries times
+    for x in range(0, retries):
+        time.sleep(5)
+        int_list = []
+        temp_list = []
+        output_expected = False
+        for interface in interface_list:
+            int_list.append(switch.ports[interface])
+            temp_list.append(switch.ports[interface])
+        appctl_result = execute_appctl_command(
+                                    switch, 'container', 'show-acl-bindings'
+                                    )
+        print('-----------------RESULT BEGIN--------------------')
+        print(appctl_result)
+        print('-----------------RESULT END--------------------')
+        # confirm if <interface number> has <acl_name> <direction>
+        for line in appctl_result.splitlines()[2:]:
+            port_acl_dir = line.split()
+            if port_acl_dir:
+                print(port_acl_dir[0], port_acl_dir[1], port_acl_dir[2])
+                print(int_list)
+                if (port_acl_dir[0] not in int_list) or \
+                   (port_acl_dir[1] != acl_name) or \
+                   (port_acl_dir[2] != direction):
+                    continue
+                # if entry present, remove the interface from the list
+                # to avoid recounting
+                else:
+                    int_list.remove(port_acl_dir[0])
+            else:
+                continue
+        # int_list should be empty in case of checking applied
+        # int_list should be equal to interface_list in case of
+        # checking unapplied
+        if (
+            (int_list and applied_or_unapplied) or
+            ((set(int_list) != set(temp_list)) and
+             (not applied_or_unapplied))
+           ):
+            continue
+        output_expected = True
+        break
+    if not output_expected:
+        print(int_list)
+        assert False
+
+
+def verify_interface_hw_status(ops, expected, interface_list=['if05', 'if06']):
+    _shell = ops.get_shell('bash')
+    _shell.send_command(
+        'ovsdb-client dump Interface name hw_status'
+    )
+    ovsdb_result = _shell.get_response()
+    print(ovsdb_result)
+    inf_name_hw_status_re = (
+        '{ready=\"(false|true)\", ready_state_blocked_reason=(\w+)}\s\"(\d+)\"'
+        )
+    count = 0
+    for line in ovsdb_result.splitlines():
+        inf_name_hw_status = re.search(inf_name_hw_status_re, line)
+        if inf_name_hw_status:
+            if (
+                (inf_name_hw_status.group(3) ==
+                 ops.ports[interface_list[0]]) or
+                (inf_name_hw_status.group(3) ==
+                 ops.ports[interface_list[1]])
+            ):
+                count = count+1
+    assert(count == expected)
+
+
+def unapply_acl(sw, app_type, interface_num, acl_addr_type,
+                acl_name, direction):
+    """
+    Unapply ACL on interface in ingress or egress direction
+    """
+    assert sw is not None
+    assert app_type in ('port', 'vlan', 'lag')  # Will add tunnel in future
+    assert acl_addr_type in ('ip', 'ipv6', 'mac')
+
+    # If the app_type is port, then interface_num is the port number the acl
+    # should be applied to.  If vlan, then the VLAN number.  If tunnel, then
+    # tunnel number.
+    assert isinstance(interface_num, str)
+    assert isinstance(acl_name, str)
+    assert direction in ('in', 'out')
+
+    if app_type == 'port':
+        if direction == 'in':
+            with sw.libs.vtysh.ConfigInterface(interface_num) as ctx:
+                ctx.no_apply_access_list_ip_in(acl_name)
+        elif direction == 'out':
+            with sw.libs.vtysh.ConfigInterface(interface_num) as ctx:
+                ctx.no_apply_access_list_ip_out(acl_name)
+        else:
+            # Undefined direction
+            assert(False)
+    elif app_type == 'lag':
+        if direction == 'in':
+            with sw.libs.vtysh.ConfigInterfaceLag(interface_num) as ctx:
+                ctx.no_apply_access_list_ip_in(acl_name)
+        elif direction == 'out':
+            with sw.libs.vtysh.ConfigInterfaceLag(interface_num) as ctx:
+                ctx.no_apply_access_list_ip_out(acl_name)
+        else:
+            # Undefined direction
+            assert(False)
+    else:
+        # Undefined ACL application type
+        assert(False)
