@@ -75,11 +75,8 @@ acl_ports_is_hw_ready(const struct ovsrec_port *port_row)
                       port_row->name, acl_row->name,
                       status_str);
 
-            if (status_str == NULL) {
-                return false;
-            }
-
-            if(strtoul(status_str, NULL, 10) != OPS_CLS_STATUS_SUCCESS) {
+            if((status_str != NULL) &&
+               (strtoul(status_str, NULL, 10) != OPS_CLS_STATUS_SUCCESS)) {
                 /* block hw_ready on this interface */
                 return false;
             }
